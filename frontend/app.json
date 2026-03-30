@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "PLXYGROUND",
+    "slug": "plxyground",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "plxyground",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#080C14"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.plxyground.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#080C14"
+      },
+      "package": "com.plxyground.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
