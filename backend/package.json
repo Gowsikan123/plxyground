@@ -6,12 +6,23 @@
   "scripts": {
     "start": "node src/index.js",
     "seed": "node src/db/seed.js",
-    "smoke": "node scripts/smoke.js"
+    "smoke": "node scripts/smoke.js",
+    "test": "jest --runInBand"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^6.3.4"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "roots": [
+      "<rootDir>/test"
+    ]
+  },
   "dependencies": {
     "bcrypt": "^6.0.0",
     "better-sqlite3": "^12.8.0",

@@ -1,13 +1,44 @@
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, StatusBar, ScrollView } from 'react-native';
+import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../components/AuthContext';
+import { apiRequest } from '../components/ApiClient';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function Settings() {
   const { user, logout } = useAuth();
   const router = useRouter();
 
+  const [message, setMessage] = useState('');
+  const [loadingAction, setLoadingAction] = useState(false);
+
   const handleLogout = async () => { await logout(); router.replace('/'); };
+
+  const handleExport = async () => {
+    setLoadingAction(true);
+    try {
+      const data = await apiRequest('/api/auth/me/export');
+      setMessage(`Export ready: ${Object.keys(data).join(', ')}`);
+    } catch (e) {
+      setMessage('Export failed.');
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setLoadingAction(true);
+    try {
+      await apiRequest('/api/auth/me', 'DELETE');
+      setMessage('Account soft-deleted (suspended). Redirecting...');
+      await logout();
+      router.replace('/');
+    } catch (e) {
+      setMessage('Delete failed.');
+    } finally {
+      setLoadingAction(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -71,6 +102,22 @@ export default function Settings() {
 
         <Text style={styles.sectionLabel}>ACCOUNT</Text>
         <View style={styles.group}>
+          <TouchableOpacity style={styles.item} onPress={handleExport} disabled={loadingAction} activeOpacity={0.7}>
+            <View style={styles.itemLeft}>
+              <Text style={styles.itemIcon}>📤</Text>
+              <Text style={styles.itemText}>Export My Data</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+          <View style={styles.divider} />
+          <TouchableOpacity style={styles.item} onPress={handleDelete} disabled={loadingAction} activeOpacity={0.7}>
+            <View style={styles.itemLeft}>
+              <Text style={styles.itemIcon}>🗑️</Text>
+              <Text style={styles.itemText}>Delete My Account</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+          <View style={styles.divider} />
           <TouchableOpacity style={[styles.item, styles.logoutItem]} onPress={handleLogout} activeOpacity={0.7}>
             <View style={styles.itemLeft}>
               <Text style={styles.itemIcon}>🚪</Text>
@@ -78,6 +125,8 @@ export default function Settings() {
             </View>
           </TouchableOpacity>
         </View>
+
+        {message ? <Text style={styles.message}>{message}</Text> : null}
 
         <Text style={styles.version}>PLXYGROUND v1.0.0</Text>
 
@@ -132,6 +181,7 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: '#1a2035', marginHorizontal: 16 },
   logoutItem: {},
   logoutText: { color: '#f87171', fontSize: 15, fontWeight: '600' },
+  message: { color: '#60a5fa', fontSize: 13, textAlign: 'center', marginTop: 12, paddingHorizontal: 6 },
   version: { color: '#1e293b', fontSize: 12, textAlign: 'center', marginTop: 8 },
   bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', backgroundColor: '#0a0e1a', borderTopWidth: 1, borderTopColor: '#1a2035', paddingBottom: 24, paddingTop: 12 },
   navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },

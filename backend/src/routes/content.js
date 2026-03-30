@@ -41,6 +41,20 @@ router.get('/', (req, res) => {
   res.json({ data: rows, limit: lim, offset: off });
 });
 
+// GET /api/content/recommend - recommended content
+router.get('/recommend', (req, res) => {
+  const userId = req.user ? req.user.id : null;
+  const recent = db.prepare(`SELECT c.*, cr.name as creator_name, cr.profile_slug FROM content c JOIN creators cr ON c.creator_id = cr.id WHERE c.is_published = 1 ORDER BY c.created_at DESC LIMIT 10`).all();
+  const trending = db.prepare(`SELECT c.*, cr.name as creator_name, cr.profile_slug FROM content c JOIN creators cr ON c.creator_id = cr.id WHERE c.is_published = 1 ORDER BY c.order_priority DESC, c.updated_at DESC LIMIT 10`).all();
+
+  if (userId) {
+    const personal = db.prepare(`SELECT c.*, cr.name as creator_name, cr.profile_slug FROM content c JOIN creators cr ON c.creator_id = cr.id WHERE c.is_published = 1 ORDER BY c.feed_rank_at DESC, c.created_at DESC LIMIT 10`).all();
+    return res.json({ mode: 'personal', data: personal, fallback: { trending, recent } });
+  }
+
+  res.json({ mode: 'aggregate', data: [...new Map([...trending, ...recent].map((item)=>[item.id,item])).values()] });
+});
+
 // GET /api/content/:id - single post
 router.get('/:id', (req, res) => {
   const row = db.prepare(`

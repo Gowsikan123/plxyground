@@ -48,6 +48,29 @@ router.get('/:id', (req, res) => {
   res.json(row);
 });
 
+// POST /api/opportunities/:id/apply - apply to an opportunity (business user)
+router.post('/:id/apply', verifyToken, requireRole('BUSINESS'), (req, res) => {
+  const opportunity = db.prepare('SELECT * FROM opportunities WHERE id = ? AND is_published = 1').get(req.params.id);
+  if (!opportunity) return res.status(404).json({ error: 'Opportunity not found' });
+
+  const { message } = req.body;
+  const exists = db.prepare('SELECT * FROM opportunity_applications WHERE opportunity_id = ? AND creator_id = ?').get(req.params.id, req.user.id);
+  if (exists) return res.status(409).json({ error: 'Already applied' });
+
+  const result = db.prepare(`
+    INSERT INTO opportunity_applications (opportunity_id, creator_id, message)
+    VALUES (?, ?, ?)
+  `).run(req.params.id, req.user.id, message || null);
+
+  db.prepare(`INSERT INTO audit_log (action_type, actor, target, metadata) VALUES (?, ?, ?, ?)`)
+    .run('opportunity_application', req.user.id, `opportunity:${req.params.id}`, JSON.stringify({ application_id: result.lastInsertRowid, message }));
+
+  // in real life, trigger push/email notification to opportunity owner
+  console.log(`User ${req.user.id} applied to opportunity ${req.params.id}`);
+
+  res.status(201).json({ message: 'Application submitted', applicationId: result.lastInsertRowid });
+});
+
 // POST /api/opportunities - create opportunity (auth required)
 router.post('/', verifyToken, requireRole('BUSINESS'), (req, res) => {
   const { title, role_type, body, requirements, benefits } = req.body;

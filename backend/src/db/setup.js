@@ -99,6 +99,33 @@ db.exec(`
     metadata TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    creator_id INTEGER NOT NULL REFERENCES creators(id),
+    token TEXT NOT NULL UNIQUE,
+    revoked INTEGER DEFAULT 0,
+    expires_at TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS two_factor_codes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    creator_id INTEGER NOT NULL REFERENCES creators(id),
+    code TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    is_used INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS opportunity_applications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    opportunity_id INTEGER NOT NULL REFERENCES opportunities(id),
+    creator_id INTEGER NOT NULL REFERENCES creators(id),
+    status TEXT DEFAULT 'pending',
+    message TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 function ensureColumn(table, column, definition) {
