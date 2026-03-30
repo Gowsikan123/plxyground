@@ -1,0 +1,45 @@
+name: Smoke Tests
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            admin-panel/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: backend
+
+      - name: Install admin panel dependencies
+        run: npm ci
+        working-directory: admin-panel
+
+      - name: Run backend and admin smoke suite
+        run: npm run smoke
+        working-directory: backend
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+        working-directory: admin-panel
+
+      - name: Run admin panel Playwright smoke test
+        run: npm run test:e2e
+        working-directory: admin-panel

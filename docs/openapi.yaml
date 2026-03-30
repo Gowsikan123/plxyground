@@ -1,0 +1,396 @@
+openapi: 3.1.0
+info:
+  title: PLXYGROUND API
+  version: 1.1.0
+  description: >
+    Core API contract for creator auth, business auth, content publishing,
+    admin moderation, and business-specific campaign content.
+servers:
+  - url: http://localhost:3011
+tags:
+  - name: Health
+  - name: Auth
+  - name: Business
+  - name: Content
+  - name: Admin
+paths:
+  /healthz:
+    get:
+      tags: [Health]
+      summary: Health check
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+  /api/auth/signup:
+    post:
+      tags: [Auth]
+      summary: Create a creator account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatorSignupRequest'
+      responses:
+        '201':
+          description: Creator account created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in as a creator
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Creator logged in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+  /api/business/auth/signup:
+    post:
+      tags: [Business]
+      summary: Create a business account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BusinessSignupRequest'
+      responses:
+        '201':
+          description: Business account created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+  /api/business/auth/login:
+    post:
+      tags: [Business]
+      summary: Log in as a business
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Business logged in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+  /api/content:
+    get:
+      tags: [Content]
+      summary: List published content
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: offset
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Published content list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Content'
+    post:
+      tags: [Content]
+      summary: Create creator content
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContentCreateRequest'
+      responses:
+        '201':
+          description: Content submitted for moderation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Content'
+  /api/business/content:
+    post:
+      tags: [Business]
+      summary: Create business campaign content
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BusinessContentCreateRequest'
+      responses:
+        '201':
+          description: Business content submitted for moderation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Content'
+  /api/business/content/mine:
+    get:
+      tags: [Business]
+      summary: List the authenticated business's content, including pending items
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Business content list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Content'
+  /api/admin/auth/login:
+    post:
+      tags: [Admin]
+      summary: Log in as an admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Admin logged in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+  /api/admin/queue:
+    get:
+      tags: [Admin]
+      summary: Get moderation queue
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Moderation queue
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ModerationQueueItem'
+  /api/admin/queue/bulk-action:
+    post:
+      tags: [Admin]
+      summary: Approve, reject, or delete moderation items in bulk
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action, ids]
+              properties:
+                action:
+                  type: string
+                  enum: [approve, reject, delete]
+                ids:
+                  type: array
+                  items:
+                    type: integer
+      responses:
+        '200':
+          description: Queue action completed
+  /api/admin/analytics:
+    get:
+      tags: [Admin]
+      summary: Get analytics KPIs
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Analytics response
+  /api/admin/alerts:
+    get:
+      tags: [Admin]
+      summary: Get recent activity alerts
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Alerts response
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    CreatorSignupRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        bio:
+          type: string
+        location:
+          type: string
+    BusinessSignupRequest:
+      type: object
+      required: [organizationName, email, password]
+      properties:
+        organizationName:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        bio:
+          type: string
+        location:
+          type: string
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+        profile_slug:
+          type: string
+    ContentCreateRequest:
+      type: object
+      required: [title, body, content_type, media_url]
+      properties:
+        title:
+          type: string
+        body:
+          type: string
+        content_type:
+          type: string
+          enum: [article, video_embed, image_story]
+        media_url:
+          type: string
+        order_priority:
+          type: integer
+    BusinessContentCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/ContentCreateRequest'
+        - type: object
+          properties:
+            campaign_goal:
+              type: string
+            call_to_action:
+              type: string
+            target_creator_profile:
+              type: string
+    Content:
+      type: object
+      properties:
+        id:
+          type: integer
+        creator_id:
+          type: integer
+        content_type:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        media_url:
+          type: string
+        is_published:
+          type: integer
+        campaign_goal:
+          type: string
+        call_to_action:
+          type: string
+        target_creator_profile:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    ModerationQueueItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        status:
+          type: string
+        title_or_name:
+          type: string
+        submitted_by:
+          type: string
+        entity_id:
+          type: integer
