@@ -20,9 +20,27 @@ function createApp(config) {
   }));
   app.use(express.json({ limit: '10mb' }));
 
-  const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
+  const authLimiter = rateLimit({ windowMs: 60 * 1000, max: 10 });
   app.use('/api/auth', authLimiter);
+  app.use('/api/business/auth', authLimiter);
   app.use('/api/admin/auth', authLimiter);
+
+  const contentCreateLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 30,
+    keyGenerator: (req) => (req.user ? String(req.user.id) : req.ip),
+    handler: (req, res) => res.status(429).json({ error: 'Too many content creation requests. Try again later.' }),
+  });
+
+  app.use('/api/content', (req, res, next) => {
+    if (req.method === 'POST') {
+      return contentCreateLimiter(req, res, next);
+    }
+    next();
+  });
+
+  const adminLimiter = rateLimit({ windowMs: 60 * 1000, max: 60 });
+  app.use('/api/admin', adminLimiter);
 
   app.get('/healthz', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
   app.get('/', (req, res) => res.json({ name: 'PLXYGROUND API', version: '1.0.0' }));

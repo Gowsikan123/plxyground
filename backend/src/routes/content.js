@@ -3,6 +3,16 @@ const db = require('../db/setup');
 const { verifyToken } = require('../middleware/auth');
 
 const router = express.Router();
+const CONTENT_TYPES = ['article', 'video_embed', 'image_story'];
+
+function isValidUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
 
 // GET /api/content - public feed
 router.get('/', (req, res) => {
@@ -52,10 +62,11 @@ router.post('/', verifyToken, (req, res) => {
     return res.status(400).json({ error: 'title, body, content_type, and media_url are required' });
   }
 
-  const allowed = ['article', 'video_embed', 'image_story'];
-  if (!allowed.includes(content_type)) {
-    return res.status(400).json({ error: 'content_type must be article, video_embed, or image_story' });
-  }
+  if (title.trim().length > 500) return res.status(400).json({ error: 'title must be 500 characters or less' });
+  if (body.trim().length > 50000) return res.status(400).json({ error: 'body must be 50000 characters or less' });
+  if (!CONTENT_TYPES.includes(content_type)) return res.status(400).json({ error: 'content_type must be article, video_embed, or image_story' });
+
+  if (!isValidUrl(media_url)) return res.status(400).json({ error: 'media_url must be a valid URL' });
 
   try {
     const result = db.prepare(`
@@ -83,6 +94,11 @@ router.put('/:id', verifyToken, (req, res) => {
   if (!media_url) {
     return res.status(400).json({ error: 'media_url is required' });
   }
+
+  if (title && title.trim().length > 500) return res.status(400).json({ error: 'title must be 500 characters or less' });
+  if (body && body.trim().length > 50000) return res.status(400).json({ error: 'body must be 50000 characters or less' });
+  if (content_type && !CONTENT_TYPES.includes(content_type)) return res.status(400).json({ error: 'Invalid content_type' });
+  if (!isValidUrl(media_url)) return res.status(400).json({ error: 'media_url must be a valid URL' });
 
   const post = db.prepare('SELECT * FROM content WHERE id = ?').get(req.params.id);
   if (!post) return res.status(404).json({ error: 'Not found' });

@@ -43,6 +43,11 @@ npm install
 npm run start
 ```
 
+4. Multi-service start scripts
+- Bash (Linux/macOS, WSL): `./start-all.sh`
+- PowerShell (Windows): `./start-all.ps1`
+
+
 **Default Ports**
 1. API: `http://localhost:3011`
 2. Admin panel: `http://localhost:3012`

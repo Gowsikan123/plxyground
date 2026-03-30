@@ -1,11 +1,18 @@
 const jwt = require('jsonwebtoken');
+const db = require('../db/setup');
 
 function verifyToken(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'No token provided' });
   }
+
   const token = authHeader.split(' ')[1];
+  if (!process.env.JWT_SECRET) {
+    console.error('JWT_SECRET is not configured');
+    return res.status(500).json({ error: 'Server configuration error' });
+  }
+
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
@@ -15,10 +22,16 @@ function verifyToken(req, res, next) {
   }
 }
 
-function requireAdmin(req, res, next) {
+async function requireAdmin(req, res, next) {
   if (!req.user || req.user.role !== 'ADMIN') {
     return res.status(403).json({ error: 'Admin access required' });
   }
+
+  const admin = db.prepare('SELECT * FROM admins WHERE id = ? AND is_active = 1').get(req.user.id);
+  if (!admin) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
   next();
 }
 

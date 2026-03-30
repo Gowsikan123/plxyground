@@ -3,15 +3,12 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../db/setup');
 
+const { requireFields } = require('../middleware/validate');
 const router = express.Router();
 
 // POST /api/business/auth/signup
-router.post('/auth/signup', async (req, res) => {
+router.post('/auth/signup', requireFields(['organizationName','email','password']), async (req, res) => {
   const { organizationName, email, password, bio, location } = req.body;
-
-  if (!organizationName || !email || !password) {
-    return res.status(400).json({ error: 'organizationName, email, and password are required' });
-  }
   if (password.length < 8) {
     return res.status(400).json({ error: 'Password must be at least 8 characters' });
   }

@@ -1,0 +1,11 @@
+.env
+*.db
+*.db-shm
+*.db-wal
+node_modules
+.expo
+/.expo
+**/node_modules
+dist
+build
+.DS_Store

@@ -4,12 +4,18 @@ const jwt = require('jsonwebtoken');
 const db = require('../../db/setup');
 
 const router = express.Router();
+const { verifyToken, requireAdmin } = require('../../middleware/auth');
 
 // POST /api/admin/auth/login
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password required' });
+  }
+
+  const activeAdminsCount = db.prepare('SELECT COUNT(*) as count FROM admins WHERE is_active = 1').get().count;
+  if (activeAdminsCount !== 1) {
+    return res.status(500).json({ error: 'Admin policy violated: exactly one active admin must exist' });
   }
 
   const admin = db.prepare('SELECT * FROM admins WHERE email = ? AND is_active = 1').get(email);
@@ -39,8 +45,9 @@ router.post('/login', async (req, res) => {
 });
 
 // POST /api/admin/auth/change-password
-router.post('/change-password', async (req, res) => {
-  const { email, currentPassword, newPassword } = req.body;
+router.post('/change-password', verifyToken, requireAdmin, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  const email = req.user.email;
   if (!email || !currentPassword || !newPassword) {
     return res.status(400).json({ error: 'email, currentPassword, and newPassword are required' });
   }
