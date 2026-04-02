@@ -1,9 +1,7 @@
-import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, StatusBar, Dimensions, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, StatusBar, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-
-const { width, height } = Dimensions.get('window');
 
 export default function Landing() {
   const router = useRouter();
@@ -106,16 +104,16 @@ export default function Landing() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  bg: { width, height },
-  gradient: { flex: 1, paddingTop: 60, paddingHorizontal: 28, paddingBottom: 48 },
-  inner: { flex: 1, justifyContent: 'space-between' },
+  container: { flex: 1, minHeight: '100%' },
+  bg: { width: '100%', minHeight: '100%' },
+  gradient: { flex: 1, minHeight: '100%', paddingTop: 60, paddingHorizontal: 28, paddingBottom: 48 },
+  inner: { flex: 1, width: '100%', maxWidth: 560, justifyContent: 'space-between' },
   top: { alignItems: 'flex-start' },
   logoWrap: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   logo: { color: '#fff', fontSize: 20, fontWeight: '900', letterSpacing: 4 },
   logoDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#3b82f6', marginHorizontal: 4, marginBottom: 2 },
   logoSub: { color: '#475569', fontSize: 9, letterSpacing: 3, marginTop: 4, fontWeight: '600' },
-  middle: { gap: 16 },
+  middle: { gap: 16, width: '100%' },
   headline: { color: '#fff', fontSize: 42, fontWeight: '900', lineHeight: 50, letterSpacing: -0.5 },
   sub: { color: '#94a3b8', fontSize: 16, lineHeight: 26 },
   trustRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
