@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 
 require('./db/setup');
 
@@ -28,7 +28,7 @@ function createApp(config) {
   const contentCreateLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 30,
-    keyGenerator: (req) => (req.user ? String(req.user.id) : req.ip),
+    keyGenerator: (req) => (req.user ? `user:${req.user.id}` : ipKeyGenerator(req.ip)),
     handler: (req, res) => res.status(429).json({ error: 'Too many content creation requests. Try again later.' }),
   });
 
