@@ -3,7 +3,7 @@
 PLXYGROUND is a monorepo for a sports creator platform with three runtime surfaces: an Express API, an Expo mobile app, and a static admin panel.
 
 **Repository Layout**
-1. `backend` - Express API + SQLite, auth, moderation, admin tooling.
+1. `backend` - Express API + PostgreSQL, auth, moderation, admin tooling.
 2. `frontend` - Expo app (creator and business flows).
 3. `admin-panel` - Static HTML/CSS/JS admin UI served by Node.
 4. `docs` - Project documentation.
@@ -19,7 +19,7 @@ PLXYGROUND is a monorepo for a sports creator platform with three runtime surfac
 **Technology Stack**
 1. Runtime: Node.js.
 2. API: Express 5, JWT auth, helmet, cors, express-rate-limit.
-3. Database: SQLite (better-sqlite3).
+3. Database: PostgreSQL (pg).
 4. Mobile: Expo 54, React Native 0.76, Expo Router.
 5. Admin UI: vanilla HTML/CSS/JS.
 
@@ -60,7 +60,7 @@ Backend (`backend/.env`)
 | Key | Purpose | Example |
 | --- | --- | --- |
 | `PORT` | API port | `3011` |
-| `DATABASE_URL` | SQLite path relative to `backend` | `./plxyground.db` |
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@localhost:5432/plxyground` |
 | `JWT_SECRET` | JWT signing secret | `replace_me_with_32+_chars` |
 | `JWT_EXPIRES_IN` | Token TTL | `7d` |
 | `CORS_ORIGIN` | Allowed origins (comma-separated) | `http://localhost:19006,http://localhost:3012` |
@@ -77,7 +77,7 @@ Frontend (`frontend/.env`)
 **Scripts**
 1. `backend`
    - `npm run start` - start API.
-   - `npm run seed` - seed SQLite with sample data.
+   - `npm run seed` - seed database with sample data.
    - `npm run smoke` - run automated backend + admin smoke coverage.
 2. `frontend`
    - `npm run start` - Expo dev server.
@@ -96,7 +96,7 @@ Frontend (`frontend/.env`)
 
 **Architecture Overview**
 1. API boots in `backend/src/index.js`, mounts route modules and applies security middleware.
-2. SQLite schema is defined and created in `backend/src/db/setup.js`.
+2. PostgreSQL schema is defined and created in `backend/src/db/setup.js`.
 3. Expo app uses `frontend/components/ApiClient.js` for API calls and `frontend/components/AuthContext.jsx` for auth state.
 4. Admin panel is a single static page in `admin-panel/index.html` and calls the API directly via `fetch`.
 
