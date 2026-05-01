@@ -42,7 +42,6 @@ router.post('/auth/signup', requireFields(['organizationName','email','password'
       }
     });
   } catch (err) {
-    // Postgres unique violation code is 23505; SQLite uses 'UNIQUE' in message
     if (err.code === '23505' || err.message.includes('UNIQUE') || err.message.includes('unique')) {
       return res.status(409).json({ error: 'Email already taken' });
     }
@@ -58,45 +57,50 @@ router.post('/auth/login', async (req, res) => {
     return res.status(400).json({ error: 'Email and password required' });
   }
 
-  const account = await db.prepare(`
-    SELECT ca.*, c.name, c.role, c.profile_slug
-    FROM creator_accounts ca
-    JOIN creators c ON c.id = ca.creator_id
-    WHERE ca.email = ? AND c.role = 'BUSINESS'
-  `).get(email);
+  try {
+    const account = await db.prepare(`
+      SELECT ca.*, c.name, c.role, c.profile_slug
+      FROM creator_accounts ca
+      JOIN creators c ON c.id = ca.creator_id
+      WHERE ca.email = ? AND c.role = 'BUSINESS'
+    `).get(email);
 
-  if (!account) {
-    return res.status(401).json({ error: 'Invalid credentials' });
-  }
-
-  if (account.is_suspended) {
-    return res.status(403).json({
-      error: 'Your account has been suspended.',
-      code: 'ACCOUNT_SUSPENDED'
-    });
-  }
-
-  const valid = await bcrypt.compare(password, account.password_hash);
-  if (!valid) {
-    return res.status(401).json({ error: 'Invalid credentials' });
-  }
-
-  const token = jwt.sign(
-    { id: account.creator_id, email, role: account.role },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN }
-  );
-
-  res.json({
-    token,
-    user: {
-      id: account.creator_id,
-      name: account.name,
-      email,
-      role: account.role,
-      profile_slug: account.profile_slug
+    if (!account) {
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
-  });
+
+    if (account.is_suspended) {
+      return res.status(403).json({
+        error: 'Your account has been suspended.',
+        code: 'ACCOUNT_SUSPENDED'
+      });
+    }
+
+    const valid = await bcrypt.compare(password, account.password_hash);
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign(
+      { id: account.creator_id, email, role: account.role },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN }
+    );
+
+    res.json({
+      token,
+      user: {
+        id: account.creator_id,
+        name: account.name,
+        email,
+        role: account.role,
+        profile_slug: account.profile_slug
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 module.exports = router;

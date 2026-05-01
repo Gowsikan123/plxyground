@@ -4,6 +4,8 @@ import { useAuth } from '../components/AuthContext';
 import { useEffect } from 'react';
 import { useRouter, useSegments } from 'expo-router';
 
+const PROTECTED = ['feed', 'create', 'profile', 'settings', 'opportunities'];
+
 function RouteGuard({ children }) {
   const { user, loading } = useAuth();
   const segments = useSegments();
@@ -11,8 +13,16 @@ function RouteGuard({ children }) {
 
   useEffect(() => {
     if (loading) return;
-    const inBusiness = segments[0] === 'business';
-    const inAuth = segments[0] === 'login' || segments[0] === 'signup' || segments[0] === 'index' || segments[0] === 'business-login' || segments[0] === 'business-signup';
+    const current = segments[0];
+    const inBusiness = current === 'business';
+    const inAuth = !current || current === 'login' || current === 'signup' ||
+      current === 'business-login' || current === 'business-signup' ||
+      current === 'terms' || current === 'privacy';
+
+    if (!user && PROTECTED.includes(current)) {
+      router.replace('/login');
+      return;
+    }
 
     if (user && user.role === 'BUSINESS' && !inBusiness && !inAuth) {
       router.replace('/business/dashboard');

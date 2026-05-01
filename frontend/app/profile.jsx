@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, SafeAreaView, StatusBar, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, SafeAreaView, StatusBar, Image, Alert } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../components/AuthContext';
@@ -8,14 +8,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 export default function Profile() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
+  const [error, setError] = useState('');
+  const { user, token } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (!user) { router.replace('/login'); return; }
-    apiRequest(`/api/creators/${user.id}`)
+    apiRequest(`/api/creators/${user.id}`, 'GET', null, token)
       .then(data => { setProfile(data); setLoading(false); })
-      .catch(() => setLoading(false));
+      .catch(() => { setError('Could not load profile'); setLoading(false); });
   }, []);
 
   if (loading) return (
@@ -24,9 +25,14 @@ export default function Profile() {
     </SafeAreaView>
   );
 
-  if (!profile) return (
+  if (error || !profile) return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.center}><Text style={styles.errorText}>Could not load profile</Text></View>
+      <View style={styles.center}>
+        <Text style={styles.errorText}>{error || 'Could not load profile'}</Text>
+        <TouchableOpacity style={styles.retryBtn} onPress={() => router.replace('/profile')}>
+          <Text style={styles.retryBtnText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 
@@ -38,7 +44,7 @@ export default function Profile() {
         <LinearGradient colors={['#0d1e38', '#080C14']} style={styles.headerBg}>
           <View style={styles.headerTop}>
             <Text style={styles.headerTitle}>Profile</Text>
-            <TouchableOpacity style={styles.editBtn} onPress={() => {}}>
+            <TouchableOpacity style={styles.editBtn} onPress={() => router.push('/settings')}>
               <Text style={styles.editBtnText}>Edit</Text>
             </TouchableOpacity>
           </View>
@@ -60,7 +66,7 @@ export default function Profile() {
 
           <View style={styles.statsRow}>
             <View style={styles.stat}>
-              <Text style={styles.statNum}>{profile.posts?.length || 0}</Text>
+              <Text style={styles.statNum}>{profile.posts?.length ?? 0}</Text>
               <Text style={styles.statLabel}>Posts</Text>
             </View>
             <View style={styles.statDivider} />
@@ -89,7 +95,12 @@ export default function Profile() {
           ) : (
             (profile.posts || []).map(p => (
               <TouchableOpacity key={p.id} style={styles.postCard} onPress={() => router.push(`/post/${p.id}`)} activeOpacity={0.85}>
-                <Image source={{ uri: p.media_url }} style={styles.postThumb} />
+                <Image
+                  source={{ uri: p.media_url }}
+                  style={styles.postThumb}
+                  defaultSource={require('../assets/placeholder.png')}
+                  onError={e => { e.target.setNativeProps({ opacity: 0 }); }}
+                />
                 <View style={styles.postInfo}>
                   <Text style={styles.postTitle} numberOfLines={2}>{p.title}</Text>
                   <View style={styles.postMeta}>
@@ -136,7 +147,7 @@ export default function Profile() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#080C14' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
   inner: { paddingBottom: 100 },
   headerBg: { padding: 24, paddingTop: 16, alignItems: 'center' },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 24 },
@@ -166,7 +177,7 @@ const styles = StyleSheet.create({
   createPostBtn: { backgroundColor: '#1e3a5f', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 },
   createPostBtnText: { color: '#60a5fa', fontWeight: '700', fontSize: 14 },
   postCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0f1623', borderRadius: 14, marginBottom: 10, overflow: 'hidden', borderWidth: 1, borderColor: '#1a2035' },
-  postThumb: { width: 76, height: 76 },
+  postThumb: { width: 76, height: 76, backgroundColor: '#1a2035' },
   postInfo: { flex: 1, padding: 14 },
   postTitle: { color: '#fff', fontWeight: '700', fontSize: 14, lineHeight: 20, marginBottom: 8 },
   postMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -175,6 +186,8 @@ const styles = StyleSheet.create({
   postDate: { color: '#334155', fontSize: 11 },
   postChevron: { color: '#334155', fontSize: 24, paddingRight: 14 },
   errorText: { color: '#f87171', fontSize: 16 },
+  retryBtn: { backgroundColor: '#1e3a5f', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 },
+  retryBtnText: { color: '#60a5fa', fontWeight: '700' },
   bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', backgroundColor: '#0a0e1a', borderTopWidth: 1, borderTopColor: '#1a2035', paddingBottom: 24, paddingTop: 12 },
   navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
   navIcon: { fontSize: 22 },
