@@ -74,52 +74,57 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'Email and password required' });
   }
 
-  const account = await db.prepare(`
-    SELECT ca.*, c.name, c.role, c.profile_slug
-    FROM creator_accounts ca
-    JOIN creators c ON c.id = ca.creator_id
-    WHERE ca.email = ? AND c.role = 'CREATOR'
-  `).get(email);
+  try {
+    const account = await db.prepare(`
+      SELECT ca.*, c.name, c.role, c.profile_slug
+      FROM creator_accounts ca
+      JOIN creators c ON c.id = ca.creator_id
+      WHERE ca.email = ? AND c.role = 'CREATOR'
+    `).get(email);
 
-  if (!account) {
-    return res.status(401).json({ error: 'Invalid credentials' });
-  }
-
-  if (account.is_suspended) {
-    return res.status(403).json({
-      error: 'Your account has been suspended.',
-      code: 'ACCOUNT_SUSPENDED'
-    });
-  }
-
-  const valid = await bcrypt.compare(password, account.password_hash);
-  if (!valid) {
-    return res.status(401).json({ error: 'Invalid credentials' });
-  }
-
-  const refreshToken = createRefreshToken({ id: account.creator_id, email, role: account.role });
-
-  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-  await db.prepare(`INSERT INTO refresh_tokens (creator_id, token, expires_at) VALUES (?, ?, ?)`)
-    .run(account.creator_id, refreshToken, expiresAt);
-
-  const accessToken = jwt.sign(
-    { id: account.creator_id, email, role: account.role },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN }
-  );
-
-  res.json({
-    token: accessToken,
-    refreshToken,
-    user: {
-      id: account.creator_id,
-      name: account.name,
-      email,
-      role: account.role,
-      profile_slug: account.profile_slug
+    if (!account) {
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
-  });
+
+    if (account.is_suspended) {
+      return res.status(403).json({
+        error: 'Your account has been suspended.',
+        code: 'ACCOUNT_SUSPENDED'
+      });
+    }
+
+    const valid = await bcrypt.compare(password, account.password_hash);
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const refreshToken = createRefreshToken({ id: account.creator_id, email, role: account.role });
+
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    await db.prepare(`INSERT INTO refresh_tokens (creator_id, token, expires_at) VALUES (?, ?, ?)`)
+      .run(account.creator_id, refreshToken, expiresAt);
+
+    const accessToken = jwt.sign(
+      { id: account.creator_id, email, role: account.role },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN }
+    );
+
+    res.json({
+      token: accessToken,
+      refreshToken,
+      user: {
+        id: account.creator_id,
+        name: account.name,
+        email,
+        role: account.role,
+        profile_slug: account.profile_slug
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // GET /api/auth/me

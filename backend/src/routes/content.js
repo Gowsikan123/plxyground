@@ -42,8 +42,11 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/content/recommend - recommended content
+// IMPORTANT: this route MUST be defined before /:id so Express does not
+// treat the literal string "recommend" as an id parameter.
 router.get('/recommend', async (req, res) => {
-  const userId = req.user ? req.user.id : null;
+  // Use optional chaining — this route is public and req.user may be undefined
+  const userId = req.user?.id ?? null;
   const recent = await db.prepare(`SELECT c.*, cr.name as creator_name, cr.profile_slug FROM content c JOIN creators cr ON c.creator_id = cr.id WHERE c.is_published = 1 ORDER BY c.created_at DESC LIMIT 10`).all();
   const trending = await db.prepare(`SELECT c.*, cr.name as creator_name, cr.profile_slug FROM content c JOIN creators cr ON c.creator_id = cr.id WHERE c.is_published = 1 ORDER BY c.order_priority DESC, c.updated_at DESC LIMIT 10`).all();
 
@@ -52,7 +55,7 @@ router.get('/recommend', async (req, res) => {
     return res.json({ mode: 'personal', data: personal, fallback: { trending, recent } });
   }
 
-  res.json({ mode: 'aggregate', data: [...new Map([...trending, ...recent].map((item)=>[item.id,item])).values()] });
+  res.json({ mode: 'aggregate', data: [...new Map([...trending, ...recent].map((item) => [item.id, item])).values()] });
 });
 
 // GET /api/content/:id - single post
@@ -79,7 +82,6 @@ router.post('/', verifyToken, async (req, res) => {
   if (title.trim().length > 500) return res.status(400).json({ error: 'title must be 500 characters or less' });
   if (body.trim().length > 50000) return res.status(400).json({ error: 'body must be 50000 characters or less' });
   if (!CONTENT_TYPES.includes(content_type)) return res.status(400).json({ error: 'content_type must be article, video_embed, or image_story' });
-
   if (!isValidUrl(media_url)) return res.status(400).json({ error: 'media_url must be a valid URL' });
 
   try {
@@ -102,37 +104,29 @@ router.post('/', verifyToken, async (req, res) => {
 });
 
 // PUT /api/content/:id - edit post (owner only)
+// media_url is optional — omitting it preserves the existing value
 router.put('/:id', verifyToken, async (req, res) => {
   const { title, body, content_type, media_url, order_priority } = req.body;
 
-  if (!media_url) {
-    return res.status(400).json({ error: 'media_url is required' });
-  }
-
   if (title && title.trim().length > 500) return res.status(400).json({ error: 'title must be 500 characters or less' });
   if (body && body.trim().length > 50000) return res.status(400).json({ error: 'body must be 50000 characters or less' });
-  if (content_type && !CONTENT_TYPES.includes(content_type)) return res.status(400).json({ error: 'Invalid content_type' });
-  if (!isValidUrl(media_url)) return res.status(400).json({ error: 'media_url must be a valid URL' });
+  if (content_type && !CONTENT_TYPES.includes(content_type)) return res.status(400).json({ error: 'content_type must be article, video_embed, or image_story' });
+  if (media_url && !isValidUrl(media_url)) return res.status(400).json({ error: 'media_url must be a valid URL' });
 
   const post = await db.prepare('SELECT * FROM content WHERE id = ?').get(req.params.id);
   if (!post) return res.status(404).json({ error: 'Not found' });
   if (post.creator_id !== req.user.id) return res.status(403).json({ error: 'Not your post' });
 
-  const allowed = ['article', 'video_embed', 'image_story'];
-  if (content_type && !allowed.includes(content_type)) {
-    return res.status(400).json({ error: 'Invalid content_type' });
-  }
-
   await db.prepare(`
     UPDATE content SET
       title = ?, body = ?, content_type = ?, media_url = ?,
-      order_priority = ?, updated_at = datetime('now')
+      order_priority = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(
     title || post.title,
     body || post.body,
     content_type || post.content_type,
-    media_url,
+    media_url || post.media_url,
     order_priority ?? post.order_priority,
     req.params.id
   );
