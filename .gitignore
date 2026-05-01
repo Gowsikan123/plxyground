@@ -75,3 +75,12 @@ coverage/
 # Temporary files
 *~
 *.tmp
+
+# Vercel env overrides
+.vercel-env
+.backend-vercel-env
+.frontend-vercel-env
+
+# Test artifacts
+test-results/
+playwright-report/
