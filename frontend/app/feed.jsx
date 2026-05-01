@@ -58,7 +58,7 @@ export default function Feed() {
     return (
       <TouchableOpacity style={[s.card, isFeatured && s.featuredCard]} onPress={() => router.push(`/post/${item.id}`)} activeOpacity={0.90}>
         <View style={s.imgWrap}>
-          <Image source={{ uri: item.media_url }} style={[s.img, isFeatured && s.featuredImg]} defaultSource={require('../assets/placeholder.png')} />
+          <Image source={{ uri: item.media_url }} style={[s.img, isFeatured && s.featuredImg]} />
           <LinearGradient colors={GRAD_CARD} style={s.imgOverlay} />
           <LinearGradient colors={meta.grad} style={s.typePill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
             <Text style={s.typePillText}>{meta.label}</Text>
