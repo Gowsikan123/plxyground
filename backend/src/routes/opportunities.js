@@ -109,7 +109,7 @@ router.put('/:id', verifyToken, requireRole('BUSINESS'), async (req, res) => {
   await db.prepare(`
     UPDATE opportunities SET
       title = ?, role_type = ?, body = ?, requirements = ?,
-      benefits = ?, is_published = 0, updated_at = datetime('now')
+      benefits = ?, is_published = 0, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(
     title || opp.title,
@@ -130,7 +130,7 @@ router.put('/:id', verifyToken, requireRole('BUSINESS'), async (req, res) => {
   if (queueItem) {
     await db.prepare(`
       UPDATE moderation_queue
-      SET status = 'pending', title_or_name = ?, updated_at = datetime('now')
+      SET status = 'pending', title_or_name = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(updated.title, queueItem.id);
   } else {

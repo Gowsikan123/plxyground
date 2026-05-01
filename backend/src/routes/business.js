@@ -42,7 +42,8 @@ router.post('/auth/signup', requireFields(['organizationName','email','password'
       }
     });
   } catch (err) {
-    if (err.message.includes('UNIQUE')) {
+    // Postgres unique violation code is 23505; SQLite uses 'UNIQUE' in message
+    if (err.code === '23505' || err.message.includes('UNIQUE') || err.message.includes('unique')) {
       return res.status(409).json({ error: 'Email already taken' });
     }
     console.error(err);

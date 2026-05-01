@@ -51,7 +51,7 @@ router.post('/bulk-action', async (req, res) => {
     } else {
       const newStatus = action === 'approve' ? 'approved' : 'rejected';
       await db.prepare(`
-        UPDATE moderation_queue SET status = ?, updated_at = datetime('now') WHERE id = ?
+        UPDATE moderation_queue SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
       `).run(newStatus, id);
 
       if (action === 'approve' && item.entity_id) {
@@ -59,9 +59,9 @@ router.post('/bulk-action', async (req, res) => {
           await db.prepare(`
             UPDATE content SET
               is_published = 1,
-              published_at = datetime('now'),
-              feed_rank_at = datetime('now'),
-              updated_at = datetime('now')
+              published_at = CURRENT_TIMESTAMP,
+              feed_rank_at = CURRENT_TIMESTAMP,
+              updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
           `).run(item.entity_id);
         }
@@ -70,7 +70,7 @@ router.post('/bulk-action', async (req, res) => {
           await db.prepare(`
             UPDATE opportunities SET
               is_published = 1,
-              updated_at = datetime('now')
+              updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
           `).run(item.entity_id);
         }
@@ -81,7 +81,7 @@ router.post('/bulk-action', async (req, res) => {
           await db.prepare(`
             UPDATE content SET
               is_published = 0,
-              updated_at = datetime('now')
+              updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
           `).run(item.entity_id);
         }
@@ -90,7 +90,7 @@ router.post('/bulk-action', async (req, res) => {
           await db.prepare(`
             UPDATE opportunities SET
               is_published = 0,
-              updated_at = datetime('now')
+              updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
           `).run(item.entity_id);
         }
@@ -171,7 +171,7 @@ router.post('/bulk-action/undo', async (req, res) => {
     return res.status(400).json({ error: 'Undo delete is not supported' });
   }
 
-  await db.prepare('UPDATE bulk_action_log SET undone_at = datetime(\'now\') WHERE id = ?').run(log_id);
+  await db.prepare('UPDATE bulk_action_log SET undone_at = CURRENT_TIMESTAMP WHERE id = ?').run(log_id);
   await db.prepare('INSERT INTO audit_log (action_type, actor, target, reason) VALUES (?, ?, ?, ?)').run(
     'QUEUE_BULK_UNDO',
     req.user.email,
