@@ -1,3 +1,0 @@
-[dotenv@17.3.1] injecting env (7) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
-PLXYGROUND backend running on http://localhost:3011
-Using database at C:\plxyground\backend\plxyground.db
