@@ -1,12 +1,77 @@
+# Environment variables
 .env
+.env.local
+.env*.local
+.frontend-vercel-env
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Expo
+.expo/
+/.expo
+dist/
+web-build/
+expo-env.d.ts
+
+# SQLite databases
 *.db
 *.db-shm
 *.db-wal
-node_modules
-.expo
-/.expo
-**/node_modules
-dist
-build
+*.db-journal
+
+# Build outputs
+build/
+dist/
+
+# Logs
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+logs/
+.run-logs/
+
+# Local dev files
+.postgres-local/
+
+# macOS
 .DS_Store
+*.pem
+
+# Windows
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.eslintcache
+.history/
+
+# Native
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# TypeScript
+*.tsbuildinfo
+
+# Deployment
+.vercel/
 .vercel
+
+# Test coverage
+coverage/
+
+# Temporary files
+*~
+*.tmp
