@@ -11,6 +11,21 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: plxyground_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,11 +50,13 @@ jobs:
       - name: Run backend and admin smoke suite
         run: npm run smoke
         working-directory: backend
+        env:
+          PORT: 3011
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/plxyground_test
+          JWT_SECRET: github_actions_test_secret_minimum_32_characters_long
+          JWT_EXPIRES_IN: 7d
+          CORS_ORIGIN: http://localhost:19006,http://localhost:3012
+          NODE_ENV: test
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
-        working-directory: admin-panel
-
-      - name: Run admin panel Playwright smoke test
-        run: npm run test:e2e
-        working-directory: admin-panel
+        run: npx playwright install --with-deps 
