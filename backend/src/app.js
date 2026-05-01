@@ -12,7 +12,7 @@ function createApp(config) {
   app.use(cors({
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
-      if (config.nodeEnv === 'development') return cb(null, true);
+      if (config.nodeEnv === 'development' || config.nodeEnv === 'test') return cb(null, true);
       if (config.corsOrigins.includes(origin)) return cb(null, true);
       return cb(new Error('Not allowed by CORS'));
     },
@@ -46,8 +46,10 @@ function createApp(config) {
   app.get('/', (req, res) => res.json({ name: 'PLXYGROUND API', version: '1.0.0' }));
 
   app.use('/api/auth', require('./routes/auth'));
-  app.use('/api/business', require('./routes/business'));
+  // NOTE: /api/business/content must be mounted BEFORE /api/business to prevent
+  // Express shadowing the more-specific path with the less-specific one.
   app.use('/api/business/content', require('./routes/businessContent'));
+  app.use('/api/business', require('./routes/business'));
   app.use('/api/content', require('./routes/content'));
   app.use('/api/creators', require('./routes/creators'));
   app.use('/api/opportunities', require('./routes/opportunities'));
