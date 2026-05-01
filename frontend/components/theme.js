@@ -1,19 +1,19 @@
-// ─── PLXYGROUND DESIGN TOKENS v2 ───────────────────────────────────────────
+// ─── PLXYGROUND DESIGN TOKENS v3 ───────────────────────────────────────────
 // Energetic · Colourful · Young Creative · Sports Creator Network
 
 export const C = {
-  // Canvas
-  bg:          '#0A0A0F',
-  surface:     '#111118',
-  surface2:    '#16161F',
-  surface3:    '#1C1C28',
+  // Canvas — warm dark undertone (more creative, less cold-techy)
+  bg:          '#0C0A12',
+  surface:     '#12101A',
+  surface2:    '#181622',
+  surface3:    '#1E1B2C',
   border:      'rgba(255,255,255,0.07)',
   borderBright:'rgba(255,255,255,0.14)',
 
-  // Text
+  // Text — improved contrast for legibility at small sizes
   text:        '#FFFFFF',
-  textMuted:   '#8884A0',
-  textFaint:   '#3D3A52',
+  textMuted:   '#9C98B8',
+  textFaint:   '#4A4665',
 
   // PRIMARY accent — electric coral
   accent:      '#FF4D6D',
@@ -36,6 +36,11 @@ export const C = {
   purpleGlow:  'rgba(191,95,255,0.18)',
   purpleDark:  'rgba(191,95,255,0.08)',
 
+  // QUINARY — warm amber (badges, streaks, "hot" content)
+  amber:       '#FFAB00',
+  amberGlow:   'rgba(255,171,0,0.18)',
+  amberDark:   'rgba(255,171,0,0.08)',
+
   // Semantic
   green:       '#22C55E',
   greenGlow:   'rgba(34,197,94,0.15)',
@@ -48,6 +53,7 @@ export const C = {
   article:     { bg: 'rgba(0,212,255,0.10)',   text: '#00D4FF',  label: 'Article'   },
   video:       { bg: 'rgba(191,95,255,0.10)',  text: '#BF5FFF',  label: 'Video'     },
   story:       { bg: 'rgba(170,255,0,0.10)',   text: '#AAFF00',  label: 'Story'     },
+  hot:         { bg: 'rgba(255,171,0,0.10)',   text: '#FFAB00',  label: 'Hot'       },
 };
 
 export const R = {
@@ -75,7 +81,8 @@ export const GRAD_ACCENT   = ['#FF4D6D', '#FF2052'];
 export const GRAD_LIME     = ['#AAFF00', '#7DCC00'];
 export const GRAD_CYAN     = ['#00D4FF', '#0099CC'];
 export const GRAD_PURPLE   = ['#BF5FFF', '#8B2FCC'];
-export const GRAD_HERO     = ['#FF4D6D', '#BF5FFF'];
-export const GRAD_SURFACE  = ['#111118', '#0A0A0F'];
-export const GRAD_CARD     = ['transparent', 'rgba(10,10,15,0.95)'];
-export const GRAD_SHIMMER  = ['#111118', '#1C1C28', '#111118'];
+export const GRAD_AMBER    = ['#FFAB00', '#FF7A00'];
+export const GRAD_HERO     = ['#FF4D6D', '#D44FFF', '#3B8BFF'];  // coral → purple → blue
+export const GRAD_SURFACE  = ['#12101A', '#0C0A12'];
+export const GRAD_CARD     = ['transparent', 'rgba(12,10,18,0.95)'];
+export const GRAD_SHIMMER  = ['#12101A', '#1E1B2C', '#12101A'];
