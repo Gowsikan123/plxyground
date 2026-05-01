@@ -5,6 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node src/index.js",
+    "db:start": "powershell -ExecutionPolicy Bypass -File scripts/start-postgres.ps1",
+    "db:stop": "powershell -ExecutionPolicy Bypass -File scripts/stop-postgres.ps1",
     "seed": "node src/db/seed.js",
     "smoke": "node scripts/smoke.js",
     "test": "jest --runInBand"
@@ -25,12 +27,15 @@
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
-    "better-sqlite3": "^12.8.0",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "express-rate-limit": "^8.3.1",
     "helmet": "^8.1.0",
-    "jsonwebtoken": "^9.0.3"
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.16.3"
+  },
+  "overrides": {
+    "path-to-regexp": "^8.4.0"
   }
 }

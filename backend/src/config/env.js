@@ -1,4 +1,3 @@
-const path = require('path');
 require('dotenv').config();
 
 function readEnv() {
@@ -20,11 +19,12 @@ function readEnv() {
     jwtSecret: process.env.JWT_SECRET,
     jwtExpiresIn: process.env.JWT_EXPIRES_IN,
     databaseUrl: process.env.DATABASE_URL,
+    databaseSsl: process.env.DATABASE_SSL === 'true' || /neon\.tech/i.test(process.env.DATABASE_URL || ''),
     corsOrigins: (process.env.CORS_ORIGIN || '')
       .split(',')
       .map((origin) => origin.trim())
       .filter(Boolean),
-    databasePath: path.resolve(path.resolve(__dirname, '..', '..'), process.env.DATABASE_URL),
+    databaseLabel: process.env.DATABASE_URL,
   };
 }
 

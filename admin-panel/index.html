@@ -272,7 +272,7 @@
 </div>
 
 <script>
-  const API = 'http://localhost:3011';
+  const API = '';
   let token = null;
   let queueData = [];
 
@@ -345,7 +345,7 @@
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  function fmtDate(d) { return d ? new Date(d).toLocaleString() : '—'; }
+  function fmtDate(d) { return d ? new Date(d).toLocaleString() : '-'; }
 
   // --- QUEUE ---
   async function loadQueue() {
@@ -421,7 +421,7 @@
           <td><span class="badge blue">${escape(r.content_type)}</span></td>
           <td><span class="badge ${r.is_published?'green':'yellow'}">${r.is_published?'Published':'Pending'}</span></td>
           <td style="max-width:200px;white-space:pre-wrap;">${escape(r.body)}</td>
-          <td>${r.media_url ? `<a href="${escape(r.media_url)}" target="_blank" class="btn btn-gray">View</a>` : '—'}</td>
+          <td>${r.media_url ? `<a href="${escape(r.media_url)}" target="_blank" class="btn btn-gray">View</a>` : '-'}</td>
           <td>${fmtDate(r.created_at)}</td>
           <td>
             <button class="btn ${r.is_published?'btn-gray':'btn-green'}" onclick="togglePublish(${r.id},${r.is_published})">${r.is_published?'Unpublish':'Publish'}</button>
@@ -636,7 +636,7 @@
         { label: 'Opps Live', value: kpis.publishedOpportunities },
         { label: 'Opps Pending', value: kpis.pendingOpportunities },
         { label: 'Last 7 Days', value: kpis.last7Days },
-      ].map(k => `<div class="kpi-card"><div class="label">${k.label}</div><div class="value">${k.value ?? '—'}</div></div>`).join('');
+      ].map(k => `<div class="kpi-card"><div class="label">${k.label}</div><div class="value">${k.value ?? '-'}</div></div>`).join('');
 
       const trend = data.weeklyTrend || [];
       document.getElementById('trend-body').innerHTML = trend.length
@@ -671,7 +671,7 @@
     const msg = document.getElementById('sec-msg');
     try {
       const res = await fetch(`${API}/api/admin/auth/change-password`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: authHeaders(),
         body: JSON.stringify({ email, currentPassword, newPassword })
       });
       const data = await res.json();

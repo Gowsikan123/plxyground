@@ -91,6 +91,7 @@ async function main() {
     let businessToken;
     let creatorPostId;
     let businessPostId;
+    let opportunityId;
 
     results.push(await expectJson('ST-API-004 creator signup', async () => {
       const { response, data } = await requestJson(`${backendUrl}/api/auth/signup`, {
@@ -198,6 +199,44 @@ async function main() {
       return `items=${data.data.length}`;
     }));
 
+    results.push(await expectJson('ST-API-015 business opportunity create stays pending', async () => {
+      const { response, data } = await requestJson(`${backendUrl}/api/opportunities`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${businessToken}`,
+        },
+        body: JSON.stringify({
+          title: `Business smoke opportunity ${nonce}`,
+          role_type: 'Sponsored campaign',
+          body: 'Need creators for an upcoming launch.',
+          requirements: 'Sports audience',
+          benefits: 'Paid collaboration',
+        }),
+      });
+      if (response.status !== 201) throw new Error(data.error || 'Opportunity create failed');
+      if (data.is_published !== 0) throw new Error('Opportunity was published before admin approval');
+      opportunityId = data.id;
+      return `id=${opportunityId}`;
+    }));
+
+    results.push(await expectJson('ST-API-016 business cannot self-publish opportunity', async () => {
+      const { response, data } = await requestJson(`${backendUrl}/api/opportunities/${opportunityId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${businessToken}`,
+        },
+        body: JSON.stringify({
+          title: `Edited business smoke opportunity ${nonce}`,
+          is_published: 1,
+        }),
+      });
+      if (!response.ok) throw new Error(data.error || 'Opportunity update failed');
+      if (data.is_published !== 0) throw new Error('Business was able to self-publish opportunity');
+      return `id=${data.id}`;
+    }));
+
     results.push(await expectJson('ST-API-009 admin queue unauthorized', async () => {
       const { response } = await requestJson(`${backendUrl}/api/admin/queue`);
       if (response.status !== 401) throw new Error(`Expected 401, received ${response.status}`);
@@ -224,10 +263,10 @@ async function main() {
         headers: { Authorization: `Bearer ${adminToken}` },
       });
       const targetIds = (queueResponse.data.data || [])
-        .filter((item) => item.entity_id === creatorPostId || item.entity_id === businessPostId)
+        .filter((item) => item.entity_id === creatorPostId || item.entity_id === businessPostId || item.entity_id === opportunityId)
         .map((item) => item.id);
 
-      if (targetIds.length < 2) throw new Error('Missing moderation queue items for created posts');
+      if (targetIds.length < 3) throw new Error('Missing moderation queue items for created entities');
 
       const { response, data } = await requestJson(`${backendUrl}/api/admin/queue/bulk-action`, {
         method: 'POST',
@@ -241,10 +280,29 @@ async function main() {
       return `approved=${targetIds.length}`;
     }));
 
-    results.push(await expectJson('ST-API-015 approved business content is public', async () => {
+    results.push(await expectJson('ST-API-017 approved business content is public', async () => {
       const { response, data } = await requestJson(`${backendUrl}/api/content/${businessPostId}`);
       if (!response.ok || data.id !== businessPostId) throw new Error('Approved business content is not public');
       return data.title;
+    }));
+
+    results.push(await expectJson('ST-API-018 approved opportunity is public', async () => {
+      const { response, data } = await requestJson(`${backendUrl}/api/opportunities/${opportunityId}`);
+      if (!response.ok || data.id !== opportunityId) throw new Error('Approved opportunity is not public');
+      return data.title;
+    }));
+
+    results.push(await expectJson('ST-API-019 creator can apply to approved opportunity', async () => {
+      const { response, data } = await requestJson(`${backendUrl}/api/opportunities/${opportunityId}/apply`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${creatorToken}`,
+        },
+        body: JSON.stringify({ message: 'Interested in this campaign.' }),
+      });
+      if (response.status !== 201) throw new Error(data.error || 'Creator application failed');
+      return `application=${data.applicationId}`;
     }));
 
     results.push(await expectJson('ST-API-011 admin analytics', async () => {

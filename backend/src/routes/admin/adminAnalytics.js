@@ -6,29 +6,29 @@ const router = express.Router();
 router.use(verifyToken, requireAdmin);
 
 // GET /api/admin/analytics
-router.get('/', (req, res) => {
-  const totalCreators = db.prepare(`SELECT COUNT(*) as count FROM creators WHERE role = 'CREATOR'`).get().count;
-  const totalBusinesses = db.prepare(`SELECT COUNT(*) as count FROM creators WHERE role = 'BUSINESS'`).get().count;
-  const totalContent = db.prepare(`SELECT COUNT(*) as count FROM content`).get().count;
-  const publishedContent = db.prepare(`SELECT COUNT(*) as count FROM content WHERE is_published = 1`).get().count;
-  const pendingContent = db.prepare(`SELECT COUNT(*) as count FROM content WHERE is_published = 0`).get().count;
-  const totalOpportunities = db.prepare(`SELECT COUNT(*) as count FROM opportunities`).get().count;
-  const publishedOpportunities = db.prepare(`SELECT COUNT(*) as count FROM opportunities WHERE is_published = 1`).get().count;
-  const pendingOpportunities = db.prepare(`SELECT COUNT(*) as count FROM opportunities WHERE is_published = 0`).get().count;
-  const last7Days = db.prepare(`
+router.get('/', async (req, res) => {
+  const totalCreators = (await db.prepare(`SELECT COUNT(*) as count FROM creators WHERE role = 'CREATOR'`).get()).count;
+  const totalBusinesses = (await db.prepare(`SELECT COUNT(*) as count FROM creators WHERE role = 'BUSINESS'`).get()).count;
+  const totalContent = (await db.prepare(`SELECT COUNT(*) as count FROM content`).get()).count;
+  const publishedContent = (await db.prepare(`SELECT COUNT(*) as count FROM content WHERE is_published = 1`).get()).count;
+  const pendingContent = (await db.prepare(`SELECT COUNT(*) as count FROM content WHERE is_published = 0`).get()).count;
+  const totalOpportunities = (await db.prepare(`SELECT COUNT(*) as count FROM opportunities`).get()).count;
+  const publishedOpportunities = (await db.prepare(`SELECT COUNT(*) as count FROM opportunities WHERE is_published = 1`).get()).count;
+  const pendingOpportunities = (await db.prepare(`SELECT COUNT(*) as count FROM opportunities WHERE is_published = 0`).get()).count;
+  const last7Days = (await db.prepare(`
     SELECT COUNT(*) as count FROM content
-    WHERE created_at >= datetime('now', '-7 days')
-  `).get().count;
+    WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL '7 days'
+  `).get()).count;
 
-  const weeklyTrend = db.prepare(`
-    SELECT date(created_at) as day, COUNT(*) as count
+  const weeklyTrend = await db.prepare(`
+    SELECT CAST(created_at AS DATE) as day, COUNT(*) as count
     FROM content
-    WHERE created_at >= datetime('now', '-7 days')
-    GROUP BY date(created_at)
+    WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL '7 days'
+    GROUP BY CAST(created_at AS DATE)
     ORDER BY day ASC
   `).all();
 
-  const recentUsers = db.prepare(`
+  const recentUsers = await db.prepare(`
     SELECT ca.email, c.name, c.role, ca.created_at
     FROM creator_accounts ca
     JOIN creators c ON c.id = ca.creator_id
@@ -54,15 +54,15 @@ router.get('/', (req, res) => {
 });
 
 // GET /api/admin/alerts
-router.get('/alerts', (req, res) => {
-  const newContent = db.prepare(`
+router.get('/alerts', async (req, res) => {
+  const newContent = await db.prepare(`
     SELECT 'content' as type, title as name, created_at
     FROM content
     ORDER BY created_at DESC
     LIMIT 10
   `).all();
 
-  const newUsers = db.prepare(`
+  const newUsers = await db.prepare(`
     SELECT 'user' as type, ca.email as name, ca.created_at
     FROM creator_accounts ca
     ORDER BY ca.created_at DESC

@@ -27,7 +27,7 @@ async function requireAdmin(req, res, next) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
-  const admin = db.prepare('SELECT * FROM admins WHERE id = ? AND is_active = 1').get(req.user.id);
+  const admin = await db.prepare('SELECT * FROM admins WHERE id = ? AND is_active = 1').get(req.user.id);
   if (!admin) {
     return res.status(403).json({ error: 'Admin access required' });
   }

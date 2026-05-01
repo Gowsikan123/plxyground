@@ -6,12 +6,12 @@ const router = express.Router();
 router.use(verifyToken, requireAdmin);
 
 // GET /api/admin/audit - list audit log
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const { limit = 50, offset = 0 } = req.query;
   const lim = Math.min(Math.max(parseInt(limit), 1), 2000);
   const off = parseInt(offset) || 0;
 
-  const rows = db.prepare(`
+  const rows = await db.prepare(`
     SELECT * FROM audit_log
     ORDER BY created_at DESC
     LIMIT ? OFFSET ?
@@ -21,8 +21,8 @@ router.get('/', (req, res) => {
 });
 
 // GET /api/admin/audit/export - export audit log as CSV
-router.get('/export', (req, res) => {
-  const rows = db.prepare(`
+router.get('/export', async (req, res) => {
+  const rows = await db.prepare(`
     SELECT * FROM audit_log ORDER BY created_at DESC
   `).all();
 

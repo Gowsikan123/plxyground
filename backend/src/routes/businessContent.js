@@ -7,8 +7,8 @@ const router = express.Router();
 router.use(verifyToken, requireRole('BUSINESS'));
 
 // GET /api/business/content/mine - all business posts including pending items
-router.get('/mine', (req, res) => {
-  const rows = db.prepare(`
+router.get('/mine', async (req, res) => {
+  const rows = await db.prepare(`
     SELECT c.*, cr.name as creator_name, cr.profile_slug
     FROM content c
     JOIN creators cr ON cr.id = c.creator_id
@@ -20,7 +20,7 @@ router.get('/mine', (req, res) => {
 });
 
 // POST /api/business/content - create a business campaign/content post
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const {
     title,
     body,
@@ -42,7 +42,7 @@ router.post('/', (req, res) => {
   }
 
   try {
-    const result = db.prepare(`
+    const result = await db.prepare(`
       INSERT INTO content (
         creator_id, content_type, title, body, media_url, order_priority,
         is_published, campaign_goal, call_to_action, target_creator_profile
@@ -60,12 +60,12 @@ router.post('/', (req, res) => {
       target_creator_profile || null
     );
 
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO moderation_queue (type, status, title_or_name, submitted_by, entity_id)
       VALUES ('content', 'pending', ?, ?, ?)
     `).run(title, req.user.email, result.lastInsertRowid);
 
-    const post = db.prepare('SELECT * FROM content WHERE id = ?').get(result.lastInsertRowid);
+    const post = await db.prepare('SELECT * FROM content WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json(post);
   } catch (err) {
     console.error(err);

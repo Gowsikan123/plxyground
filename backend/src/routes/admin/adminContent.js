@@ -6,7 +6,7 @@ const router = express.Router();
 router.use(verifyToken, requireAdmin);
 
 // GET /api/admin/content - list all content
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const { search, limit = 2000, offset = 0 } = req.query;
   const lim = Math.min(Math.max(parseInt(limit), 1), 2000);
   const off = parseInt(offset) || 0;
@@ -28,12 +28,12 @@ router.get('/', (req, res) => {
   query += ` ORDER BY c.created_at DESC LIMIT ? OFFSET ?`;
   params.push(lim, off);
 
-  const rows = db.prepare(query).all(...params);
+  const rows = await db.prepare(query).all(...params);
   res.json({ data: rows, limit: lim, offset: off });
 });
 
 // PUT /api/admin/content/:id - approve/publish/unpublish
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   const {
     is_published,
     title,
@@ -45,12 +45,12 @@ router.put('/:id', (req, res) => {
     target_creator_profile
   } = req.body;
 
-  const post = db.prepare('SELECT * FROM content WHERE id = ?').get(req.params.id);
+  const post = await db.prepare('SELECT * FROM content WHERE id = ?').get(req.params.id);
   if (!post) return res.status(404).json({ error: 'Not found' });
 
   const before = JSON.stringify(post);
 
-  db.prepare(`
+  await db.prepare(`
     UPDATE content SET
       is_published = ?,
       title = ?,
@@ -78,9 +78,9 @@ router.put('/:id', (req, res) => {
     req.params.id
   );
 
-  const after = db.prepare('SELECT * FROM content WHERE id = ?').get(req.params.id);
+  const after = await db.prepare('SELECT * FROM content WHERE id = ?').get(req.params.id);
 
-  db.prepare(`
+  await db.prepare(`
     INSERT INTO audit_log (action_type, actor, target, before_snapshot, after_snapshot)
     VALUES (?, ?, ?, ?, ?)
   `).run(
@@ -92,7 +92,7 @@ router.put('/:id', (req, res) => {
   );
 
   if (is_published) {
-    db.prepare(`
+    await db.prepare(`
       UPDATE moderation_queue SET status = 'approved', updated_at = datetime('now')
       WHERE entity_id = ? AND type = 'content'
     `).run(req.params.id);
@@ -102,17 +102,17 @@ router.put('/:id', (req, res) => {
 });
 
 // DELETE /api/admin/content/:id
-router.delete('/:id', (req, res) => {
-  const post = db.prepare('SELECT * FROM content WHERE id = ?').get(req.params.id);
+router.delete('/:id', async (req, res) => {
+  const post = await db.prepare('SELECT * FROM content WHERE id = ?').get(req.params.id);
   if (!post) return res.status(404).json({ error: 'Not found' });
 
-  db.prepare(`
+  await db.prepare(`
     INSERT INTO audit_log (action_type, actor, target, before_snapshot)
     VALUES ('DELETE_CONTENT', ?, ?, ?)
   `).run(req.user.email, `content:${req.params.id}`, JSON.stringify(post));
 
-  db.prepare('DELETE FROM content WHERE id = ?').run(req.params.id);
-  db.prepare(`DELETE FROM moderation_queue WHERE entity_id = ? AND type = 'content'`).run(req.params.id);
+  await db.prepare('DELETE FROM content WHERE id = ?').run(req.params.id);
+  await db.prepare(`DELETE FROM moderation_queue WHERE entity_id = ? AND type = 'content'`).run(req.params.id);
 
   res.json({ message: 'Deleted' });
 });

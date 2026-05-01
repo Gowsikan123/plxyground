@@ -6,7 +6,7 @@ const router = express.Router();
 router.use(verifyToken, requireAdmin);
 
 // GET /api/admin/users - list all users
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const { search, limit = 50, offset = 0 } = req.query;
   const lim = Math.min(Math.max(parseInt(limit), 1), 2000);
   const off = parseInt(offset) || 0;
@@ -30,23 +30,23 @@ router.get('/', (req, res) => {
   query += ` ORDER BY ca.created_at DESC LIMIT ? OFFSET ?`;
   params.push(lim, off);
 
-  const rows = db.prepare(query).all(...params);
+  const rows = await db.prepare(query).all(...params);
   res.json({ data: rows, limit: lim, offset: off });
 });
 
 // POST /api/admin/users/:userId/suspend
-router.post('/:userId/suspend', (req, res) => {
+router.post('/:userId/suspend', async (req, res) => {
   const { reason } = req.body;
-  const account = db.prepare('SELECT * FROM creator_accounts WHERE id = ?').get(req.params.userId);
+  const account = await db.prepare('SELECT * FROM creator_accounts WHERE id = ?').get(req.params.userId);
   if (!account) return res.status(404).json({ error: 'User not found' });
 
-  db.prepare(`
+  await db.prepare(`
     UPDATE creator_accounts SET
       is_suspended = 1, suspension_reason = ?, updated_at = datetime('now')
     WHERE id = ?
   `).run(reason || 'Suspended by admin', req.params.userId);
 
-  db.prepare(`
+  await db.prepare(`
     INSERT INTO audit_log (action_type, actor, target, reason)
     VALUES ('SUSPEND_USER', ?, ?, ?)
   `).run(req.user.email, account.email, reason || 'Suspended by admin');
@@ -55,17 +55,17 @@ router.post('/:userId/suspend', (req, res) => {
 });
 
 // POST /api/admin/users/:userId/reactivate
-router.post('/:userId/reactivate', (req, res) => {
-  const account = db.prepare('SELECT * FROM creator_accounts WHERE id = ?').get(req.params.userId);
+router.post('/:userId/reactivate', async (req, res) => {
+  const account = await db.prepare('SELECT * FROM creator_accounts WHERE id = ?').get(req.params.userId);
   if (!account) return res.status(404).json({ error: 'User not found' });
 
-  db.prepare(`
+  await db.prepare(`
     UPDATE creator_accounts SET
       is_suspended = 0, suspension_reason = NULL, updated_at = datetime('now')
     WHERE id = ?
   `).run(req.params.userId);
 
-  db.prepare(`
+  await db.prepare(`
     INSERT INTO audit_log (action_type, actor, target)
     VALUES ('REACTIVATE_USER', ?, ?)
   `).run(req.user.email, account.email);
@@ -74,19 +74,19 @@ router.post('/:userId/reactivate', (req, res) => {
 });
 
 // PUT /api/admin/users/:userId/role
-router.put('/:userId/role', (req, res) => {
+router.put('/:userId/role', async (req, res) => {
   const { role } = req.body;
   const allowed = ['CREATOR', 'BUSINESS'];
   if (!allowed.includes(role)) {
     return res.status(400).json({ error: 'Role must be CREATOR or BUSINESS' });
   }
 
-  const account = db.prepare('SELECT * FROM creator_accounts WHERE id = ?').get(req.params.userId);
+  const account = await db.prepare('SELECT * FROM creator_accounts WHERE id = ?').get(req.params.userId);
   if (!account) return res.status(404).json({ error: 'User not found' });
 
-  db.prepare(`UPDATE creators SET role = ?, updated_at = datetime('now') WHERE id = ?`).run(role, account.creator_id);
+  await db.prepare(`UPDATE creators SET role = ?, updated_at = datetime('now') WHERE id = ?`).run(role, account.creator_id);
 
-  db.prepare(`
+  await db.prepare(`
     INSERT INTO audit_log (action_type, actor, target, after_snapshot)
     VALUES ('CHANGE_ROLE', ?, ?, ?)
   `).run(req.user.email, account.email, JSON.stringify({ role }));
@@ -95,11 +95,11 @@ router.put('/:userId/role', (req, res) => {
 });
 
 // PUT /api/admin/users/:userId/email-verify
-router.put('/:userId/email-verify', (req, res) => {
-  const account = db.prepare('SELECT * FROM creator_accounts WHERE id = ?').get(req.params.userId);
+router.put('/:userId/email-verify', async (req, res) => {
+  const account = await db.prepare('SELECT * FROM creator_accounts WHERE id = ?').get(req.params.userId);
   if (!account) return res.status(404).json({ error: 'User not found' });
 
-  db.prepare(`
+  await db.prepare(`
     UPDATE creator_accounts SET
       email_verified_at = datetime('now'), updated_at = datetime('now')
     WHERE id = ?
@@ -109,16 +109,16 @@ router.put('/:userId/email-verify', (req, res) => {
 });
 
 // POST /api/admin/users/reset-password
-router.post('/reset-password', (req, res) => {
+router.post('/reset-password', async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email required' });
 
-  const account = db.prepare('SELECT * FROM creator_accounts WHERE email = ?').get(email);
+  const account = await db.prepare('SELECT * FROM creator_accounts WHERE email = ?').get(email);
   if (!account) return res.status(404).json({ error: 'User not found' });
 
   console.log(`[STUB EMAIL] Password reset requested for ${email}`);
 
-  db.prepare(`
+  await db.prepare(`
     INSERT INTO audit_log (action_type, actor, target)
     VALUES ('RESET_PASSWORD', ?, ?)
   `).run(req.user.email, email);

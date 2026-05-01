@@ -17,11 +17,11 @@ router.post('/auth/signup', requireFields(['organizationName','email','password'
 
   try {
     const hash = await bcrypt.hash(password, 10);
-    const creator = db.prepare(
+    const creator = await db.prepare(
       `INSERT INTO creators (name, role, bio, location, profile_slug) VALUES (?, 'BUSINESS', ?, ?, ?)`
     ).run(organizationName, bio || null, location || null, slug);
 
-    db.prepare(
+    await db.prepare(
       `INSERT INTO creator_accounts (creator_id, email, password_hash) VALUES (?, ?, ?)`
     ).run(creator.lastInsertRowid, email, hash);
 
@@ -57,7 +57,7 @@ router.post('/auth/login', async (req, res) => {
     return res.status(400).json({ error: 'Email and password required' });
   }
 
-  const account = db.prepare(`
+  const account = await db.prepare(`
     SELECT ca.*, c.name, c.role, c.profile_slug
     FROM creator_accounts ca
     JOIN creators c ON c.id = ca.creator_id

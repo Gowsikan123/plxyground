@@ -5,12 +5,12 @@ const { verifyToken, requireRole } = require('../middleware/auth');
 const router = express.Router();
 
 // GET /api/opportunities - list all published opportunities
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const { limit = 20, offset = 0 } = req.query;
   const lim = Math.min(Math.max(parseInt(limit), 1), 100);
   const off = parseInt(offset) || 0;
 
-  const rows = db.prepare(`
+  const rows = await db.prepare(`
     SELECT o.*, c.name as creator_name, c.profile_slug, c.role as creator_role
     FROM opportunities o
     JOIN creators c ON c.id = o.creator_id
@@ -23,8 +23,8 @@ router.get('/', (req, res) => {
 });
 
 // GET /api/opportunities/mine - list all opportunities for the authenticated business
-router.get('/mine', verifyToken, requireRole('BUSINESS'), (req, res) => {
-  const rows = db.prepare(`
+router.get('/mine', verifyToken, requireRole('BUSINESS'), async (req, res) => {
+  const rows = await db.prepare(`
     SELECT o.*, c.name as creator_name, c.profile_slug, c.role as creator_role
     FROM opportunities o
     JOIN creators c ON c.id = o.creator_id
@@ -36,8 +36,8 @@ router.get('/mine', verifyToken, requireRole('BUSINESS'), (req, res) => {
 });
 
 // GET /api/opportunities/:id - single opportunity
-router.get('/:id', (req, res) => {
-  const row = db.prepare(`
+router.get('/:id', async (req, res) => {
+  const row = await db.prepare(`
     SELECT o.*, c.name as creator_name, c.profile_slug, c.role as creator_role
     FROM opportunities o
     JOIN creators c ON c.id = o.creator_id
@@ -48,21 +48,21 @@ router.get('/:id', (req, res) => {
   res.json(row);
 });
 
-// POST /api/opportunities/:id/apply - apply to an opportunity (business user)
-router.post('/:id/apply', verifyToken, requireRole('BUSINESS'), (req, res) => {
-  const opportunity = db.prepare('SELECT * FROM opportunities WHERE id = ? AND is_published = 1').get(req.params.id);
+// POST /api/opportunities/:id/apply - apply to an opportunity (creator user)
+router.post('/:id/apply', verifyToken, requireRole('CREATOR'), async (req, res) => {
+  const opportunity = await db.prepare('SELECT * FROM opportunities WHERE id = ? AND is_published = 1').get(req.params.id);
   if (!opportunity) return res.status(404).json({ error: 'Opportunity not found' });
 
   const { message } = req.body;
-  const exists = db.prepare('SELECT * FROM opportunity_applications WHERE opportunity_id = ? AND creator_id = ?').get(req.params.id, req.user.id);
+  const exists = await db.prepare('SELECT * FROM opportunity_applications WHERE opportunity_id = ? AND creator_id = ?').get(req.params.id, req.user.id);
   if (exists) return res.status(409).json({ error: 'Already applied' });
 
-  const result = db.prepare(`
+  const result = await db.prepare(`
     INSERT INTO opportunity_applications (opportunity_id, creator_id, message)
     VALUES (?, ?, ?)
   `).run(req.params.id, req.user.id, message || null);
 
-  db.prepare(`INSERT INTO audit_log (action_type, actor, target, metadata) VALUES (?, ?, ?, ?)`)
+  await db.prepare(`INSERT INTO audit_log (action_type, actor, target, metadata) VALUES (?, ?, ?, ?)`)
     .run('opportunity_application', req.user.id, `opportunity:${req.params.id}`, JSON.stringify({ application_id: result.lastInsertRowid, message }));
 
   // in real life, trigger push/email notification to opportunity owner
@@ -72,7 +72,7 @@ router.post('/:id/apply', verifyToken, requireRole('BUSINESS'), (req, res) => {
 });
 
 // POST /api/opportunities - create opportunity (auth required)
-router.post('/', verifyToken, requireRole('BUSINESS'), (req, res) => {
+router.post('/', verifyToken, requireRole('BUSINESS'), async (req, res) => {
   const { title, role_type, body, requirements, benefits } = req.body;
 
   if (!title || !body) {
@@ -80,17 +80,17 @@ router.post('/', verifyToken, requireRole('BUSINESS'), (req, res) => {
   }
 
   try {
-    const result = db.prepare(`
+    const result = await db.prepare(`
       INSERT INTO opportunities (creator_id, title, role_type, body, requirements, benefits, is_published)
       VALUES (?, ?, ?, ?, ?, ?, 0)
     `).run(req.user.id, title, role_type || null, body, requirements || null, benefits || null);
 
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO moderation_queue (type, status, title_or_name, submitted_by, entity_id)
       VALUES ('opportunity', 'pending', ?, ?, ?)
     `).run(title, req.user.email, result.lastInsertRowid);
 
-    const opportunity = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(result.lastInsertRowid);
+    const opportunity = await db.prepare('SELECT * FROM opportunities WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json(opportunity);
   } catch (err) {
     console.error(err);
@@ -98,49 +98,59 @@ router.post('/', verifyToken, requireRole('BUSINESS'), (req, res) => {
   }
 });
 
-// PUT /api/opportunities/:id - edit opportunity (owner only)
-router.put('/:id', verifyToken, requireRole('BUSINESS'), (req, res) => {
-  const { title, role_type, body, requirements, benefits, is_published } = req.body;
+// PUT /api/opportunities/:id - edit opportunity (owner only, returns to moderation)
+router.put('/:id', verifyToken, requireRole('BUSINESS'), async (req, res) => {
+  const { title, role_type, body, requirements, benefits } = req.body;
 
-  const opp = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(req.params.id);
+  const opp = await db.prepare('SELECT * FROM opportunities WHERE id = ?').get(req.params.id);
   if (!opp) return res.status(404).json({ error: 'Not found' });
   if (opp.creator_id !== req.user.id) return res.status(403).json({ error: 'Not your opportunity' });
 
-  db.prepare(`
+  await db.prepare(`
     UPDATE opportunities SET
       title = ?, role_type = ?, body = ?, requirements = ?,
-      benefits = ?, is_published = ?, updated_at = datetime('now')
+      benefits = ?, is_published = 0, updated_at = datetime('now')
     WHERE id = ?
   `).run(
     title || opp.title,
     role_type || opp.role_type,
     body || opp.body,
-    requirements || opp.requirements,
-    benefits || opp.benefits,
-    is_published !== undefined ? is_published : opp.is_published,
+    requirements !== undefined ? requirements : opp.requirements,
+    benefits !== undefined ? benefits : opp.benefits,
     req.params.id
   );
 
-  const updated = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(req.params.id);
+  const updated = await db.prepare('SELECT * FROM opportunities WHERE id = ?').get(req.params.id);
 
-  if (is_published !== undefined) {
-    db.prepare(`
+  const queueItem = await db.prepare(`
+    SELECT id FROM moderation_queue
+    WHERE entity_id = ? AND type = 'opportunity'
+  `).get(req.params.id);
+
+  if (queueItem) {
+    await db.prepare(`
       UPDATE moderation_queue
-      SET status = ?, updated_at = datetime('now')
-      WHERE entity_id = ? AND type = 'opportunity'
-    `).run(is_published ? 'approved' : 'pending', req.params.id);
+      SET status = 'pending', title_or_name = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(updated.title, queueItem.id);
+  } else {
+    await db.prepare(`
+      INSERT INTO moderation_queue (type, status, title_or_name, submitted_by, entity_id)
+      VALUES ('opportunity', 'pending', ?, ?, ?)
+    `).run(updated.title, req.user.email, req.params.id);
   }
 
   res.json(updated);
 });
 
 // DELETE /api/opportunities/:id - delete opportunity (owner only)
-router.delete('/:id', verifyToken, requireRole('BUSINESS'), (req, res) => {
-  const opp = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(req.params.id);
+router.delete('/:id', verifyToken, requireRole('BUSINESS'), async (req, res) => {
+  const opp = await db.prepare('SELECT * FROM opportunities WHERE id = ?').get(req.params.id);
   if (!opp) return res.status(404).json({ error: 'Not found' });
   if (opp.creator_id !== req.user.id) return res.status(403).json({ error: 'Not your opportunity' });
 
-  db.prepare('DELETE FROM opportunities WHERE id = ?').run(req.params.id);
+  await db.prepare('DELETE FROM opportunities WHERE id = ?').run(req.params.id);
+  await db.prepare(`DELETE FROM moderation_queue WHERE entity_id = ? AND type = 'opportunity'`).run(req.params.id);
   res.json({ message: 'Deleted' });
 });
 

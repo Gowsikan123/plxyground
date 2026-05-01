@@ -13,12 +13,12 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'Email and password required' });
   }
 
-  const activeAdminsCount = db.prepare('SELECT COUNT(*) as count FROM admins WHERE is_active = 1').get().count;
+  const activeAdminsCount = (await db.prepare('SELECT COUNT(*) as count FROM admins WHERE is_active = 1').get()).count;
   if (activeAdminsCount !== 1) {
     return res.status(500).json({ error: 'Admin policy violated: exactly one active admin must exist' });
   }
 
-  const admin = db.prepare('SELECT * FROM admins WHERE email = ? AND is_active = 1').get(email);
+  const admin = await db.prepare('SELECT * FROM admins WHERE email = ? AND is_active = 1').get(email);
   if (!admin) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
@@ -52,7 +52,7 @@ router.post('/change-password', verifyToken, requireAdmin, async (req, res) => {
     return res.status(400).json({ error: 'email, currentPassword, and newPassword are required' });
   }
 
-  const admin = db.prepare('SELECT * FROM admins WHERE email = ?').get(email);
+  const admin = await db.prepare('SELECT * FROM admins WHERE email = ?').get(email);
   if (!admin) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
@@ -67,7 +67,7 @@ router.post('/change-password', verifyToken, requireAdmin, async (req, res) => {
   }
 
   const hash = await bcrypt.hash(newPassword, 10);
-  db.prepare(`UPDATE admins SET password_hash = ?, updated_at = datetime('now') WHERE id = ?`).run(hash, admin.id);
+  await db.prepare(`UPDATE admins SET password_hash = ?, updated_at = datetime('now') WHERE id = ?`).run(hash, admin.id);
 
   res.json({ message: 'Password changed successfully' });
 });

@@ -6,15 +6,15 @@ const router = express.Router();
 router.use(verifyToken, requireAdmin);
 
 // GET /api/admin/alerts - recent activity
-router.get('/', (req, res) => {
-  const newContent = db.prepare(`
+router.get('/', async (req, res) => {
+  const newContent = await db.prepare(`
     SELECT 'content' as type, title as name, created_at
     FROM content
     ORDER BY created_at DESC
     LIMIT 10
   `).all();
 
-  const newUsers = db.prepare(`
+  const newUsers = await db.prepare(`
     SELECT 'user' as type, ca.email as name, ca.created_at
     FROM creator_accounts ca
     ORDER BY ca.created_at DESC

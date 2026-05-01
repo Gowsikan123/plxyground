@@ -13,7 +13,7 @@ function createApp(config) {
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
       if (config.nodeEnv === 'development') return cb(null, true);
-      if (!config.corsOrigins.length || config.corsOrigins.includes(origin)) return cb(null, true);
+      if (config.corsOrigins.includes(origin)) return cb(null, true);
       return cb(new Error('Not allowed by CORS'));
     },
     credentials: true,

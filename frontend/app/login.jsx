@@ -6,6 +6,11 @@ import { apiRequest } from '../components/ApiClient';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { height } = Dimensions.get('window');
+const DEMO_CREATORS = [
+  { label: 'Sarah Johnson', email: 'sarahjohnson@plxyground.local', password: 'Password1!' },
+  { label: 'Mike Thompson', email: 'mikethompson@plxyground.local', password: 'Password1!' },
+  { label: 'Alex Rivera', email: 'alexrivera@plxyground.local', password: 'Password1!' },
+];
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -15,6 +20,12 @@ export default function Login() {
   const [showPass, setShowPass] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
+
+  const fillDemoAccount = (account) => {
+    setEmail(account.email);
+    setPassword(account.password);
+    setError('');
+  };
 
   const handleLogin = async () => {
     setError('');
@@ -86,6 +97,25 @@ export default function Login() {
           </LinearGradient>
         </TouchableOpacity>
 
+        <View style={styles.demoCard}>
+          <Text style={styles.demoTitle}>Demo creator accounts</Text>
+          <Text style={styles.demoSub}>All creator demos use `Password1!`.</Text>
+          {DEMO_CREATORS.map((account) => (
+            <TouchableOpacity
+              key={account.email}
+              style={styles.demoBtn}
+              onPress={() => fillDemoAccount(account)}
+              activeOpacity={0.85}
+            >
+              <View>
+                <Text style={styles.demoBtnTitle}>{account.label}</Text>
+                <Text style={styles.demoBtnMeta}>{account.email}</Text>
+              </View>
+              <Text style={styles.demoBtnAction}>Use</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         <View style={styles.dividerRow}>
           <View style={styles.divider} />
           <Text style={styles.dividerText}>or</Text>
@@ -127,6 +157,13 @@ const styles = StyleSheet.create({
   btn: { marginTop: 24, borderRadius: 14, overflow: 'hidden', shadowColor: '#3b82f6', shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
   btnGradient: { paddingVertical: 18, alignItems: 'center' },
   btnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  demoCard: { marginTop: 18, backgroundColor: '#131929', borderRadius: 16, borderWidth: 1, borderColor: '#1e293b', padding: 14, gap: 10 },
+  demoTitle: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  demoSub: { color: '#64748b', fontSize: 12, marginBottom: 2 },
+  demoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#0f1623', borderRadius: 12, borderWidth: 1, borderColor: '#1e293b', paddingHorizontal: 14, paddingVertical: 12 },
+  demoBtnTitle: { color: '#e2e8f0', fontSize: 13, fontWeight: '700' },
+  demoBtnMeta: { color: '#64748b', fontSize: 12, marginTop: 2 },
+  demoBtnAction: { color: '#60a5fa', fontSize: 13, fontWeight: '800' },
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 20, gap: 12 },
   divider: { flex: 1, height: 1, backgroundColor: '#1e293b' },
   dividerText: { color: '#334155', fontSize: 13 },

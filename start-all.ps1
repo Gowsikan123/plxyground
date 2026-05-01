@@ -31,7 +31,7 @@ $admin = Invoke-WebRequest -UseBasicParsing -Uri http://localhost:3012 -ErrorAct
 if ($admin -and $admin.StatusCode -eq 200) { Write-Host "✅ Admin panel healthy" } else { Write-Host "❌ Admin panel not healthy" }
 
 $frontend = Invoke-WebRequest -UseBasicParsing -Uri http://localhost:19006 -ErrorAction SilentlyContinue
-if ($frontend -and $frontend.StatusCode -eq 200) { Write-Host "✅ Frontend healthy" } else { Write-Host "❌ Frontend not healthy" }
+if ($frontend -and $frontend.StatusCode -eq 200) { Write-Host "Frontend healthy" } else { Write-Host "Frontend not healthy" }
 
 Write-Host "===================================="
 Write-Host "  PLXYGROUND RUNNING"

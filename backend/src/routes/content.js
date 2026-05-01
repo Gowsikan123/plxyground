@@ -15,7 +15,7 @@ function isValidUrl(value) {
 }
 
 // GET /api/content - public feed
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const { search, limit = 20, offset = 0 } = req.query;
   const lim = Math.min(Math.max(parseInt(limit), 1), 100);
   const off = parseInt(offset) || 0;
@@ -37,18 +37,18 @@ router.get('/', (req, res) => {
   query += ` ORDER BY c.feed_rank_at DESC, c.published_at DESC LIMIT ? OFFSET ?`;
   params.push(lim, off);
 
-  const rows = db.prepare(query).all(...params);
+  const rows = await db.prepare(query).all(...params);
   res.json({ data: rows, limit: lim, offset: off });
 });
 
 // GET /api/content/recommend - recommended content
-router.get('/recommend', (req, res) => {
+router.get('/recommend', async (req, res) => {
   const userId = req.user ? req.user.id : null;
-  const recent = db.prepare(`SELECT c.*, cr.name as creator_name, cr.profile_slug FROM content c JOIN creators cr ON c.creator_id = cr.id WHERE c.is_published = 1 ORDER BY c.created_at DESC LIMIT 10`).all();
-  const trending = db.prepare(`SELECT c.*, cr.name as creator_name, cr.profile_slug FROM content c JOIN creators cr ON c.creator_id = cr.id WHERE c.is_published = 1 ORDER BY c.order_priority DESC, c.updated_at DESC LIMIT 10`).all();
+  const recent = await db.prepare(`SELECT c.*, cr.name as creator_name, cr.profile_slug FROM content c JOIN creators cr ON c.creator_id = cr.id WHERE c.is_published = 1 ORDER BY c.created_at DESC LIMIT 10`).all();
+  const trending = await db.prepare(`SELECT c.*, cr.name as creator_name, cr.profile_slug FROM content c JOIN creators cr ON c.creator_id = cr.id WHERE c.is_published = 1 ORDER BY c.order_priority DESC, c.updated_at DESC LIMIT 10`).all();
 
   if (userId) {
-    const personal = db.prepare(`SELECT c.*, cr.name as creator_name, cr.profile_slug FROM content c JOIN creators cr ON c.creator_id = cr.id WHERE c.is_published = 1 ORDER BY c.feed_rank_at DESC, c.created_at DESC LIMIT 10`).all();
+    const personal = await db.prepare(`SELECT c.*, cr.name as creator_name, cr.profile_slug FROM content c JOIN creators cr ON c.creator_id = cr.id WHERE c.is_published = 1 ORDER BY c.feed_rank_at DESC, c.created_at DESC LIMIT 10`).all();
     return res.json({ mode: 'personal', data: personal, fallback: { trending, recent } });
   }
 
@@ -56,8 +56,8 @@ router.get('/recommend', (req, res) => {
 });
 
 // GET /api/content/:id - single post
-router.get('/:id', (req, res) => {
-  const row = db.prepare(`
+router.get('/:id', async (req, res) => {
+  const row = await db.prepare(`
     SELECT c.*, cr.name as creator_name, cr.profile_slug
     FROM content c
     JOIN creators cr ON cr.id = c.creator_id
@@ -69,7 +69,7 @@ router.get('/:id', (req, res) => {
 });
 
 // POST /api/content - create post (auth required)
-router.post('/', verifyToken, (req, res) => {
+router.post('/', verifyToken, async (req, res) => {
   const { title, body, content_type, media_url, order_priority } = req.body;
 
   if (!title || !body || !content_type || !media_url) {
@@ -83,17 +83,17 @@ router.post('/', verifyToken, (req, res) => {
   if (!isValidUrl(media_url)) return res.status(400).json({ error: 'media_url must be a valid URL' });
 
   try {
-    const result = db.prepare(`
+    const result = await db.prepare(`
       INSERT INTO content (creator_id, content_type, title, body, media_url, order_priority, is_published)
       VALUES (?, ?, ?, ?, ?, ?, 0)
     `).run(req.user.id, content_type, title, body, media_url, order_priority || 0);
 
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO moderation_queue (type, status, title_or_name, submitted_by, entity_id)
       VALUES ('content', 'pending', ?, ?, ?)
     `).run(title, req.user.email, result.lastInsertRowid);
 
-    const post = db.prepare('SELECT * FROM content WHERE id = ?').get(result.lastInsertRowid);
+    const post = await db.prepare('SELECT * FROM content WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json(post);
   } catch (err) {
     console.error(err);
@@ -102,7 +102,7 @@ router.post('/', verifyToken, (req, res) => {
 });
 
 // PUT /api/content/:id - edit post (owner only)
-router.put('/:id', verifyToken, (req, res) => {
+router.put('/:id', verifyToken, async (req, res) => {
   const { title, body, content_type, media_url, order_priority } = req.body;
 
   if (!media_url) {
@@ -114,7 +114,7 @@ router.put('/:id', verifyToken, (req, res) => {
   if (content_type && !CONTENT_TYPES.includes(content_type)) return res.status(400).json({ error: 'Invalid content_type' });
   if (!isValidUrl(media_url)) return res.status(400).json({ error: 'media_url must be a valid URL' });
 
-  const post = db.prepare('SELECT * FROM content WHERE id = ?').get(req.params.id);
+  const post = await db.prepare('SELECT * FROM content WHERE id = ?').get(req.params.id);
   if (!post) return res.status(404).json({ error: 'Not found' });
   if (post.creator_id !== req.user.id) return res.status(403).json({ error: 'Not your post' });
 
@@ -123,7 +123,7 @@ router.put('/:id', verifyToken, (req, res) => {
     return res.status(400).json({ error: 'Invalid content_type' });
   }
 
-  db.prepare(`
+  await db.prepare(`
     UPDATE content SET
       title = ?, body = ?, content_type = ?, media_url = ?,
       order_priority = ?, updated_at = datetime('now')
@@ -137,17 +137,17 @@ router.put('/:id', verifyToken, (req, res) => {
     req.params.id
   );
 
-  const updated = db.prepare('SELECT * FROM content WHERE id = ?').get(req.params.id);
+  const updated = await db.prepare('SELECT * FROM content WHERE id = ?').get(req.params.id);
   res.json(updated);
 });
 
 // DELETE /api/content/:id - delete post (owner only)
-router.delete('/:id', verifyToken, (req, res) => {
-  const post = db.prepare('SELECT * FROM content WHERE id = ?').get(req.params.id);
+router.delete('/:id', verifyToken, async (req, res) => {
+  const post = await db.prepare('SELECT * FROM content WHERE id = ?').get(req.params.id);
   if (!post) return res.status(404).json({ error: 'Not found' });
   if (post.creator_id !== req.user.id) return res.status(403).json({ error: 'Not your post' });
 
-  db.prepare('DELETE FROM content WHERE id = ?').run(req.params.id);
+  await db.prepare('DELETE FROM content WHERE id = ?').run(req.params.id);
   res.json({ message: 'Deleted' });
 });
 

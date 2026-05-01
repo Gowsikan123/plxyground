@@ -1,0 +1,6 @@
+Retrieving project…
+Resolving deployment "plxyground.vercel.app"
+waiting for new logs...
+WARNING! Command automatically interrupted after 5 minutes.
+
+Error: An unexpected error occurred in logs: AbortError: The user aborted a request.
