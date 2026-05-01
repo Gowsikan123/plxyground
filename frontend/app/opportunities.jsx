@@ -1,22 +1,26 @@
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, SafeAreaView, StatusBar, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, StatusBar, SafeAreaView, ActivityIndicator, RefreshControl } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
+import { useAuth } from '../components/AuthContext';
 import { apiRequest } from '../components/ApiClient';
 import { LinearGradient } from 'expo-linear-gradient';
+import BottomNav from '../components/BottomNav';
+import { C, R, GRAD_ACCENT } from '../components/theme';
 
 export default function Opportunities() {
-  const router = useRouter();
-  const [opportunities, setOpportunities] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [opps, setOpps]           = useState([]);
+  const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError]         = useState('');
+  const { token } = useAuth();
+  const router = useRouter();
 
   const load = async () => {
     try {
       const data = await apiRequest('/api/opportunities?limit=50');
-      setOpportunities(data.data || []);
+      setOpps(data.data || []);
       setError('');
-    } catch (e) {
+    } catch {
       setError('Failed to load opportunities. Pull down to retry.');
     } finally {
       setLoading(false);
@@ -25,145 +29,118 @@ export default function Opportunities() {
   };
 
   useEffect(() => { load(); }, []);
+  const onRefresh = () => { setRefreshing(true); load(); };
 
-  const renderOpportunity = ({ item }) => (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View style={styles.brandChip}>
-          <Text style={styles.brandChipText}>{item.creator_name}</Text>
+  const renderOpp = ({ item }) => (
+    <TouchableOpacity style={s.card} activeOpacity={0.88}>
+      <View style={s.cardTop}>
+        <View style={s.orgAvatar}>
+          <Text style={s.orgAvatarText}>{item.creator_name?.[0]?.toUpperCase()}</Text>
         </View>
-        <Text style={styles.cardDate}>{new Date(item.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</Text>
+        <View style={s.cardMeta}>
+          <Text style={s.orgName}>{item.creator_name}</Text>
+          <Text style={s.postedDate}>{new Date(item.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
+        </View>
+        <View style={s.liveBadge}>
+          <View style={s.liveDot} />
+          <Text style={s.liveText}>Live</Text>
+        </View>
       </View>
 
-      <Text style={styles.cardTitle}>{item.title}</Text>
-      <Text style={styles.roleType}>{item.role_type || 'Partnership'}</Text>
-      <Text style={styles.cardBody}>{item.body}</Text>
-
-      {item.requirements ? (
-        <View style={styles.block}>
-          <Text style={styles.blockLabel}>Requirements</Text>
-          <Text style={styles.blockText}>{item.requirements}</Text>
+      <Text style={s.title}>{item.title}</Text>
+      {item.role_type ? (
+        <View style={s.roleWrap}>
+          <Text style={s.roleText}>{item.role_type}</Text>
         </View>
       ) : null}
+      <Text style={s.body} numberOfLines={3}>{item.body}</Text>
 
-      {item.benefits ? (
-        <View style={styles.block}>
-          <Text style={styles.blockLabel}>Benefits</Text>
-          <Text style={styles.blockText}>{item.benefits}</Text>
-        </View>
-      ) : null}
-
-      <TouchableOpacity style={styles.interestBtn} activeOpacity={0.85}>
-        <Text style={styles.interestBtnText}>Express Interest</Text>
+      <TouchableOpacity style={s.applyWrap} activeOpacity={0.85}>
+        <LinearGradient colors={GRAD_ACCENT} style={s.applyBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+          <Text style={s.applyText}>Apply Now →</Text>
+        </LinearGradient>
       </TouchableOpacity>
-    </View>
+    </TouchableOpacity>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={s.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      <View style={styles.header}>
-        <Text style={styles.title}>Opportunities</Text>
-        <TouchableOpacity style={styles.feedBtn} onPress={() => router.push('/feed')}>
-          <Text style={styles.feedBtnText}>Back to Feed</Text>
-        </TouchableOpacity>
+      <View style={s.header}>
+        <View>
+          <Text style={s.headerTitle}>Opportunities</Text>
+          <Text style={s.headerSub}>Brand deals & collabs for creators</Text>
+        </View>
+        <View style={s.countBadge}>
+          <Text style={s.countText}>{opps.length}</Text>
+        </View>
       </View>
 
-      <LinearGradient colors={['#0d1e38', '#080C14']} style={styles.hero}>
-        <Text style={styles.heroTitle}>Find brand work worth saying yes to</Text>
-        <Text style={styles.heroSub}>Browse live opportunities from businesses looking for sports creators, ambassadors, and campaign partners.</Text>
-      </LinearGradient>
-
       {error ? (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{error}</Text>
+        <View style={s.errorBox}>
+          <Text style={s.errorText}>⚠ {error}</Text>
         </View>
       ) : null}
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color="#3b82f6" size="large" />
-          <Text style={styles.loadingText}>Loading opportunities...</Text>
+        <View style={s.center}>
+          <ActivityIndicator color={C.accent} size="large" />
         </View>
       ) : (
         <FlatList
-          data={opportunities}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={renderOpportunity}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor="#3b82f6" />}
+          data={opps}
+          keyExtractor={i => String(i.id)}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
+          contentContainerStyle={s.list}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.list}
-          ListEmptyComponent={(
-            <View style={styles.empty}>
-              <Text style={styles.emptyTitle}>No live opportunities yet</Text>
-              <Text style={styles.emptySub}>When businesses publish briefs, they will show up here for creators to review.</Text>
+          ListEmptyComponent={
+            <View style={s.empty}>
+              <Text style={s.emptyIcon}>🎯</Text>
+              <Text style={s.emptyTitle}>No opportunities yet</Text>
+              <Text style={s.emptySub}>Brands will post deals here. Check back soon.</Text>
             </View>
-          )}
+          }
+          renderItem={renderOpp}
         />
       )}
 
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/feed')}>
-          <Text style={styles.navIcon}>🏠</Text>
-          <Text style={styles.navLabel}>Feed</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/opportunities')}>
-          <Text style={styles.navIcon}>🤝</Text>
-          <Text style={[styles.navLabel, { color: '#3b82f6' }]}>Opps</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/create')}>
-          <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.navCreateBtn}>
-            <Text style={styles.navCreateIcon}>+</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
-          <Text style={styles.navIcon}>👤</Text>
-          <Text style={styles.navLabel}>Profile</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/settings')}>
-          <Text style={styles.navIcon}>⚙️</Text>
-          <Text style={styles.navLabel}>Settings</Text>
-        </TouchableOpacity>
-      </View>
+      <BottomNav />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#080C14' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
-  title: { color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
-  feedBtn: { backgroundColor: '#0f1623', borderWidth: 1, borderColor: '#1e293b', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
-  feedBtnText: { color: '#60a5fa', fontSize: 12, fontWeight: '700' },
-  hero: { marginHorizontal: 16, borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#1e3a5f', marginBottom: 14 },
-  heroTitle: { color: '#fff', fontSize: 22, fontWeight: '900', marginBottom: 8, lineHeight: 30 },
-  heroSub: { color: '#94a3b8', fontSize: 14, lineHeight: 22 },
-  errorBox: { backgroundColor: '#1a0808', borderWidth: 1, borderColor: '#7f1d1d', padding: 12, marginHorizontal: 16, borderRadius: 12, marginBottom: 8 },
-  errorText: { color: '#f87171', fontSize: 13 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loadingText: { color: '#334155', fontSize: 14 },
-  list: { paddingHorizontal: 16, paddingBottom: 110, paddingTop: 6 },
-  empty: { alignItems: 'center', paddingTop: 80, gap: 12 },
-  emptyTitle: { color: '#fff', fontSize: 20, fontWeight: '800' },
-  emptySub: { color: '#475569', fontSize: 14, textAlign: 'center', paddingHorizontal: 28 },
-  card: { backgroundColor: '#0f1623', borderRadius: 18, padding: 18, marginBottom: 14, borderWidth: 1, borderColor: '#1a2035' },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  brandChip: { backgroundColor: '#1a2420', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
-  brandChipText: { color: '#34d399', fontSize: 11, fontWeight: '800' },
-  cardDate: { color: '#475569', fontSize: 12 },
-  cardTitle: { color: '#fff', fontSize: 18, fontWeight: '800', lineHeight: 25 },
-  roleType: { color: '#60a5fa', fontSize: 12, fontWeight: '700', marginTop: 8, marginBottom: 10 },
-  cardBody: { color: '#94a3b8', fontSize: 14, lineHeight: 22 },
-  block: { marginTop: 14 },
-  blockLabel: { color: '#64748b', fontSize: 11, fontWeight: '700', letterSpacing: 0.6, marginBottom: 5 },
-  blockText: { color: '#cbd5e1', fontSize: 13, lineHeight: 20 },
-  interestBtn: { backgroundColor: '#1e3a5f', borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 16 },
-  interestBtnText: { color: '#60a5fa', fontWeight: '800', fontSize: 14 },
-  bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', backgroundColor: '#0a0e1a', borderTopWidth: 1, borderTopColor: '#1a2035', paddingBottom: 24, paddingTop: 12 },
-  navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
-  navIcon: { fontSize: 22 },
-  navLabel: { color: '#475569', fontSize: 10, fontWeight: '600' },
-  navCreateBtn: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  navCreateIcon: { color: '#fff', fontSize: 26, fontWeight: '300', lineHeight: 30 },
+const s = StyleSheet.create({
+  container:    { flex: 1, backgroundColor: C.bg },
+  center:       { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 14 },
+  headerTitle:  { color: C.text, fontSize: 22, fontWeight: '900', letterSpacing: -0.3 },
+  headerSub:    { color: C.textMuted, fontSize: 13, marginTop: 3 },
+  countBadge:   { backgroundColor: C.accentDark, width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  countText:    { color: C.accent, fontSize: 15, fontWeight: '800' },
+  errorBox:     { backgroundColor: '#1A0808', borderWidth: 1, borderColor: '#7F1D1D', padding: 12, marginHorizontal: 16, borderRadius: R.md, marginBottom: 8 },
+  errorText:    { color: C.red, fontSize: 13 },
+  list:         { paddingHorizontal: 16, paddingBottom: 120, paddingTop: 4 },
+  empty:        { alignItems: 'center', paddingTop: 80, gap: 12 },
+  emptyIcon:    { fontSize: 52 },
+  emptyTitle:   { color: C.text, fontSize: 20, fontWeight: '800' },
+  emptySub:     { color: C.textMuted, fontSize: 14, textAlign: 'center', paddingHorizontal: 32 },
+  // Card
+  card:         { backgroundColor: C.surface, borderRadius: R.xl, marginBottom: 14, padding: 18, borderWidth: 1, borderColor: C.border },
+  cardTop:      { flexDirection: 'row', alignItems: 'center', marginBottom: 14, gap: 12 },
+  orgAvatar:    { width: 44, height: 44, borderRadius: 22, backgroundColor: C.accentDark, alignItems: 'center', justifyContent: 'center' },
+  orgAvatarText:{ color: C.accent, fontSize: 18, fontWeight: '900' },
+  cardMeta:     { flex: 1 },
+  orgName:      { color: C.text, fontSize: 15, fontWeight: '700' },
+  postedDate:   { color: C.textMuted, fontSize: 12, marginTop: 2 },
+  liveBadge:    { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.greenGlow, borderWidth: 1, borderColor: C.greenDark, paddingHorizontal: 10, paddingVertical: 5, borderRadius: R.full },
+  liveDot:      { width: 6, height: 6, borderRadius: 3, backgroundColor: C.green },
+  liveText:     { color: C.green, fontSize: 11, fontWeight: '700' },
+  title:        { color: C.text, fontSize: 18, fontWeight: '800', marginBottom: 10, lineHeight: 26, letterSpacing: -0.2 },
+  roleWrap:     { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: R.full, marginBottom: 10 },
+  roleText:     { color: C.textMuted, fontSize: 12, fontWeight: '600' },
+  body:         { color: C.textMuted, fontSize: 14, lineHeight: 22, marginBottom: 16 },
+  applyWrap:    { borderRadius: R.md, overflow: 'hidden' },
+  applyBtn:     { paddingVertical: 14, alignItems: 'center', borderRadius: R.md },
+  applyText:    { color: '#fff', fontWeight: '800', fontSize: 15 },
 });
