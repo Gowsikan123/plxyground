@@ -1,35 +1,53 @@
-// Central design tokens — import this everywhere instead of hardcoding colours
+// ─── PLXYGROUND DESIGN TOKENS v2 ───────────────────────────────────────────
+// Energetic · Colourful · Young Creative · Sports Creator Network
+
 export const C = {
-  bg:         '#07080F',
-  surface:    '#0D1018',
-  surface2:   '#121520',
-  border:     '#1C2030',
-  borderSoft: '#151926',
+  // Canvas
+  bg:          '#0A0A0F',
+  surface:     '#111118',
+  surface2:    '#16161F',
+  surface3:    '#1C1C28',
+  border:      'rgba(255,255,255,0.07)',
+  borderBright:'rgba(255,255,255,0.14)',
 
-  text:       '#F0F2F8',
-  textMuted:  '#5A6278',
-  textFaint:  '#2E3347',
+  // Text
+  text:        '#FFFFFF',
+  textMuted:   '#8884A0',
+  textFaint:   '#3D3A52',
 
-  accent:     '#4F7EFF',
-  accentDark: '#1E3A8A',
-  accentGlow: 'rgba(79,126,255,0.15)',
+  // PRIMARY accent — electric coral
+  accent:      '#FF4D6D',
+  accentAlt:   '#FF2D52',
+  accentGlow:  'rgba(255,77,109,0.22)',
+  accentDark:  'rgba(255,77,109,0.12)',
 
-  green:      '#22C55E',
-  greenDark:  '#14532D',
-  greenGlow:  'rgba(34,197,94,0.12)',
+  // SECONDARY — neon lime
+  lime:        '#AAFF00',
+  limeGlow:    'rgba(170,255,0,0.18)',
+  limeDark:    'rgba(170,255,0,0.08)',
 
-  purple:     '#A78BFA',
-  purpleDark: '#3B0764',
-  purpleGlow: 'rgba(167,139,250,0.12)',
+  // TERTIARY — electric cyan
+  cyan:        '#00D4FF',
+  cyanGlow:    'rgba(0,212,255,0.18)',
+  cyanDark:    'rgba(0,212,255,0.08)',
 
-  red:        '#F87171',
-  redDark:    '#450A0A',
+  // QUATERNARY — electric purple
+  purple:      '#BF5FFF',
+  purpleGlow:  'rgba(191,95,255,0.18)',
+  purpleDark:  'rgba(191,95,255,0.08)',
 
-  gold:       '#FBBF24',
+  // Semantic
+  green:       '#22C55E',
+  greenGlow:   'rgba(34,197,94,0.15)',
+  greenDark:   'rgba(34,197,94,0.08)',
+  red:         '#FF4444',
+  redDark:     'rgba(255,68,68,0.12)',
+  gold:        '#FFD700',
 
-  article:    { bg: '#0E1835', text: '#4F7EFF',  label: 'Article' },
-  video:      { bg: '#160E2E', text: '#A78BFA',  label: 'Video'   },
-  story:      { bg: '#0A1E16', text: '#22C55E',  label: 'Story'   },
+  // Content type tokens
+  article:     { bg: 'rgba(0,212,255,0.10)',   text: '#00D4FF',  label: 'Article'   },
+  video:       { bg: 'rgba(191,95,255,0.10)',  text: '#BF5FFF',  label: 'Video'     },
+  story:       { bg: 'rgba(170,255,0,0.10)',   text: '#AAFF00',  label: 'Story'     },
 };
 
 export const R = {
@@ -38,21 +56,26 @@ export const R = {
   md:   14,
   lg:   18,
   xl:   24,
+  xxl:  32,
   full: 999,
 };
 
 export const S = {
-  xs:  4,
-  sm:  8,
-  md:  12,
-  lg:  16,
-  xl:  24,
-  xxl: 32,
-  '3xl': 48,
+  xs:   4,
+  sm:   8,
+  md:   12,
+  lg:   16,
+  xl:   24,
+  xxl:  32,
+  '3xl':48,
 };
 
-export const GRAD_ACCENT  = ['#4F7EFF', '#2563EB'];
-export const GRAD_GREEN   = ['#22C55E', '#16A34A'];
-export const GRAD_PURPLE  = ['#A78BFA', '#7C3AED'];
-export const GRAD_SURFACE = ['#0D1018', '#07080F'];
-export const GRAD_CARD    = ['transparent', 'rgba(7,8,15,0.9)'];
+// Gradients
+export const GRAD_ACCENT   = ['#FF4D6D', '#FF2052'];
+export const GRAD_LIME     = ['#AAFF00', '#7DCC00'];
+export const GRAD_CYAN     = ['#00D4FF', '#0099CC'];
+export const GRAD_PURPLE   = ['#BF5FFF', '#8B2FCC'];
+export const GRAD_HERO     = ['#FF4D6D', '#BF5FFF'];
+export const GRAD_SURFACE  = ['#111118', '#0A0A0F'];
+export const GRAD_CARD     = ['transparent', 'rgba(10,10,15,0.95)'];
+export const GRAD_SHIMMER  = ['#111118', '#1C1C28', '#111118'];

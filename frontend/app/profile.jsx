@@ -1,159 +1,185 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, SafeAreaView, StatusBar, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, SafeAreaView, RefreshControl } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../components/AuthContext';
 import { apiRequest } from '../components/ApiClient';
 import { LinearGradient } from 'expo-linear-gradient';
 import BottomNav from '../components/BottomNav';
-import { C, R, GRAD_ACCENT, GRAD_SURFACE } from '../components/theme';
+import { C, R, S, GRAD_HERO, GRAD_CYAN, GRAD_LIME } from '../components/theme';
 
 export default function Profile() {
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState('');
-  const { user, token } = useAuth();
+  const [profile, setProfile]   = useState(null);
+  const [posts, setPosts]       = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const { token, user, logout } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    if (!user) { router.replace('/login'); return; }
-    apiRequest(`/api/creators/${user.id}`, 'GET', null, token)
-      .then(data => { setProfile(data); setLoading(false); })
-      .catch(() => { setError('Could not load profile'); setLoading(false); });
-  }, [user]);
+  const load = async () => {
+    try {
+      const [prof, content] = await Promise.all([
+        apiRequest('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
+        apiRequest('/api/content?limit=50'),
+      ]);
+      setProfile(prof);
+      setPosts((content.data || []).filter(p => p.creator_id === prof.id));
+    } catch {} finally {
+      setLoading(false); setRefreshing(false);
+    }
+  };
 
-  if (loading) return (
-    <SafeAreaView style={s.container}>
-      <View style={s.center}><ActivityIndicator color={C.accent} size="large" /></View>
-    </SafeAreaView>
-  );
+  useEffect(() => { if (token) load(); else setLoading(false); }, [token]);
+  const onRefresh = () => { setRefreshing(true); load(); };
+  const handleLogout = async () => { await logout(); router.replace('/'); };
 
-  if (error || !profile) return (
-    <SafeAreaView style={s.container}>
+  if (!token) return (
+    <SafeAreaView style={s.safe}>
       <View style={s.center}>
-        <Text style={s.errorText}>{error || 'Could not load profile'}</Text>
-        <TouchableOpacity style={s.retryBtn} onPress={() => router.replace('/profile')}>
-          <Text style={s.retryText}>Try again</Text>
+        <Text style={s.noAuthIcon}>🔒</Text>
+        <Text style={s.noAuthTitle}>Sign in to view your profile</Text>
+        <TouchableOpacity style={s.signInWrap} onPress={() => router.push('/login')}>
+          <LinearGradient colors={GRAD_HERO} style={s.signInBtn}>
+            <Text style={s.signInText}>Sign In</Text>
+          </LinearGradient>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 
-  const posts = profile.posts || [];
+  const initial = profile?.name?.[0]?.toUpperCase() ?? '?';
 
   return (
-    <SafeAreaView style={s.container}>
+    <SafeAreaView style={s.safe}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
-
-        {/* Hero */}
-        <LinearGradient colors={['#0A1128', C.bg]} style={s.hero}>
-          <View style={s.heroTop}>
-            <Text style={s.heroTitle}>Profile</Text>
-            <TouchableOpacity style={s.editBtn} onPress={() => router.push('/settings')}>
-              <Text style={s.editBtnText}>Edit Profile</Text>
-            </TouchableOpacity>
-          </View>
-
-          <LinearGradient colors={GRAD_ACCENT} style={s.avatarRing} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-            <View style={s.avatarInner}>
-              <Text style={s.avatarText}>{profile.name?.[0]?.toUpperCase()}</Text>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
+        contentContainerStyle={s.scroll}
+      >
+        {/* Profile hero */}
+        <LinearGradient colors={['rgba(255,77,109,0.15)', 'transparent']} style={s.profileHero}>
+          <View style={s.profileTop}>
+            <LinearGradient colors={GRAD_HERO} style={s.avatarLarge} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+              <Text style={s.avatarLargeText}>{initial}</Text>
+            </LinearGradient>
+            <View style={s.profileInfo}>
+              <Text style={s.profileName}>{profile?.name ?? '—'}</Text>
+              <Text style={s.profileHandle}>@{profile?.email?.split('@')[0] ?? '—'}</Text>
+              <View style={s.rolePill}>
+                <Text style={s.roleText}>⚡ Creator</Text>
+              </View>
             </View>
-          </LinearGradient>
-
-          <Text style={s.name}>{profile.name}</Text>
-          {profile.location ? <Text style={s.location}>📍 {profile.location}</Text> : null}
-          {profile.bio ? <Text style={s.bio}>{profile.bio}</Text> : null}
-
-          <View style={s.roleTag}>
-            <Text style={s.roleTagText}>{profile.role === 'BUSINESS' ? '🏢 Business' : '⭐ Creator'}</Text>
           </View>
 
-          <View style={s.stats}>
-            {[['Posts', posts.length], ['Following', '—'], ['Followers', '—']].map(([label, val], i, arr) => (
-              <View key={label} style={s.statItem}>
-                <Text style={s.statNum}>{val}</Text>
-                <Text style={s.statLabel}>{label}</Text>
-                {i < arr.length - 1 && <View style={s.statDivider} />}
+          {/* Stats */}
+          <View style={s.statsRow}>
+            {[
+              { val: posts.length, label: 'Posts'    },
+              { val: '—',          label: 'Followers' },
+              { val: '—',          label: 'Deals'     },
+            ].map((stat, i) => (
+              <View key={i} style={[s.stat, i < 2 && s.statBorder]}>
+                <Text style={s.statVal}>{stat.val}</Text>
+                <Text style={s.statLabel}>{stat.label}</Text>
               </View>
             ))}
           </View>
         </LinearGradient>
 
-        {/* Posts */}
+        {/* Action buttons */}
+        <View style={s.actions}>
+          <TouchableOpacity style={s.editBtn} activeOpacity={0.8}>
+            <Text style={s.editBtnText}>Edit Profile</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.settingsBtn} onPress={() => router.push('/settings')} activeOpacity={0.8}>
+            <Text style={s.settingsBtnText}>⚙</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Posts section */}
         <View style={s.section}>
-          <Text style={s.sectionTitle}>Posts</Text>
-          {posts.length === 0 ? (
-            <View style={s.empty}>
-              <Text style={s.emptyIcon}>📝</Text>
-              <Text style={s.emptyText}>No posts yet</Text>
-              <TouchableOpacity style={s.createBtn} onPress={() => router.push('/create')}>
-                <Text style={s.createBtnText}>Create your first post</Text>
+          <Text style={s.sectionTitle}>My Posts</Text>
+          {loading ? (
+            <Text style={s.loadingText}>Loading…</Text>
+          ) : posts.length === 0 ? (
+            <View style={s.emptyPosts}>
+              <Text style={s.emptyPostsIcon}>📝</Text>
+              <Text style={s.emptyPostsTitle}>No posts yet</Text>
+              <Text style={s.emptyPostsSub}>Share your first story with the world</Text>
+              <TouchableOpacity onPress={() => router.push('/create')}>
+                <LinearGradient colors={GRAD_HERO} style={s.createWrap}>
+                  <Text style={s.createText}>Create Post →</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           ) : (
-            posts.map(p => (
-              <TouchableOpacity key={p.id} style={s.postCard} onPress={() => router.push(`/post/${p.id}`)} activeOpacity={0.88}>
-                <Image source={{ uri: p.media_url }} style={s.postThumb} defaultSource={require('../assets/placeholder.png')} />
-                <View style={s.postInfo}>
-                  <Text style={s.postTitle} numberOfLines={2}>{p.title}</Text>
-                  <View style={s.postMeta}>
-                    <View style={s.postTypeBadge}>
-                      <Text style={s.postTypeText}>{p.content_type}</Text>
-                    </View>
-                    <Text style={s.postDate}>{new Date(p.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</Text>
+            <View style={s.postGrid}>
+              {posts.map(post => (
+                <TouchableOpacity key={post.id} style={s.postCard} onPress={() => router.push(`/post/${post.id}`)} activeOpacity={0.85}>
+                  <LinearGradient colors={GRAD_HERO} style={s.postCardBar} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} />
+                  <View style={s.postCardBody}>
+                    <Text style={s.postCardTitle} numberOfLines={2}>{post.title}</Text>
+                    <Text style={s.postCardDate}>{new Date(post.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</Text>
                   </View>
-                </View>
-                <Text style={s.chevron}>›</Text>
-              </TouchableOpacity>
-            ))
+                </TouchableOpacity>
+              ))}
+            </View>
           )}
         </View>
-      </ScrollView>
 
+        {/* Logout */}
+        <TouchableOpacity style={s.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
+          <Text style={s.logoutText}>Sign Out</Text>
+        </TouchableOpacity>
+      </ScrollView>
       <BottomNav />
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
-  container:     { flex: 1, backgroundColor: C.bg },
-  center:        { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
-  scroll:        { paddingBottom: 120 },
-  errorText:     { color: C.red, fontSize: 16 },
-  retryBtn:      { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, paddingHorizontal: 20, paddingVertical: 10, borderRadius: R.md },
-  retryText:     { color: C.accent, fontWeight: '700' },
-  hero:          { padding: 24, paddingTop: 16, alignItems: 'center' },
-  heroTop:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 28 },
-  heroTitle:     { color: C.text, fontSize: 20, fontWeight: '900' },
-  editBtn:       { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, paddingHorizontal: 16, paddingVertical: 8, borderRadius: R.full },
-  editBtnText:   { color: C.textMuted, fontSize: 13, fontWeight: '600' },
-  avatarRing:    { width: 100, height: 100, borderRadius: 50, alignItems: 'center', justifyContent: 'center', marginBottom: 14, padding: 3 },
-  avatarInner:   { width: 94, height: 94, borderRadius: 47, backgroundColor: C.surface2, alignItems: 'center', justifyContent: 'center' },
-  avatarText:    { color: C.accent, fontSize: 42, fontWeight: '900' },
-  name:          { color: C.text, fontSize: 26, fontWeight: '900', marginBottom: 6, letterSpacing: -0.4 },
-  location:      { color: C.textMuted, fontSize: 13, marginBottom: 8 },
-  bio:           { color: C.textMuted, fontSize: 14, textAlign: 'center', lineHeight: 22, paddingHorizontal: 20, marginBottom: 12 },
-  roleTag:       { backgroundColor: C.accentDark, borderWidth: 1, borderColor: '#1E3A8A', paddingHorizontal: 14, paddingVertical: 5, borderRadius: R.full, marginBottom: 20 },
-  roleTagText:   { color: C.accent, fontSize: 12, fontWeight: '700' },
-  stats:         { flexDirection: 'row', backgroundColor: C.surface, borderRadius: R.lg, borderWidth: 1, borderColor: C.border, width: '100%', paddingVertical: 18 },
-  statItem:      { flex: 1, alignItems: 'center', position: 'relative' },
-  statNum:       { color: C.text, fontSize: 22, fontWeight: '900' },
-  statLabel:     { color: C.textMuted, fontSize: 11, marginTop: 4, fontWeight: '600' },
-  statDivider:   { position: 'absolute', right: 0, top: '10%', width: 1, height: '80%', backgroundColor: C.border },
-  section:       { paddingHorizontal: 20, paddingTop: 24 },
-  sectionTitle:  { color: C.text, fontSize: 18, fontWeight: '800', marginBottom: 16 },
-  empty:         { alignItems: 'center', paddingVertical: 40, gap: 10 },
-  emptyIcon:     { fontSize: 40 },
-  emptyText:     { color: C.textMuted, fontSize: 15 },
-  createBtn:     { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, paddingHorizontal: 20, paddingVertical: 10, borderRadius: R.md },
-  createBtnText: { color: C.accent, fontWeight: '700', fontSize: 14 },
-  postCard:      { flexDirection: 'row', alignItems: 'center', backgroundColor: C.surface, borderRadius: R.lg, marginBottom: 10, overflow: 'hidden', borderWidth: 1, borderColor: C.border },
-  postThumb:     { width: 76, height: 76, backgroundColor: C.surface2 },
-  postInfo:      { flex: 1, paddingHorizontal: 14, paddingVertical: 12 },
-  postTitle:     { color: C.text, fontWeight: '700', fontSize: 14, lineHeight: 20, marginBottom: 8 },
-  postMeta:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  postTypeBadge: { backgroundColor: C.accentDark, paddingHorizontal: 8, paddingVertical: 3, borderRadius: R.xs },
-  postTypeText:  { color: C.accent, fontSize: 10, fontWeight: '700' },
-  postDate:      { color: C.textFaint, fontSize: 11 },
-  chevron:       { color: C.textFaint, fontSize: 24, paddingRight: 16 },
+  safe:            { flex: 1, backgroundColor: C.bg },
+  scroll:          { paddingBottom: 120 },
+  center:          { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 32 },
+  noAuthIcon:      { fontSize: 52 },
+  noAuthTitle:     { color: C.text, fontSize: 18, fontWeight: '700', textAlign: 'center' },
+  signInWrap:      { borderRadius: R.xl, overflow: 'hidden', width: '100%' },
+  signInBtn:       { paddingVertical: 16, alignItems: 'center' },
+  signInText:      { color: '#fff', fontWeight: '800', fontSize: 16 },
+  profileHero:     { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24 },
+  profileTop:      { flexDirection: 'row', gap: 18, alignItems: 'center', marginBottom: 24 },
+  avatarLarge:     { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
+  avatarLargeText: { color: '#fff', fontSize: 32, fontWeight: '900' },
+  profileInfo:     { flex: 1 },
+  profileName:     { color: C.text, fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
+  profileHandle:   { color: C.textMuted, fontSize: 14, marginTop: 2 },
+  rolePill:        { alignSelf: 'flex-start', backgroundColor: C.accentDark, borderWidth: 1, borderColor: 'rgba(255,77,109,0.25)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: R.full, marginTop: 8 },
+  roleText:        { color: C.accent, fontSize: 12, fontWeight: '700' },
+  statsRow:        { flexDirection: 'row', backgroundColor: C.surface, borderRadius: R.xl, borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
+  stat:            { flex: 1, alignItems: 'center', paddingVertical: 16 },
+  statBorder:      { borderRightWidth: 1, borderRightColor: C.border },
+  statVal:         { color: C.text, fontSize: 20, fontWeight: '900' },
+  statLabel:       { color: C.textMuted, fontSize: 11, marginTop: 2 },
+  actions:         { flexDirection: 'row', paddingHorizontal: 20, gap: 12, marginBottom: 24 },
+  editBtn:         { flex: 1, paddingVertical: 13, alignItems: 'center', backgroundColor: C.surface, borderRadius: R.lg, borderWidth: 1, borderColor: C.borderBright },
+  editBtnText:     { color: C.text, fontWeight: '700', fontSize: 14 },
+  settingsBtn:     { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: C.surface, borderRadius: R.lg, borderWidth: 1, borderColor: C.border },
+  settingsBtnText: { fontSize: 22 },
+  section:         { paddingHorizontal: 20 },
+  sectionTitle:    { color: C.text, fontSize: 18, fontWeight: '800', marginBottom: 16, letterSpacing: -0.3 },
+  loadingText:     { color: C.textMuted, fontSize: 14 },
+  emptyPosts:      { alignItems: 'center', paddingVertical: 40, gap: 10 },
+  emptyPostsIcon:  { fontSize: 44 },
+  emptyPostsTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
+  emptyPostsSub:   { color: C.textMuted, fontSize: 14, textAlign: 'center' },
+  createWrap:      { borderRadius: R.lg, overflow: 'hidden', marginTop: 6 },
+  createText:      { color: '#fff', fontWeight: '800', fontSize: 14, paddingHorizontal: 24, paddingVertical: 13 },
+  postGrid:        { gap: 12 },
+  postCard:        { backgroundColor: C.surface, borderRadius: R.lg, overflow: 'hidden', borderWidth: 1, borderColor: C.border },
+  postCardBar:     { height: 3 },
+  postCardBody:    { padding: 14 },
+  postCardTitle:   { color: C.text, fontSize: 15, fontWeight: '700', lineHeight: 22, marginBottom: 6 },
+  postCardDate:    { color: C.textMuted, fontSize: 12 },
+  logoutBtn:       { marginHorizontal: 20, marginTop: 28, paddingVertical: 15, alignItems: 'center', backgroundColor: C.redDark, borderRadius: R.lg, borderWidth: 1, borderColor: 'rgba(255,68,68,0.2)' },
+  logoutText:      { color: C.red, fontSize: 15, fontWeight: '700' },
 });

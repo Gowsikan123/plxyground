@@ -6,22 +6,25 @@ import { apiRequest } from '../components/ApiClient';
 import { LinearGradient } from 'expo-linear-gradient';
 import BottomNav from '../components/BottomNav';
 import SkeletonCard from '../components/SkeletonCard';
-import { C, R, S, GRAD_ACCENT, GRAD_CARD } from '../components/theme';
+import { C, R, GRAD_HERO, GRAD_CARD } from '../components/theme';
 
 const { width } = Dimensions.get('window');
 
 const TYPE_META = {
-  article:     { color: C.accent,  bg: C.article.bg,  label: 'Article' },
-  video_embed: { color: C.purple,  bg: C.video.bg,    label: 'Video'   },
-  image_story: { color: C.green,   bg: C.story.bg,    label: 'Story'   },
+  article:     { color: C.cyan,   bg: C.article.bg, label: 'Article', grad: ['#00D4FF','#0099CC'] },
+  video_embed: { color: C.purple, bg: C.video.bg,   label: 'Video',   grad: ['#BF5FFF','#8B2FCC'] },
+  image_story: { color: C.lime,   bg: C.story.bg,   label: 'Story',   grad: ['#AAFF00','#7DCC00'] },
 };
 
+const FILTERS = ['All', 'Article', 'Video', 'Story'];
+
 export default function Feed() {
-  const [posts, setPosts]         = useState([]);
-  const [search, setSearch]       = useState('');
-  const [loading, setLoading]     = useState(true);
+  const [posts, setPosts]           = useState([]);
+  const [search, setSearch]         = useState('');
+  const [filter, setFilter]         = useState('All');
+  const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError]         = useState('');
+  const [error, setError]           = useState('');
   const { token } = useAuth();
   const router = useRouter();
 
@@ -39,42 +42,43 @@ export default function Feed() {
   };
 
   useEffect(() => { load(); }, []);
-  useEffect(() => {
-    const t = setTimeout(() => load(search), 400);
-    return () => clearTimeout(t);
-  }, [search]);
-
+  useEffect(() => { const t = setTimeout(() => load(search), 400); return () => clearTimeout(t); }, [search]);
   const onRefresh = () => { setRefreshing(true); load(search); };
 
-  const renderPost = ({ item }) => {
+  const displayed = filter === 'All' ? posts : posts.filter(p => {
+    if (filter === 'Article') return p.content_type === 'article';
+    if (filter === 'Video')   return p.content_type === 'video_embed';
+    if (filter === 'Story')   return p.content_type === 'image_story';
+    return true;
+  });
+
+  const renderPost = ({ item, index }) => {
     const meta = TYPE_META[item.content_type] || TYPE_META.article;
+    const isFeatured = index === 0 && filter === 'All';
     return (
-      <TouchableOpacity style={s.card} onPress={() => router.push(`/post/${item.id}`)} activeOpacity={0.92}>
+      <TouchableOpacity style={[s.card, isFeatured && s.featuredCard]} onPress={() => router.push(`/post/${item.id}`)} activeOpacity={0.90}>
         <View style={s.imgWrap}>
-          <Image
-            source={{ uri: item.media_url }}
-            style={s.img}
-            defaultSource={require('../assets/placeholder.png')}
-          />
+          <Image source={{ uri: item.media_url }} style={[s.img, isFeatured && s.featuredImg]} defaultSource={require('../assets/placeholder.png')} />
           <LinearGradient colors={GRAD_CARD} style={s.imgOverlay} />
-          <View style={[s.badge, { backgroundColor: meta.bg }]}>
-            <Text style={[s.badgeText, { color: meta.color }]}>{meta.label}</Text>
-          </View>
+          <LinearGradient colors={meta.grad} style={s.typePill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+            <Text style={s.typePillText}>{meta.label}</Text>
+          </LinearGradient>
+          {isFeatured && <View style={s.featuredTag}><Text style={s.featuredTagText}>✦ Featured</Text></View>}
         </View>
-        <View style={s.body}>
+        <View style={s.cardBody}>
           <View style={s.metaRow}>
-            <View style={s.creator}>
-              <View style={s.avatar}>
+            <View style={s.creatorRow}>
+              <LinearGradient colors={GRAD_HERO} style={s.avatar} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
                 <Text style={s.avatarText}>{item.creator_name?.[0]?.toUpperCase()}</Text>
-              </View>
+              </LinearGradient>
               <Text style={s.creatorName} numberOfLines={1}>{item.creator_name}</Text>
             </View>
             <Text style={s.date}>{new Date(item.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</Text>
           </View>
-          <Text style={s.title} numberOfLines={2}>{item.title}</Text>
+          <Text style={[s.cardTitle, isFeatured && s.featuredTitle]} numberOfLines={isFeatured ? 3 : 2}>{item.title}</Text>
           <Text style={s.excerpt} numberOfLines={2}>{item.body}</Text>
-          <View style={s.footer}>
-            <Text style={s.readMore}>Read more →</Text>
+          <View style={s.cardFooter}>
+            <Text style={[s.readMore, { color: meta.color }]}>Read more →</Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -82,7 +86,7 @@ export default function Feed() {
   };
 
   return (
-    <SafeAreaView style={s.container}>
+    <SafeAreaView style={s.safe}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
       {/* Header */}
@@ -92,46 +96,45 @@ export default function Feed() {
           <Text style={s.logoSub}>Sports Creator Network</Text>
         </View>
         {token && (
-          <TouchableOpacity style={s.createWrap} onPress={() => router.push('/create')} activeOpacity={0.85}>
-            <LinearGradient colors={GRAD_ACCENT} style={s.createBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-              <Text style={s.createBtnText}>+ Create</Text>
+          <TouchableOpacity onPress={() => router.push('/create')} activeOpacity={0.85}>
+            <LinearGradient colors={GRAD_HERO} style={s.createBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+              <Text style={s.createBtnText}>+ Post</Text>
             </LinearGradient>
           </TouchableOpacity>
         )}
       </View>
 
       {/* Search */}
-      <View style={s.searchWrap}>
+      <View style={s.searchBar}>
         <Text style={s.searchIcon}>🔍</Text>
-        <TextInput
-          style={s.searchInput}
-          placeholder="Search posts, creators..."
-          placeholderTextColor={C.textFaint}
-          value={search}
-          onChangeText={setSearch}
-        />
-        {search ? (
-          <TouchableOpacity onPress={() => setSearch('')} style={s.clearBtn}>
-            <Text style={s.clearText}>✕</Text>
-          </TouchableOpacity>
-        ) : null}
+        <TextInput style={s.searchInput} placeholder="Search creators & posts…" placeholderTextColor={C.textFaint} value={search} onChangeText={setSearch} />
+        {search ? <TouchableOpacity onPress={() => setSearch('')}><Text style={s.clearText}>✕</Text></TouchableOpacity> : null}
       </View>
 
-      {error ? (
-        <View style={s.errorBox}>
-          <Text style={s.errorText}>⚠ {error}</Text>
-        </View>
-      ) : null}
+      {/* Filter chips */}
+      <View style={s.filters}>
+        {FILTERS.map(f => {
+          const active = filter === f;
+          return (
+            <TouchableOpacity key={f} style={[s.chip, active && s.chipActive]} onPress={() => setFilter(f)} activeOpacity={0.8}>
+              {active
+                ? <LinearGradient colors={GRAD_HERO} style={s.chipGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}><Text style={s.chipActiveText}>{f}</Text></LinearGradient>
+                : <Text style={s.chipText}>{f}</Text>
+              }
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {error ? <View style={s.errorBox}><Text style={s.errorText}>⚠ {error}</Text></View> : null}
 
       {loading ? (
         <View style={s.list}>
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
+          <SkeletonCard /><SkeletonCard />
         </View>
       ) : (
         <FlatList
-          data={posts}
+          data={displayed}
           keyExtractor={i => String(i.id)}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
           contentContainerStyle={s.list}
@@ -141,11 +144,6 @@ export default function Feed() {
               <Text style={s.emptyIcon}>⚡</Text>
               <Text style={s.emptyTitle}>Nothing here yet</Text>
               <Text style={s.emptySub}>Be the first creator to post</Text>
-              {token && (
-                <TouchableOpacity style={s.emptyBtn} onPress={() => router.push('/create')}>
-                  <Text style={s.emptyBtnText}>Create Post</Text>
-                </TouchableOpacity>
-              )}
             </View>
           }
           renderItem={renderPost}
@@ -158,43 +156,49 @@ export default function Feed() {
 }
 
 const s = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: C.bg },
-  header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 14 },
-  logo:         { color: C.text, fontSize: 17, fontWeight: '900', letterSpacing: 2.5 },
-  logoSub:      { color: C.textMuted, fontSize: 11, marginTop: 2 },
-  createWrap:   { borderRadius: R.full, overflow: 'hidden' },
-  createBtn:    { paddingHorizontal: 18, paddingVertical: 9, borderRadius: R.full },
-  createBtnText:{ color: '#fff', fontWeight: '700', fontSize: 13 },
-  searchWrap:   { flexDirection: 'row', alignItems: 'center', backgroundColor: C.surface, marginHorizontal: 16, marginBottom: 10, borderRadius: R.lg, paddingHorizontal: 14, borderWidth: 1, borderColor: C.border },
-  searchIcon:   { fontSize: 14, marginRight: 8, opacity: 0.5 },
-  searchInput:  { flex: 1, color: C.text, paddingVertical: 13, fontSize: 14 },
-  clearBtn:     { padding: 8 },
-  clearText:    { color: C.textMuted, fontSize: 13 },
-  errorBox:     { backgroundColor: '#1A0808', borderWidth: 1, borderColor: '#7F1D1D', padding: 12, marginHorizontal: 16, borderRadius: R.md, marginBottom: 8 },
-  errorText:    { color: C.red, fontSize: 13 },
-  list:         { paddingHorizontal: 16, paddingBottom: 120, paddingTop: 4 },
-  empty:        { alignItems: 'center', paddingTop: 80, gap: 12 },
-  emptyIcon:    { fontSize: 52 },
-  emptyTitle:   { color: C.text, fontSize: 20, fontWeight: '800' },
-  emptySub:     { color: C.textMuted, fontSize: 14, textAlign: 'center', paddingHorizontal: 32 },
-  emptyBtn:     { backgroundColor: C.surface, borderWidth: 1, borderColor: C.accent, paddingHorizontal: 24, paddingVertical: 12, borderRadius: R.md, marginTop: 8 },
-  emptyBtnText: { color: C.accent, fontWeight: '700' },
-  // Card
-  card:         { backgroundColor: C.surface, borderRadius: R.xl, marginBottom: 16, overflow: 'hidden', borderWidth: 1, borderColor: C.border },
-  imgWrap:      { position: 'relative' },
-  img:          { width: '100%', height: 220, backgroundColor: C.surface2 },
-  imgOverlay:   { position: 'absolute', bottom: 0, left: 0, right: 0, height: 80 },
-  badge:        { position: 'absolute', top: 12, left: 12, paddingHorizontal: 10, paddingVertical: 5, borderRadius: R.full },
-  badgeText:    { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-  body:         { padding: 18 },
-  metaRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  creator:      { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
-  avatar:       { width: 28, height: 28, borderRadius: 14, backgroundColor: C.accentDark, alignItems: 'center', justifyContent: 'center' },
-  avatarText:   { color: C.accent, fontSize: 12, fontWeight: '800' },
-  creatorName:  { color: C.textMuted, fontSize: 13, fontWeight: '600', flex: 1 },
-  date:         { color: C.textFaint, fontSize: 12 },
-  title:        { color: C.text, fontSize: 18, fontWeight: '800', marginBottom: 8, lineHeight: 26, letterSpacing: -0.3 },
-  excerpt:      { color: C.textMuted, fontSize: 14, lineHeight: 22 },
-  footer:       { marginTop: 14, flexDirection: 'row', justifyContent: 'flex-end' },
-  readMore:     { color: C.accent, fontSize: 13, fontWeight: '700' },
+  safe:           { flex: 1, backgroundColor: C.bg },
+  header:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12 },
+  logo:           { color: C.text, fontSize: 16, fontWeight: '900', letterSpacing: 3 },
+  logoSub:        { color: C.textMuted, fontSize: 10, marginTop: 1, letterSpacing: 0.3 },
+  createBtn:      { paddingHorizontal: 16, paddingVertical: 9, borderRadius: R.full },
+  createBtnText:  { color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 0.3 },
+  searchBar:      { flexDirection: 'row', alignItems: 'center', backgroundColor: C.surface, marginHorizontal: 16, marginBottom: 12, borderRadius: R.lg, paddingHorizontal: 14, borderWidth: 1, borderColor: C.border },
+  searchIcon:     { fontSize: 14, marginRight: 8, opacity: 0.5 },
+  searchInput:    { flex: 1, color: C.text, paddingVertical: 13, fontSize: 14 },
+  clearText:      { color: C.textMuted, fontSize: 14, padding: 8 },
+  filters:        { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 12 },
+  chip:           { borderRadius: R.full, borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
+  chipActive:     { borderColor: 'transparent' },
+  chipGrad:       { paddingHorizontal: 16, paddingVertical: 8 },
+  chipText:       { color: C.textMuted, fontSize: 13, fontWeight: '600', paddingHorizontal: 16, paddingVertical: 8 },
+  chipActiveText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  errorBox:       { backgroundColor: C.redDark, borderWidth: 1, borderColor: 'rgba(255,68,68,0.25)', padding: 12, marginHorizontal: 16, borderRadius: R.md, marginBottom: 8 },
+  errorText:      { color: C.red, fontSize: 13 },
+  list:           { paddingHorizontal: 16, paddingBottom: 120, paddingTop: 4 },
+  empty:          { alignItems: 'center', paddingTop: 80, gap: 12 },
+  emptyIcon:      { fontSize: 52 },
+  emptyTitle:     { color: C.text, fontSize: 20, fontWeight: '800' },
+  emptySub:       { color: C.textMuted, fontSize: 14, textAlign: 'center', paddingHorizontal: 32 },
+  card:           { backgroundColor: C.surface, borderRadius: R.xl, marginBottom: 16, overflow: 'hidden', borderWidth: 1, borderColor: C.border },
+  featuredCard:   { borderColor: 'rgba(255,77,109,0.3)', shadowColor: C.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 8 },
+  imgWrap:        { position: 'relative' },
+  img:            { width: '100%', height: 210, backgroundColor: C.surface2 },
+  featuredImg:    { height: 260 },
+  imgOverlay:     { position: 'absolute', bottom: 0, left: 0, right: 0, height: 100 },
+  typePill:       { position: 'absolute', top: 12, left: 12, paddingHorizontal: 10, paddingVertical: 5, borderRadius: R.full },
+  typePillText:   { color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
+  featuredTag:    { position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(255,215,0,0.15)', borderWidth: 1, borderColor: 'rgba(255,215,0,0.3)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: R.full },
+  featuredTagText:{ color: C.gold, fontSize: 11, fontWeight: '700' },
+  cardBody:       { padding: 16 },
+  metaRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  creatorRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  avatar:         { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  avatarText:     { color: '#fff', fontSize: 11, fontWeight: '900' },
+  creatorName:    { color: C.textMuted, fontSize: 13, fontWeight: '600', flex: 1 },
+  date:           { color: C.textFaint, fontSize: 12 },
+  cardTitle:      { color: C.text, fontSize: 17, fontWeight: '800', marginBottom: 7, lineHeight: 24, letterSpacing: -0.3 },
+  featuredTitle:  { fontSize: 20, lineHeight: 28 },
+  excerpt:        { color: C.textMuted, fontSize: 13, lineHeight: 20 },
+  cardFooter:     { marginTop: 12, flexDirection: 'row', justifyContent: 'flex-end' },
+  readMore:       { fontSize: 13, fontWeight: '700' },
 });

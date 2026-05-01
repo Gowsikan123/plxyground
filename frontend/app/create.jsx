@@ -1,168 +1,137 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform, StatusBar, SafeAreaView, Image } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, StatusBar, ScrollView, KeyboardAvoidingView, Platform, Switch } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../components/AuthContext';
 import { apiRequest } from '../components/ApiClient';
-import { LinearGradient } from 'expo-linear-gradient';
+import { C, R, GRAD_HERO, GRAD_CYAN, GRAD_LIME, GRAD_PURPLE } from '../components/theme';
 
 const TYPES = [
-  { key: 'article', label: '📝 Article', desc: 'Long-form content' },
-  { key: 'video_embed', label: '🎥 Video', desc: 'Video content' },
-  { key: 'image_story', label: '📸 Story', desc: 'Photo story' },
-];
-
-const SAMPLE_URLS = [
-  'https://images.unsplash.com/photo-1546519638405-a9f5a95a5b64?w=800',
-  'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800',
-  'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=800',
+  { id: 'article',     label: 'Article', icon: '📝', grad: ['#00D4FF','#0099CC'] },
+  { id: 'video_embed', label: 'Video',   icon: '🎥', grad: ['#BF5FFF','#8B2FCC'] },
+  { id: 'image_story', label: 'Story',   icon: '📸', grad: ['#AAFF00','#7DCC00'] },
 ];
 
 export default function Create() {
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
+  const [type, setType]         = useState('article');
+  const [title, setTitle]       = useState('');
+  const [body, setBody]         = useState('');
   const [mediaUrl, setMediaUrl] = useState('');
-  const [contentType, setContentType] = useState('article');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
   const { token } = useAuth();
   const router = useRouter();
 
-  const handleCreate = async () => {
-    setError(''); setSuccess('');
-    if (!title) { setError('Title is required'); return; }
-    if (!body) { setError('Body content is required'); return; }
-    if (!mediaUrl) { setError('Media URL is required — add an image link'); return; }
-    setLoading(true);
+  const handleSubmit = async () => {
+    if (!title.trim() || !body.trim()) { setError('Title and body are required'); return; }
+    setLoading(true); setError('');
     try {
-      await apiRequest('/api/content', 'POST', { title, body, content_type: contentType, media_url: mediaUrl }, token);
-      setSuccess('🎉 Post submitted for review!');
-      setTimeout(() => router.replace('/feed'), 1800);
-    } catch (err) {
-      setError(err.error || 'Failed to create post');
-    } finally { setLoading(false); }
+      await apiRequest('/api/content', {
+        method: 'POST',
+        body: { title: title.trim(), body: body.trim(), content_type: type, media_url: mediaUrl.trim() || null },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      router.replace('/feed');
+    } catch (e) {
+      setError(e.message || 'Failed to post. Try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
+  const selectedType = TYPES.find(t => t.id === type);
+
   return (
-    <SafeAreaView style={styles.container}>
+    <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <View style={s.blobBR} />
+      <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={s.header}>
+          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
+            <Text style={s.backText}>✕</Text>
+          </TouchableOpacity>
+          <Text style={s.headerTitle}>New Post</Text>
+          <View style={{ width: 32 }} />
+        </View>
 
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-              <Text style={styles.backText}>←</Text>
-            </TouchableOpacity>
-            <Text style={styles.title}>New Post</Text>
-            <View style={{ width: 40 }} />
+        {/* Type selector */}
+        <View style={s.typeSection}>
+          <Text style={s.sectionLabel}>Content Type</Text>
+          <View style={s.typeRow}>
+            {TYPES.map(t => {
+              const active = type === t.id;
+              return (
+                <TouchableOpacity key={t.id} style={[s.typeBtn, active && s.typeBtnActive]} onPress={() => setType(t.id)} activeOpacity={0.8}>
+                  {active
+                    ? <LinearGradient colors={t.grad} style={s.typeBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                        <Text style={s.typeIcon}>{t.icon}</Text>
+                        <Text style={s.typeBtnActiveText}>{t.label}</Text>
+                      </LinearGradient>
+                    : <><Text style={s.typeIcon}>{t.icon}</Text><Text style={s.typeBtnText}>{t.label}</Text></>
+                  }
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Form */}
+        <View style={s.form}>
+          {error ? <View style={s.errorBox}><Text style={s.errorText}>{error}</Text></View> : null}
+
+          <View style={s.field}>
+            <Text style={s.label}>Title *</Text>
+            <TextInput style={s.input} placeholder="Give your post a bold title…" placeholderTextColor={C.textFaint} value={title} onChangeText={setTitle} maxLength={120} />
+            <Text style={s.charCount}>{title.length}/120</Text>
           </View>
 
-          {error ? <View style={styles.errorBox}><Text style={styles.errorIcon}>⚠</Text><Text style={styles.errorText}>{error}</Text></View> : null}
-          {success ? <View style={styles.successBox}><Text style={styles.successText}>{success}</Text></View> : null}
-
-          <Text style={styles.sectionTitle}>Post Type</Text>
-          <View style={styles.typeGrid}>
-            {TYPES.map(t => (
-              <TouchableOpacity
-                key={t.key}
-                style={[styles.typeCard, contentType === t.key && styles.typeCardActive]}
-                onPress={() => setContentType(t.key)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.typeEmoji}>{t.label.split(' ')[0]}</Text>
-                <Text style={[styles.typeLabel, contentType === t.key && styles.typeLabelActive]}>{t.label.split(' ').slice(1).join(' ')}</Text>
-                <Text style={styles.typeDesc}>{t.desc}</Text>
-              </TouchableOpacity>
-            ))}
+          <View style={s.field}>
+            <Text style={s.label}>Body *</Text>
+            <TextInput style={[s.input, s.textArea]} placeholder="Tell your story…" placeholderTextColor={C.textFaint} value={body} onChangeText={setBody} multiline numberOfLines={6} textAlignVertical="top" />
           </View>
 
-          <Text style={styles.sectionTitle}>Title</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Give your post a compelling title"
-            placeholderTextColor="#334155"
-            value={title}
-            onChangeText={setTitle}
-          />
+          <View style={s.field}>
+            <Text style={s.label}>Media URL {type === 'video_embed' ? '(YouTube/Vimeo)' : '(Image)'}</Text>
+            <TextInput style={s.input} placeholder="https://…" placeholderTextColor={C.textFaint} value={mediaUrl} onChangeText={setMediaUrl} autoCapitalize="none" autoCorrect={false} keyboardType="url" />
+          </View>
 
-          <Text style={styles.sectionTitle}>Media URL <Text style={styles.required}>* required</Text></Text>
-          <TextInput
-            style={styles.input}
-            placeholder="https://..."
-            placeholderTextColor="#334155"
-            value={mediaUrl}
-            onChangeText={setMediaUrl}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <Text style={styles.hint}>Tap a sample image below to use it:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sampleRow}>
-            {SAMPLE_URLS.map((url, i) => (
-              <TouchableOpacity key={i} onPress={() => setMediaUrl(url)} style={[styles.sampleThumb, mediaUrl === url && styles.sampleThumbActive]}>
-                <Image source={{ uri: url }} style={styles.sampleImg} />
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {mediaUrl ? <Image source={{ uri: mediaUrl }} style={styles.preview} /> : null}
-
-          <Text style={styles.sectionTitle}>Body</Text>
-          <TextInput
-            style={[styles.input, styles.textarea]}
-            placeholder="Share your story, insights, or experience..."
-            placeholderTextColor="#334155"
-            value={body}
-            onChangeText={setBody}
-            multiline
-            numberOfLines={8}
-            textAlignVertical="top"
-          />
-
-          <TouchableOpacity style={styles.btn} onPress={handleCreate} disabled={loading} activeOpacity={0.85}>
-            <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.btnGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Submit Post →</Text>}
+          <TouchableOpacity style={s.submitWrap} onPress={handleSubmit} activeOpacity={0.88} disabled={loading}>
+            <LinearGradient colors={GRAD_HERO} style={s.submitBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+              <Text style={s.submitText}>{loading ? 'Publishing…' : `Publish ${selectedType?.label} →`}</Text>
             </LinearGradient>
           </TouchableOpacity>
-
-          <Text style={styles.disclaimer}>Your post will be reviewed by our team before going live.</Text>
-
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#080C14' },
-  inner: { paddingHorizontal: 20, paddingBottom: 40 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16 },
-  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#0f1623', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#1e293b' },
-  backText: { color: '#3b82f6', fontSize: 18 },
-  title: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  sectionTitle: { color: '#64748b', fontSize: 12, fontWeight: '700', letterSpacing: 0.5, marginBottom: 10, marginTop: 24 },
-  required: { color: '#f87171', fontWeight: '400' },
-  hint: { color: '#334155', fontSize: 12, marginTop: 6, marginBottom: 10 },
-  input: { backgroundColor: '#0f1623', color: '#fff', padding: 16, borderRadius: 14, fontSize: 15, borderWidth: 1, borderColor: '#1e293b' },
-  textarea: { height: 160, textAlignVertical: 'top', lineHeight: 22 },
-  typeGrid: { flexDirection: 'row', gap: 10 },
-  typeCard: { flex: 1, backgroundColor: '#0f1623', borderRadius: 14, padding: 14, alignItems: 'center', borderWidth: 1.5, borderColor: '#1e293b', gap: 4 },
-  typeCardActive: { borderColor: '#3b82f6', backgroundColor: '#0d1e38' },
-  typeEmoji: { fontSize: 22 },
-  typeLabel: { color: '#64748b', fontSize: 12, fontWeight: '700' },
-  typeLabelActive: { color: '#60a5fa' },
-  typeDesc: { color: '#334155', fontSize: 10 },
-  sampleRow: { marginBottom: 12 },
-  sampleThumb: { width: 80, height: 60, borderRadius: 10, marginRight: 8, overflow: 'hidden', borderWidth: 2, borderColor: 'transparent' },
-  sampleThumbActive: { borderColor: '#3b82f6' },
-  sampleImg: { width: '100%', height: '100%' },
-  preview: { width: '100%', height: 180, borderRadius: 14, marginBottom: 8, marginTop: 4 },
-  btn: { borderRadius: 16, overflow: 'hidden', marginTop: 28, shadowColor: '#3b82f6', shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
-  btnGradient: { paddingVertical: 18, alignItems: 'center' },
-  btnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
-  errorBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a0808', borderWidth: 1, borderColor: '#7f1d1d', padding: 14, borderRadius: 12, marginBottom: 8, marginTop: 8, gap: 10 },
-  errorIcon: { fontSize: 16 },
-  errorText: { color: '#f87171', fontSize: 14, flex: 1 },
-  successBox: { backgroundColor: '#052e16', borderWidth: 1, borderColor: '#166534', padding: 14, borderRadius: 12, marginBottom: 8, marginTop: 8 },
-  successText: { color: '#4ade80', fontSize: 14, fontWeight: '600', textAlign: 'center' },
-  disclaimer: { color: '#334155', fontSize: 12, textAlign: 'center', marginTop: 16 },
+const s = StyleSheet.create({
+  container:       { flex: 1, backgroundColor: C.bg },
+  blobBR:          { position: 'absolute', bottom: 80, right: -60, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(170,255,0,0.07)' },
+  scroll:          { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 40 },
+  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 },
+  backText:        { color: C.textMuted, fontSize: 22, fontWeight: '300' },
+  headerTitle:     { color: C.text, fontSize: 18, fontWeight: '900', letterSpacing: -0.3 },
+  typeSection:     { marginBottom: 28 },
+  sectionLabel:    { color: C.textMuted, fontSize: 13, fontWeight: '700', letterSpacing: 0.5, marginBottom: 12 },
+  typeRow:         { flexDirection: 'row', gap: 10 },
+  typeBtn:         { flex: 1, borderRadius: R.lg, borderWidth: 1, borderColor: C.border, overflow: 'hidden', paddingVertical: 14, alignItems: 'center', gap: 6, backgroundColor: C.surface },
+  typeBtnActive:   { borderColor: 'transparent' },
+  typeBtnGrad:     { width: '100%', paddingVertical: 14, alignItems: 'center', gap: 6 },
+  typeIcon:        { fontSize: 22 },
+  typeBtnText:     { color: C.textMuted, fontSize: 12, fontWeight: '600' },
+  typeBtnActiveText:{ color: '#fff', fontSize: 12, fontWeight: '800' },
+  form:            { gap: 18 },
+  errorBox:        { backgroundColor: C.redDark, borderWidth: 1, borderColor: 'rgba(255,68,68,0.3)', padding: 14, borderRadius: R.md },
+  errorText:       { color: C.red, fontSize: 13, fontWeight: '600' },
+  field:           { gap: 8 },
+  label:           { color: C.textMuted, fontSize: 13, fontWeight: '700', letterSpacing: 0.5 },
+  input:           { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: R.lg, padding: 16, color: C.text, fontSize: 15 },
+  textArea:        { minHeight: 140, paddingTop: 16 },
+  charCount:       { color: C.textFaint, fontSize: 11, textAlign: 'right' },
+  submitWrap:      { borderRadius: R.xl, overflow: 'hidden', marginTop: 8 },
+  submitBtn:       { paddingVertical: 20, alignItems: 'center' },
+  submitText:      { color: '#fff', fontSize: 17, fontWeight: '900' },
 });
