@@ -1,0 +1,57 @@
+name: Smoke Tests
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: plxyground_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: backend
+
+      - name: Run backend smoke suite
+        run: npm run smoke
+        working-directory: backend
+        env:
+          PORT: 3011
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/plxyground_test
+          JWT_SECRET: github_actions_test_secret_minimum_32_characters_long
+          JWT_EXPIRES_IN: 7d
+          CORS_ORIGIN: http://localhost:19006,http://localhost:3012
+          LOCAL_STUB_EMAIL: "true"
+          RESEND_API_KEY: re_placeholder
+          RESEND_FROM_EMAIL: noreply@plxyground.local
+          NODE_ENV: test
