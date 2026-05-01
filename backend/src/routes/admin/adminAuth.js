@@ -67,7 +67,7 @@ router.post('/change-password', verifyToken, requireAdmin, async (req, res) => {
   }
 
   const hash = await bcrypt.hash(newPassword, 10);
-  await db.prepare(`UPDATE admins SET password_hash = ?, updated_at = datetime('now') WHERE id = ?`).run(hash, admin.id);
+  await db.prepare(`UPDATE admins SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(hash, admin.id);
 
   res.json({ message: 'Password changed successfully' });
 });

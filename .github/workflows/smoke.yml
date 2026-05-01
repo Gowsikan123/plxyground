@@ -39,10 +39,15 @@ jobs:
           cache: npm
           cache-dependency-path: |
             backend/package-lock.json
+            admin-panel/package-lock.json
 
       - name: Install backend dependencies
         run: npm ci
         working-directory: backend
+
+      - name: Install admin-panel dependencies
+        run: npm ci
+        working-directory: admin-panel
 
       - name: Run backend smoke suite
         run: npm run smoke
