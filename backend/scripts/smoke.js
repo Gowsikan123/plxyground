@@ -51,8 +51,11 @@ async function expectJson(name, fn) {
 }
 
 async function main() {
-  const backendProcess = startNodeProcess(backendDir, 'src/index.js');
-  const adminProcess = startNodeProcess(adminDir, 'server.js');
+  // Explicitly pin each process to its own port so the inherited PORT env
+  // var (set to 3011 by CI) does not cause the admin panel to collide with
+  // the backend on the same port.
+  const backendProcess = startNodeProcess(backendDir, 'src/index.js', { PORT: '3011' });
+  const adminProcess = startNodeProcess(adminDir, 'server.js', { PORT: '3012' });
   const results = [];
 
   try {
