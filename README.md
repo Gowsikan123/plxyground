@@ -4,8 +4,6 @@
 
 **The sports creator platform — connecting athletes and creators with businesses and opportunities.**
 
-Built by [Basketball Nxtion](https://github.com/Gowsikan123) · Developed by Gowi (T-Level Placement Student)
-
 [![Node.js](https://img.shields.io/badge/Node.js-22_LTS-339933?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![Express](https://img.shields.io/badge/Express-5.0-000000?style=flat-square&logo=express&logoColor=white)](https://expressjs.com)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://postgresql.org)
