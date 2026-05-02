@@ -1,40 +1,43 @@
 'use strict';
 
-const { getPool } = require('../db/client');
+const db = require('../db/client');
 
+/**
+ * Convert a string to a URL-safe slug.
+ * e.g. "Jamal Baller 🏀" → "jamal-baller"
+ */
 function toSlug(str) {
   return str
     .toLowerCase()
-    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/[\s-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .trim()
+    .replace(/[\s-]+/g, '-');
 }
 
-async function generateUniqueSlug(base, table, column = 'slug') {
-  const pool = getPool();
-  const slug = toSlug(base);
+/**
+ * Generate a unique slug for a users row.
+ * If the base slug is taken, append -2, -3, etc.
+ *
+ * @param {string} base - raw display name or username
+ * @param {string|null} [excludeId] - existing user id to exclude from uniqueness check
+ * @returns {Promise<string>}
+ */
+async function uniqueUserSlug(base, excludeId = null) {
+  const baseSlug = toSlug(base);
+  let candidate = baseSlug;
+  let suffix = 2;
 
-  const { rows } = await pool.query(
-    `SELECT $3 FROM $1 WHERE $2 = $3 LIMIT 1`,
-    [table, column, slug]
-  );
-
-  if (rows.length === 0) return slug;
-
-  // Collision — append a random 4-digit suffix
-  const suffix = Math.floor(1000 + Math.random() * 9000);
-  const candidate = `${slug}-${suffix}`;
-
-  const { rows: rows2 } = await pool.query(
-    `SELECT $2 FROM ${table} WHERE ${column} = $1 LIMIT 1`,
-    [candidate, column]
-  );
-
-  if (rows2.length === 0) return candidate;
-
-  // Extremely unlikely second collision — append timestamp ms
-  return `${slug}-${Date.now()}`;
+  while (true) {
+    const { rows } = await db.query(
+      `SELECT id FROM users WHERE slug = $1 AND ($2::uuid IS NULL OR id <> $2)`,
+      [candidate, excludeId]
+    );
+    if (rows.length === 0) return candidate;
+    candidate = `${baseSlug}-${suffix}`;
+    suffix++;
+  }
 }
 
-module.exports = { toSlug, generateUniqueSlug };
+module.exports = { toSlug, uniqueUserSlug };

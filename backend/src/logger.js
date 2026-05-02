@@ -1,26 +1,40 @@
 'use strict';
 
-const LEVELS = { info: 'INFO', warn: 'WARN', error: 'ERROR' };
+const { env } = require('./config');
+
+const LEVELS = { error: 0, warn: 1, info: 2, debug: 3 };
+const LEVEL_NAMES = ['error', 'warn', 'info', 'debug'];
+const currentLevel = LEVELS[process.env.LOG_LEVEL] ?? (env === 'production' ? LEVELS.info : LEVELS.debug);
 
 function format(level, message, meta) {
   const ts = new Date().toISOString();
-  const base = `[${ts}] [${level}] ${message}`;
-  if (meta && Object.keys(meta).length > 0) {
-    return `${base} ${JSON.stringify(meta)}`;
+  const base = `[${ts}] [${level.toUpperCase().padEnd(5)}] ${message}`;
+  if (meta && Object.keys(meta).length) {
+    try {
+      return `${base} ${JSON.stringify(meta)}`;
+    } catch {
+      return `${base} [unserializable meta]`;
+    }
   }
   return base;
 }
 
+function write(level, message, meta = {}) {
+  if (LEVELS[level] > currentLevel) return;
+  const line = format(level, message, meta);
+  if (level === 'error' || level === 'warn') {
+    process.stderr.write(line + '\n');
+  } else {
+    process.stdout.write(line + '\n');
+  }
+}
+
 const logger = {
-  info(message, meta = {}) {
-    process.stdout.write(format(LEVELS.info, message, meta) + '\n');
-  },
-  warn(message, meta = {}) {
-    process.stdout.write(format(LEVELS.warn, message, meta) + '\n');
-  },
-  error(message, meta = {}) {
-    process.stderr.write(format(LEVELS.error, message, meta) + '\n');
-  },
+  error: (msg, meta) => write('error', msg, meta),
+  warn:  (msg, meta) => write('warn',  msg, meta),
+  info:  (msg, meta) => write('info',  msg, meta),
+  debug: (msg, meta) => write('debug', msg, meta),
+  http:  (msg, meta) => write('debug', msg, meta),
 };
 
 module.exports = logger;
