@@ -15,6 +15,8 @@ const businessContentRouter = require('./routes/businessContent');
 const contentRouter = require('./routes/content');
 const creatorsRouter = require('./routes/creators');
 const opportunitiesRouter = require('./routes/opportunities');
+const partnersRouter = require('./routes/partners');
+const businessPlanRouter = require('./routes/business-plan');
 const adminAuthRouter = require('./routes/admin/adminAuth');
 const adminQueueRouter = require('./routes/admin/adminQueue');
 const adminUsersRouter = require('./routes/admin/adminUsers');
@@ -47,6 +49,10 @@ setupDatabase().then(() => {
   app.use('/api/content', contentRouter);
   app.use('/api/creators', creatorsRouter);
   app.use('/api/opportunities', opportunitiesRouter);
+
+  // Partners & business plans
+  app.use('/api/partners', partnersRouter);
+  app.use('/api/business-plan', businessPlanRouter);
 
   // Admin routes
   app.use('/api/admin/auth', adminAuthRouter);
