@@ -1,68 +1,79 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useNavigation } from 'expo-router';
 import { colors } from '../../constants/colors';
-import { typography } from '../../constants/typography';
+import { fontFamily, fontSize } from '../../constants/typography';
 import { spacing } from '../../constants/spacing';
 
-export const Header = React.memo(({ title, showLogo = false, rightAction, onBack, showBack }) => {
-  const insets     = useSafeAreaInsets();
-  const router     = useRouter();
+export function Header({ title, showLogo = false, rightAction, onBack }) {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
   const navigation = useNavigation();
+  const canGoBack = navigation.canGoBack();
 
-  const canGoBack   = navigation.canGoBack();
-  const shouldShowBack = showBack !== undefined ? showBack : (canGoBack && !showLogo);
-
-  const handleBack = useCallback(() => {
-    if (onBack) { onBack(); return; }
-    router.back();
-  }, [onBack]);
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+    } else if (canGoBack) {
+      router.back();
+    }
+  };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, { paddingTop: insets.top + spacing[2] }]}>
       <View style={styles.inner}>
-        {/* Left */}
-        <View style={styles.side}>
-          {shouldShowBack && (
-            <TouchableOpacity onPress={handleBack} style={styles.backBtn} accessibilityLabel="Go back" accessibilityRole="button">
-              <Text style={styles.backChevron}>‹</Text>
+        <View style={styles.left}>
+          {(canGoBack || onBack) && (
+            <TouchableOpacity onPress={handleBack} style={styles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={styles.backIcon}>←</Text>
             </TouchableOpacity>
           )}
         </View>
 
-        {/* Center */}
-        {showLogo ? (
-          <Text style={styles.logo}>PLXYGROUND</Text>
-        ) : (
-          <Text style={styles.title} numberOfLines={1}>{title}</Text>
-        )}
+        <View style={styles.center}>
+          {showLogo ? (
+            <Text style={styles.logo}>PLXYGROUND</Text>
+          ) : (
+            <Text style={styles.title} numberOfLines={1}>{title}</Text>
+          )}
+        </View>
 
-        {/* Right */}
-        <View style={[styles.side, styles.sideRight]}>
+        <View style={styles.right}>
           {rightAction}
         </View>
       </View>
     </View>
   );
-});
+}
 
 const styles = StyleSheet.create({
   container: {
     backgroundColor: colors.background,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    paddingBottom: spacing[2],
   },
   inner: {
-    height: 52,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.base,
+    paddingHorizontal: spacing[4],
+    height: 44,
   },
-  side:      { width: 48, alignItems: 'flex-start', justifyContent: 'center' },
-  sideRight: { alignItems: 'flex-end' },
-  backBtn:   { padding: spacing.xs },
-  backChevron: { ...typography.h2, color: colors.textPrimary, fontSize: 28, lineHeight: 28, marginTop: -2 },
-  logo:  { flex: 1, textAlign: 'center', ...typography.h3, color: colors.primary, letterSpacing: 2, textTransform: 'uppercase' },
-  title: { flex: 1, textAlign: 'center', ...typography.bodyMd, color: colors.textPrimary },
+  left: { width: 44, justifyContent: 'center' },
+  center: { flex: 1, alignItems: 'center' },
+  right: { width: 44, alignItems: 'flex-end', justifyContent: 'center' },
+  backBtn: { padding: spacing[1] },
+  backIcon: { color: colors.textPrimary, fontSize: 22 },
+  title: {
+    color: colors.textPrimary,
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.md,
+  },
+  logo: {
+    color: colors.primary,
+    fontFamily: fontFamily.displayExtraBold,
+    fontSize: fontSize.lg,
+    letterSpacing: 1.5,
+  },
 });

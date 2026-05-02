@@ -1,48 +1,42 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../../constants/colors';
-import { typography } from '../../constants/typography';
-import { borderRadius } from '../../constants/spacing';
+import { fontFamily, fontSize } from '../../constants/typography';
 
-export const Avatar = React.memo(({ uri, name, size = 40, style }) => {
-  const [error, setError] = useState(false);
-
+export function Avatar({ uri, name, size = 40, style }) {
   const initials = name
-    ? name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
+    ? name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()
     : '?';
 
-  if (uri && !error) {
-    return (
-      <Image
-        source={{ uri }}
-        style={[styles.img, { width: size, height: size, borderRadius: size / 2 }, style]}
-        onError={() => setError(true)}
-        accessibilityLabel={name ? `${name} avatar` : 'Avatar'}
-      />
-    );
-  }
-
-  return (
-    <View style={[styles.fallback, { width: size, height: size, borderRadius: size / 2 }, style]}>
-      <Text style={[styles.initials, { fontSize: size * 0.36 }]}>{initials}</Text>
-    </View>
-  );
-});
-
-const styles = StyleSheet.create({
-  img: {
-    backgroundColor: colors.surfaceElevated,
-  },
-  fallback: {
+  const containerStyle = {
+    width: size,
+    height: size,
+    borderRadius: size / 2,
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.border,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  initials: {
-    ...typography.bodyMd,
+  };
+
+  const textStyle = {
     color: colors.textSecondary,
-    fontWeight: '700',
-  },
-});
+    fontFamily: fontFamily.bold,
+    fontSize: size * 0.36,
+  };
+
+  return (
+    <View style={[containerStyle, style]}>
+      {uri ? (
+        <Image
+          source={{ uri }}
+          style={{ width: size, height: size }}
+          resizeMode="cover"
+        />
+      ) : (
+        <Text style={textStyle}>{initials}</Text>
+      )}
+    </View>
+  );
+}

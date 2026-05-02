@@ -1,52 +1,57 @@
 import api from './api';
 
 export const contentService = {
-  getFeed: async ({ limit = 20, offset = 0, search, sport, tags } = {}) => {
+  async getFeed({ search = '', sport = '', limit = 20, offset = 0 } = {}) {
     try {
-      const params = { limit, offset };
-      if (search) params.search = search;
-      if (sport)  params.sport  = sport;
-      if (tags)   params.tags   = tags;
-      const res = await api.get('/api/content', { params });
+      const res = await api.get('/api/content', { params: { search, sport, limit, offset } });
       return { data: res.data, error: null };
     } catch (err) {
-      return { data: null, error: err.message };
+      return { data: null, error: err.response?.data?.message || 'Failed to load feed' };
     }
   },
 
-  getPost: async (id) => {
+  async getPost(id) {
     try {
       const res = await api.get(`/api/content/${id}`);
       return { data: res.data, error: null };
     } catch (err) {
-      return { data: null, error: err.message };
+      return { data: null, error: err.response?.data?.message || 'Failed to load post' };
     }
   },
 
-  createPost: async (payload) => {
+  async createPost(data) {
     try {
-      const res = await api.post('/api/content', payload);
+      const res = await api.post('/api/content', data);
       return { data: res.data, error: null };
     } catch (err) {
-      return { data: null, error: err.message };
+      return { data: null, error: err.response?.data?.errors || err.response?.data?.message || 'Failed to create post' };
     }
   },
 
-  updatePost: async (id, payload) => {
+  async updatePost(id, data) {
     try {
-      const res = await api.put(`/api/content/${id}`, payload);
+      const res = await api.put(`/api/content/${id}`, data);
       return { data: res.data, error: null };
     } catch (err) {
-      return { data: null, error: err.message };
+      return { data: null, error: err.response?.data?.message || 'Failed to update post' };
     }
   },
 
-  deletePost: async (id) => {
+  async deletePost(id) {
     try {
       const res = await api.delete(`/api/content/${id}`);
       return { data: res.data, error: null };
     } catch (err) {
-      return { data: null, error: err.message };
+      return { data: null, error: err.response?.data?.message || 'Failed to delete post' };
+    }
+  },
+
+  async getMyContent({ limit = 20, offset = 0 } = {}) {
+    try {
+      const res = await api.get('/api/business-auth/content/mine', { params: { limit, offset } });
+      return { data: res.data, error: null };
+    } catch (err) {
+      return { data: null, error: err.response?.data?.message || 'Failed to load content' };
     }
   },
 };

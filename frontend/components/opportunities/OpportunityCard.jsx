@@ -1,70 +1,95 @@
-import React, { useCallback } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { memo } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors } from '../../constants/colors';
-import { typography } from '../../constants/typography';
+import { fontFamily, fontSize } from '../../constants/typography';
 import { spacing, borderRadius } from '../../constants/spacing';
-import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 
-export const OpportunityCard = React.memo(({ opportunity, onPress }) => {
-  const handlePress = useCallback(() => onPress?.(opportunity), [opportunity, onPress]);
-
-  const poster = opportunity.poster;
-  const posterName = poster?.display_name || poster?.company_name || 'Unknown';
+export const OpportunityCard = memo(function OpportunityCard({ opportunity, onPress }) {
+  const { title, description, sport, budget, deadline, location, postedbytype, postername } = opportunity;
 
   return (
-    <Card onPress={handlePress} style={styles.card}>
-      {/* Header row */}
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
       <View style={styles.header}>
-        <Text style={styles.title} numberOfLines={2}>{opportunity.title}</Text>
-        {opportunity.sport && <Badge label={opportunity.sport} variant="primary" />}
+        <Text style={styles.title} numberOfLines={2}>{title}</Text>
+        {sport && <Badge label={sport} variant="primary" />}
       </View>
 
-      {/* Description */}
-      <Text style={styles.desc} numberOfLines={2}>{opportunity.description}</Text>
+      <Text style={styles.description} numberOfLines={2}>{description}</Text>
 
-      {/* Meta row */}
       <View style={styles.meta}>
-        {opportunity.budget && (
+        {budget && (
           <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>Budget</Text>
-            <Text style={styles.metaValue}>{opportunity.budget}</Text>
+            <Text style={styles.metaIcon}>💰</Text>
+            <Text style={styles.metaText}>{budget}</Text>
           </View>
         )}
-        {opportunity.deadline && (
+        {deadline && (
           <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>Deadline</Text>
-            <Text style={styles.metaValue}>{opportunity.deadline}</Text>
+            <Text style={styles.metaIcon}>📅</Text>
+            <Text style={styles.metaText}>{deadline}</Text>
           </View>
         )}
-        {opportunity.location && (
+        {location && (
           <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>Location</Text>
-            <Text style={styles.metaValue}>{opportunity.location}</Text>
+            <Text style={styles.metaIcon}>📍</Text>
+            <Text style={styles.metaText}>{location}</Text>
           </View>
         )}
       </View>
 
-      {/* Posted by */}
       <View style={styles.footer}>
-        <Text style={styles.postedBy}>Posted by </Text>
-        <Text style={styles.posterName}>{posterName}</Text>
-        <Text style={styles.postedBy}> · {opportunity.posted_by_type}</Text>
+        <Text style={styles.postedBy}>
+          Posted by <Text style={styles.posterName}>{postername ?? postedbytype}</Text>
+        </Text>
       </View>
-    </Card>
+    </TouchableOpacity>
   );
 });
 
 const styles = StyleSheet.create({
-  card:        { marginBottom: spacing.sm },
-  header:      { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm, marginBottom: spacing.xs },
-  title:       { ...typography.h3, flex: 1, fontSize: 15 },
-  desc:        { ...typography.body, color: colors.textSecondary, marginBottom: spacing.md },
-  meta:        { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.sm },
-  metaItem:    { gap: 2 },
-  metaLabel:   { ...typography.label },
-  metaValue:   { ...typography.caption, color: colors.textPrimary },
-  footer:      { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.sm, marginTop: spacing.xs },
-  postedBy:    { ...typography.caption },
-  posterName:  { ...typography.caption, color: colors.primary, fontWeight: '700' },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing[4],
+    marginBottom: spacing[3],
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: spacing[2],
+    gap: spacing[2],
+  },
+  title: {
+    flex: 1,
+    color: colors.textPrimary,
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.md,
+    lineHeight: fontSize.md * 1.3,
+  },
+  description: {
+    color: colors.textSecondary,
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.sm,
+    lineHeight: fontSize.sm * 1.6,
+    marginBottom: spacing[3],
+  },
+  meta: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[3], marginBottom: spacing[3] },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: spacing[1] },
+  metaIcon: { fontSize: 13 },
+  metaText: {
+    color: colors.textMuted,
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.xs,
+  },
+  footer: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing[2] },
+  postedBy: {
+    color: colors.textMuted,
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.xs,
+  },
+  posterName: { color: colors.textSecondary, fontFamily: fontFamily.medium },
 });

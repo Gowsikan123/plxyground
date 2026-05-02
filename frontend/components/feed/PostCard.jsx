@@ -1,104 +1,117 @@
-import React, { useCallback } from 'react';
+import React, { memo } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors } from '../../constants/colors';
-import { typography } from '../../constants/typography';
+import { fontFamily, fontSize } from '../../constants/typography';
 import { spacing, borderRadius } from '../../constants/spacing';
-import { Card } from '../ui/Card';
 import { Avatar } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
 
-function timeAgo(dateStr) {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1)  return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24)  return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 7)  return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-}
-
-export const PostCard = React.memo(({ post }) => {
+export const PostCard = memo(function PostCard({ post }) {
   const router = useRouter();
 
-  const handlePress = useCallback(() => {
-    router.push(`/post/${post.id}`);
-  }, [post.id]);
-
-  const tags = Array.isArray(post.tags) ? post.tags.slice(0, 2) : [];
+  const handlePress = () => router.push(`/post/${post.id}`);
+  const handleCreatorPress = () => router.push(`/creator/${post.creator?.id}`);
 
   return (
-    <Card onPress={handlePress} style={styles.card}>
-      {/* Creator row */}
-      <View style={styles.header}>
-        <Avatar
-          uri={post.avatar_url}
-          name={post.display_name}
-          size={38}
-        />
-        <View style={styles.headerText}>
-          <Text style={styles.displayName} numberOfLines={1}>{post.display_name}</Text>
-          <View style={styles.metaRow}>
-            {post.sport && <Badge label={post.sport} variant="primary" style={styles.sportBadge} />}
-            <Text style={styles.time}>{timeAgo(post.created_at)}</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Title */}
-      {post.title ? (
-        <Text style={styles.title} numberOfLines={2}>{post.title}</Text>
-      ) : null}
-
-      {/* Body preview */}
-      {post.body ? (
-        <Text style={styles.body} numberOfLines={3}>{post.body}</Text>
-      ) : null}
-
-      {/* Media thumbnail */}
-      {post.media_url && post.media_type !== 'none' ? (
+    <TouchableOpacity style={styles.card} onPress={handlePress} activeOpacity={0.85}>
+      {post.mediaurl && post.mediatype === 'image' && (
         <Image
-          source={{ uri: post.media_url }}
+          source={{ uri: post.mediaurl }}
           style={styles.media}
           resizeMode="cover"
-          accessibilityLabel={`Media for ${post.title}`}
         />
-      ) : null}
+      )}
+      <View style={styles.body}>
+        <TouchableOpacity style={styles.creatorRow} onPress={handleCreatorPress}>
+          <Avatar uri={post.creator?.avatarurl} name={post.creator?.displayname} size={34} />
+          <View style={styles.creatorInfo}>
+            <Text style={styles.creatorName}>{post.creator?.displayname}</Text>
+            <Text style={styles.creatorUsername}>@{post.creator?.username}</Text>
+          </View>
+          {post.creator?.sport && (
+            <Badge label={post.creator.sport} variant="default" />
+          )}
+        </TouchableOpacity>
 
-      {/* Footer */}
-      <View style={styles.footer}>
-        <Text style={styles.stat}>👁 {post.view_count ?? 0}</Text>
-        <Text style={styles.stat}>❤️ {post.like_count ?? 0}</Text>
-        <View style={styles.tags}>
-          {tags.map(tag => (
-            <Badge key={tag} label={tag} style={styles.tag} />
-          ))}
+        <Text style={styles.title} numberOfLines={2}>{post.title}</Text>
+        {post.body && (
+          <Text style={styles.body_text} numberOfLines={3}>{post.body}</Text>
+        )}
+
+        <View style={styles.footer}>
+          <Text style={styles.stat}>👁 {post.viewcount ?? 0}</Text>
+          <Text style={styles.stat}>❤️ {post.likecount ?? 0}</Text>
+          <Text style={styles.date}>
+            {new Date(post.createdat).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+          </Text>
         </View>
       </View>
-    </Card>
+    </TouchableOpacity>
   );
 });
 
 const styles = StyleSheet.create({
-  card:        { marginBottom: spacing.sm },
-  header:      { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
-  headerText:  { flex: 1 },
-  displayName: { ...typography.bodyMd, color: colors.textPrimary },
-  metaRow:     { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 },
-  sportBadge:  { },
-  time:        { ...typography.caption },
-  title:       { ...typography.h3, fontSize: 16, marginBottom: spacing.xs },
-  body:        { ...typography.body, color: colors.textSecondary, marginBottom: spacing.sm },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing[3],
+    overflow: 'hidden',
+  },
   media: {
-    width: '100%', height: 180,
-    borderRadius: borderRadius.md,
-    marginBottom: spacing.sm,
+    width: '100%',
+    height: 200,
     backgroundColor: colors.surfaceElevated,
   },
-  footer:      { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  stat:        { ...typography.caption, color: colors.textSecondary },
-  tags:        { flexDirection: 'row', gap: spacing.xs, flex: 1, justifyContent: 'flex-end' },
-  tag:         { },
+  body: { padding: spacing[4] },
+  creatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing[3],
+    gap: spacing[2],
+  },
+  creatorInfo: { flex: 1 },
+  creatorName: {
+    color: colors.textPrimary,
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.sm,
+  },
+  creatorUsername: {
+    color: colors.textMuted,
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.xs,
+  },
+  title: {
+    color: colors.textPrimary,
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.md,
+    marginBottom: spacing[1] + 2,
+    lineHeight: fontSize.md * 1.35,
+  },
+  body_text: {
+    color: colors.textSecondary,
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.sm,
+    lineHeight: fontSize.sm * 1.6,
+    marginBottom: spacing[3],
+  },
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[4],
+    marginTop: spacing[2],
+  },
+  stat: {
+    color: colors.textMuted,
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.xs,
+  },
+  date: {
+    color: colors.textMuted,
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.xs,
+    marginLeft: 'auto',
+  },
 });

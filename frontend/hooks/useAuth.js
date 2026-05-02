@@ -1,37 +1,53 @@
-import { useEffect } from 'react';
-import { useRouter, useSegments } from 'expo-router';
+import { useCallback } from 'react';
 import { useAuthStore } from '../store/authStore';
+import { authService } from '../services/authService';
 
 export function useAuth() {
-  const { token, user, userType, isLoading, error, logout, refreshUser, clearError } = useAuthStore();
-  return { token, user, userType, isLoading, error, logout, refreshUser, clearError, isAuthenticated: !!token };
-}
+  const { user, token, userType, isLoading, isAuthenticated, setAuth, updateUser, logout } = useAuthStore();
 
-export function useProtectedRoute() {
-  const { token, userType, isLoading } = useAuthStore();
-  const segments  = useSegments();
-  const router    = useRouter();
+  const creatorLogin = useCallback(async (email, password) => {
+    const { data, error } = await authService.creatorLogin(email, password);
+    if (data) {
+      setAuth(data.token, data.user, 'creator');
+    }
+    return { data, error };
+  }, [setAuth]);
 
-  useEffect(() => {
-    if (isLoading) return;
-    const inAuthGroup     = segments[0] === 'auth';
-    const inCreatorGroup  = segments[0] === 'creator';
-    const inBusinessGroup = segments[0] === 'business';
+  const businessLogin = useCallback(async (email, password) => {
+    const { data, error } = await authService.businessLogin(email, password);
+    if (data) {
+      setAuth(data.token, data.user, 'business');
+    }
+    return { data, error };
+  }, [setAuth]);
 
-    if (!token && !inAuthGroup) {
-      router.replace('/auth/login');
-      return;
+  const creatorSignup = useCallback(async (formData) => {
+    const { data, error } = await authService.creatorSignup(formData);
+    if (data) {
+      setAuth(data.token, data.user, 'creator');
     }
-    if (token && inAuthGroup) {
-      router.replace(userType === 'business' ? '/business/dashboard' : '/creator/feed');
-      return;
+    return { data, error };
+  }, [setAuth]);
+
+  const businessSignup = useCallback(async (formData) => {
+    const { data, error } = await authService.businessSignup(formData);
+    if (data) {
+      setAuth(data.token, data.user, 'business');
     }
-    if (token && userType === 'creator' && inBusinessGroup) {
-      router.replace('/creator/feed');
-      return;
-    }
-    if (token && userType === 'business' && inCreatorGroup) {
-      router.replace('/business/dashboard');
-    }
-  }, [token, userType, isLoading, segments]);
+    return { data, error };
+  }, [setAuth]);
+
+  return {
+    user,
+    token,
+    userType,
+    isLoading,
+    isAuthenticated,
+    creatorLogin,
+    businessLogin,
+    creatorSignup,
+    businessSignup,
+    updateUser,
+    logout,
+  };
 }

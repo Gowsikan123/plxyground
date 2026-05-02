@@ -1,21 +1,24 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useFeedStore } from '../store/feedStore';
 
-export function useFeed() {
+export function useFeed(filters = {}) {
   const {
-    posts, total, isLoading, isRefreshing, hasMore, error,
-    loadFeed, refresh, setFilters, clearError,
+    posts, total, isLoading, isRefreshing, isFetchingMore, error,
+    fetchFeed, refresh, setFilters,
   } = useFeedStore();
 
   useEffect(() => {
-    if (posts.length === 0) loadFeed(true);
-  }, []);
+    if (filters.search !== undefined || filters.sport !== undefined) {
+      setFilters(filters);
+    }
+    fetchFeed(true);
+  }, [filters.search, filters.sport]);
 
-  return {
-    posts, total, isLoading, isRefreshing, hasMore, error,
-    loadMore:   () => loadFeed(false),
-    refresh,
-    setFilters,
-    clearError,
-  };
+  const loadMore = useCallback(() => {
+    if (!isFetchingMore && posts.length < total) {
+      fetchFeed(false);
+    }
+  }, [isFetchingMore, posts.length, total]);
+
+  return { posts, total, isLoading, isRefreshing, isFetchingMore, error, refresh, loadMore };
 }

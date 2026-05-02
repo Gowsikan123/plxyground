@@ -1,31 +1,39 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-const AUTH_TOKEN_KEY = 'plxyground_token';
+const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+
+if (!BASE_URL) {
+  throw new Error('EXPO_PUBLIC_API_BASE_URL is not set in environment variables');
+}
 
 const api = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_BASE_URL,
+  baseURL: BASE_URL,
   timeout: 15000,
-  headers: { 'Content-Type': 'application/json' },
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
-api.interceptors.request.use(async (config) => {
-  try {
-    const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-  } catch { /* no token available */ }
-  return config;
-});
+api.interceptors.request.use(
+  async (config) => {
+    const token = await SecureStore.getItemAsync('authToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    const message =
-      error?.response?.data?.error ||
-      error?.response?.data?.message ||
-      error?.message ||
-      'An unexpected error occurred';
-    return Promise.reject(new Error(message));
+  async (error) => {
+    if (error.response?.status === 401) {
+      await SecureStore.deleteItemAsync('authToken');
+      await SecureStore.deleteItemAsync('authUser');
+    }
+    return Promise.reject(error);
   }
 );
 

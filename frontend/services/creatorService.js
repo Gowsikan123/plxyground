@@ -1,42 +1,39 @@
 import api from './api';
 
 export const creatorService = {
-  getCreators: async ({ search, sport, limit = 20, offset = 0 } = {}) => {
+  async getCreators({ search = '', sport = '', limit = 20, offset = 0 } = {}) {
     try {
-      const params = { limit, offset };
-      if (search) params.search = search;
-      if (sport)  params.sport  = sport;
-      const res = await api.get('/api/creators', { params });
+      const res = await api.get('/api/creators', { params: { search, sport, limit, offset } });
       return { data: res.data, error: null };
     } catch (err) {
-      return { data: null, error: err.message };
+      return { data: null, error: err.response?.data?.message || 'Failed to load creators' };
     }
   },
 
-  getCreatorBySlug: async (slug) => {
+  async getCreatorBySlug(slug) {
     try {
       const res = await api.get(`/api/creators/slug/${slug}`);
       return { data: res.data, error: null };
     } catch (err) {
-      return { data: null, error: err.message };
+      return { data: null, error: err.response?.data?.message || 'Creator not found' };
     }
   },
 
-  getCreatorById: async (id) => {
+  async getCreatorById(id) {
     try {
-      const res = await api.get(`/api/creators/id/${id}`);
+      const res = await api.get(`/api/creators/${id}`);
       return { data: res.data, error: null };
     } catch (err) {
-      return { data: null, error: err.message };
+      return { data: null, error: err.response?.data?.message || 'Creator not found' };
     }
   },
 
-  updateCreator: async (id, payload) => {
+  async updateProfile(id, data) {
     try {
-      const res = await api.put(`/api/creators/${id}`, payload);
+      const res = await api.put(`/api/creators/${id}`, data);
       return { data: res.data, error: null };
     } catch (err) {
-      return { data: null, error: err.message };
+      return { data: null, error: err.response?.data?.message || 'Failed to update profile' };
     }
   },
 };

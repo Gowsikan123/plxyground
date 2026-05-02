@@ -1,73 +1,80 @@
-import React, { useCallback } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { colors } from '../../constants/colors';
-import { typography } from '../../constants/typography';
+import { fontFamily, fontSize } from '../../constants/typography';
 import { spacing, borderRadius } from '../../constants/spacing';
 
-export const Button = React.memo(({ title, onPress, variant = 'primary', size = 'md', loading = false, disabled = false, icon, style, textStyle }) => {
-  const handlePress = useCallback(() => {
-    if (!loading && !disabled) onPress?.();
-  }, [onPress, loading, disabled]);
+export function Button({
+  onPress,
+  title,
+  variant = 'primary',
+  size = 'md',
+  loading = false,
+  disabled = false,
+  style,
+  textStyle,
+  fullWidth = true,
+}) {
+  const isDisabled = disabled || loading;
 
   const containerStyle = [
     styles.base,
-    styles[`variant_${variant}`],
+    styles[variant],
     styles[`size_${size}`],
-    (loading || disabled) && styles.disabled,
+    fullWidth && styles.fullWidth,
+    isDisabled && styles.disabled,
     style,
+  ];
+
+  const labelStyle = [
+    styles.label,
+    styles[`label_${variant}`],
+    styles[`labelSize_${size}`],
+    textStyle,
   ];
 
   return (
     <TouchableOpacity
-      onPress={handlePress}
-      activeOpacity={0.75}
-      disabled={loading || disabled}
+      onPress={onPress}
+      disabled={isDisabled}
       style={containerStyle}
-      accessibilityRole="button"
-      accessibilityLabel={title}
+      activeOpacity={0.75}
     >
       {loading ? (
-        <ActivityIndicator size="small" color={variant === 'primary' ? colors.white : colors.primary} />
+        <ActivityIndicator color={variant === 'primary' ? colors.white : colors.primary} size="small" />
       ) : (
-        <View style={styles.row}>
-          {icon && <View style={styles.iconWrap}>{icon}</View>}
-          <Text style={[styles.label, styles[`text_${variant}`], styles[`labelSize_${size}`], textStyle]}>
-            {title}
-          </Text>
-        </View>
+        <Text style={labelStyle}>{title}</Text>
       )}
     </TouchableOpacity>
   );
-});
+}
 
 const styles = StyleSheet.create({
   base: {
-    borderRadius: borderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: borderRadius.md,
+    flexDirection: 'row',
   },
-  row:      { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  iconWrap: { alignItems: 'center', justifyContent: 'center' },
+  fullWidth: { width: '100%' },
   disabled: { opacity: 0.45 },
 
-  variant_primary:  { backgroundColor: colors.primary },
-  variant_secondary:{ backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border },
-  variant_ghost:    { backgroundColor: colors.transparent },
-  variant_danger:   { backgroundColor: 'rgba(255,60,60,0.12)', borderWidth: 1, borderColor: 'rgba(255,60,60,0.3)' },
-  variant_success:  { backgroundColor: 'rgba(0,200,83,0.12)', borderWidth: 1, borderColor: 'rgba(0,200,83,0.3)' },
+  primary: { backgroundColor: colors.primary },
+  secondary: { backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border },
+  ghost: { backgroundColor: colors.transparent },
+  danger: { backgroundColor: colors.error },
 
-  text_primary:   { color: colors.white },
-  text_secondary: { color: colors.textPrimary },
-  text_ghost:     { color: colors.textSecondary },
-  text_danger:    { color: colors.error },
-  text_success:   { color: colors.success },
+  size_sm: { paddingVertical: spacing[2], paddingHorizontal: spacing[4] },
+  size_md: { paddingVertical: spacing[3] + 2, paddingHorizontal: spacing[5] },
+  size_lg: { paddingVertical: spacing[4], paddingHorizontal: spacing[6] },
 
-  size_sm: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, minHeight: 36 },
-  size_md: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm + 2, minHeight: 48 },
-  size_lg: { paddingHorizontal: spacing.xl, paddingVertical: spacing.md, minHeight: 56 },
+  label: { fontFamily: fontFamily.bold },
+  label_primary: { color: colors.white },
+  label_secondary: { color: colors.textPrimary },
+  label_ghost: { color: colors.primary },
+  label_danger: { color: colors.white },
 
-  label:       { ...typography.button },
-  labelSize_sm:{ fontSize: 13 },
-  labelSize_md:{ fontSize: 15 },
-  labelSize_lg:{ fontSize: 17 },
+  labelSize_sm: { fontSize: fontSize.sm },
+  labelSize_md: { fontSize: fontSize.base },
+  labelSize_lg: { fontSize: fontSize.md },
 });

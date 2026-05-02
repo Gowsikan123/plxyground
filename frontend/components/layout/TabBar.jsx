@@ -1,57 +1,60 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../constants/colors';
-import { typography } from '../../constants/typography';
+import { fontFamily, fontSize } from '../../constants/typography';
 import { spacing } from '../../constants/spacing';
 
 const CREATOR_TABS = [
-  { key: 'feed',          label: 'Feed',     icon: '⚡' },
-  { key: 'create',        label: 'Create',   icon: '＋' },
-  { key: 'opportunities', label: 'Collab',   icon: '🤝' },
-  { key: 'profile',       label: 'Profile',  icon: '👤' },
+  { name: 'feed', label: 'Feed', icon: '🏠' },
+  { name: 'create', label: 'Create', icon: '➕' },
+  { name: 'opportunities', label: 'Opps', icon: '💼' },
+  { name: 'profile', label: 'Profile', icon: '👤' },
 ];
 
 const BUSINESS_TABS = [
-  { key: 'dashboard',        label: 'Home',     icon: '📊' },
-  { key: 'my-content',       label: 'Content',  icon: '📄' },
-  { key: 'search-creators',  label: 'Discover', icon: '🔍' },
-  { key: 'opportunities',    label: 'Collab',   icon: '🤝' },
-  { key: 'profile',          label: 'Profile',  icon: '🏢' },
+  { name: 'dashboard', label: 'Home', icon: '📊' },
+  { name: 'my-content', label: 'Content', icon: '📝' },
+  { name: 'search-creators', label: 'Discover', icon: '🔍' },
+  { name: 'opportunities', label: 'Opps', icon: '💼' },
+  { name: 'profile', label: 'Profile', icon: '👤' },
 ];
 
-export const TabBar = React.memo(({ state, descriptors, navigation, userType }) => {
+export function TabBar({ state, descriptors, navigation, userType = 'creator' }) {
   const insets = useSafeAreaInsets();
-  const tabs   = userType === 'business' ? BUSINESS_TABS : CREATOR_TABS;
+  const tabs = userType === 'business' ? BUSINESS_TABS : CREATOR_TABS;
 
   return (
-    <View style={[styles.container, { paddingBottom: insets.bottom || spacing.sm }]}>
-      {tabs.map((tab) => {
-        const route   = state.routes.find(r => r.name === tab.key) || state.routes[0];
-        const focused = state.routes[state.index]?.name === tab.key;
+    <View style={[styles.container, { paddingBottom: insets.bottom + spacing[2] }]}>
+      {state.routes.map((route, index) => {
+        const isFocused = state.index === index;
+        const tab = tabs.find((t) => t.name === route.name) ?? tabs[index];
 
-        const onPress = useCallback(() => {
+        const onPress = () => {
           const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-          if (!focused && !event.defaultPrevented) navigation.navigate(tab.key);
-        }, [focused, route.key]);
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name);
+          }
+        };
 
         return (
           <TouchableOpacity
-            key={tab.key}
+            key={route.key}
             onPress={onPress}
             style={styles.tab}
-            accessibilityRole="tab"
-            accessibilityLabel={tab.label}
-            accessibilityState={{ selected: focused }}
+            activeOpacity={0.7}
           >
-            <Text style={[styles.icon, focused && styles.iconActive]}>{tab.icon}</Text>
-            <Text style={[styles.label, focused && styles.labelActive]}>{tab.label}</Text>
+            <Text style={[styles.icon, isFocused && styles.iconFocused]}>{tab?.icon}</Text>
+            <Text style={[styles.label, isFocused && styles.labelFocused]}>
+              {tab?.label}
+            </Text>
+            {isFocused && <View style={styles.indicator} />}
           </TouchableOpacity>
         );
       })}
     </View>
   );
-});
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -59,11 +62,30 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    paddingTop: spacing.sm,
+    paddingTop: spacing[2],
   },
-  tab:          { flex: 1, alignItems: 'center', gap: 3 },
-  icon:         { fontSize: 20 },
-  iconActive:   { },
-  label:        { ...typography.label, fontSize: 10, color: colors.textMuted },
-  labelActive:  { color: colors.primary },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing[1] + 2,
+    position: 'relative',
+  },
+  icon: { fontSize: 20, marginBottom: spacing[1] },
+  iconFocused: {},
+  label: {
+    color: colors.textMuted,
+    fontFamily: fontFamily.medium,
+    fontSize: fontSize.xs,
+  },
+  labelFocused: { color: colors.primary },
+  indicator: {
+    position: 'absolute',
+    top: 0,
+    left: '25%',
+    right: '25%',
+    height: 2,
+    backgroundColor: colors.primary,
+    borderRadius: 1,
+  },
 });

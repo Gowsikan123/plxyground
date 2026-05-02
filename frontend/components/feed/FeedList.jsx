@@ -1,65 +1,84 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { colors } from '../../constants/colors';
 import { spacing } from '../../constants/spacing';
 import { PostCard } from './PostCard';
-import { SkeletonCard } from '../ui/Skeleton';
+import { Skeleton } from '../ui/Skeleton';
 import { EmptyState } from '../ui/EmptyState';
 
-const SKELETON_COUNT = 4;
-
-export const FeedList = React.memo(({ posts, isLoading, isRefreshing, hasMore, onLoadMore, onRefresh, ListHeaderComponent }) => {
-  const renderItem = useCallback(({ item }) => <PostCard post={item} />, []);
-
-  const keyExtractor = useCallback((item) => String(item.id), []);
-
-  const ListEmptyComponent = useCallback(() => {
-    if (isLoading) {
-      return (
-        <View style={styles.skeletons}>
-          {Array.from({ length: SKELETON_COUNT }).map((_, i) => <SkeletonCard key={i} />)}
+function PostSkeleton() {
+  return (
+    <View style={styles.skeletonCard}>
+      <Skeleton width="100%" height={180} borderRadius={0} />
+      <View style={styles.skeletonBody}>
+        <View style={styles.skeletonRow}>
+          <Skeleton width={34} height={34} borderRadius={17} />
+          <View style={{ flex: 1, gap: spacing[1] }}>
+            <Skeleton width="50%" height={12} />
+            <Skeleton width="30%" height={10} />
+          </View>
         </View>
-      );
-    }
-    return (
-      <EmptyState
-        title="No posts yet"
-        message="Follow creators and check back soon."
-      />
-    );
-  }, [isLoading]);
+        <Skeleton width="90%" height={14} style={{ marginBottom: spacing[1] }} />
+        <Skeleton width="70%" height={14} style={{ marginBottom: spacing[2] }} />
+        <Skeleton width="60%" height={11} />
+      </View>
+    </View>
+  );
+}
 
-  const ListFooterComponent = useCallback(() => {
-    if (!hasMore || !isLoading || posts.length === 0) return <View style={styles.footer} />;
+export function FeedList({ onRefresh, onLoadMore, isRefreshing, isLoading, isFetchingMore, posts, emptyTitle, emptyMessage, emptyIcon, emptyAction, emptyActionLabel }) {
+  if (isLoading && posts.length === 0) {
     return (
-      <View style={styles.skeletons}>
-        {Array.from({ length: 2 }).map((_, i) => <SkeletonCard key={i} />)}
+      <View style={styles.skeletonContainer}>
+        {[...Array(4)].map((_, i) => <PostSkeleton key={i} />)}
       </View>
     );
-  }, [hasMore, isLoading, posts.length]);
+  }
 
   return (
     <FlashList
       data={posts}
-      renderItem={renderItem}
-      keyExtractor={keyExtractor}
+      keyExtractor={(item) => String(item.id)}
+      renderItem={({ item }) => <PostCard post={item} />}
       estimatedItemSize={280}
-      contentContainerStyle={styles.list}
-      onEndReached={hasMore ? onLoadMore : undefined}
+      onEndReached={onLoadMore}
       onEndReachedThreshold={0.4}
-      refreshing={isRefreshing}
       onRefresh={onRefresh}
-      ListEmptyComponent={ListEmptyComponent}
-      ListFooterComponent={ListFooterComponent}
-      ListHeaderComponent={ListHeaderComponent}
-      showsVerticalScrollIndicator={false}
+      refreshing={isRefreshing}
+      contentContainerStyle={styles.list}
+      ListEmptyComponent={
+        <EmptyState
+          icon={emptyIcon ?? '🏟️'}
+          title={emptyTitle ?? 'No posts yet'}
+          message={emptyMessage ?? 'Check back soon for new content.'}
+          actionLabel={emptyActionLabel}
+          onAction={emptyAction}
+        />
+      }
+      ListFooterComponent={
+        isFetchingMore ? (
+          <View style={styles.footer}>
+            <Skeleton width={200} height={12} style={{ alignSelf: 'center' }} />
+          </View>
+        ) : null
+      }
     />
   );
-});
+}
 
 const styles = StyleSheet.create({
-  list:     { padding: spacing.base, backgroundColor: colors.background },
-  skeletons:{ paddingTop: spacing.sm },
-  footer:   { height: spacing.xxxl },
+  list: { padding: spacing[4] },
+  skeletonContainer: { padding: spacing[4], gap: spacing[3] },
+  skeletonCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+    marginBottom: spacing[3],
+  },
+  skeletonBody: { padding: spacing[4], gap: spacing[2] },
+  skeletonRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginBottom: spacing[2] },
+  footer: { paddingVertical: spacing[4] },
 });

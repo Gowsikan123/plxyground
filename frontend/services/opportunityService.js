@@ -1,51 +1,48 @@
 import api from './api';
 
 export const opportunityService = {
-  getOpportunities: async ({ search, sport, limit = 20, offset = 0 } = {}) => {
+  async getOpportunities({ search = '', sport = '', limit = 20, offset = 0 } = {}) {
     try {
-      const params = { limit, offset };
-      if (search) params.search = search;
-      if (sport)  params.sport  = sport;
-      const res = await api.get('/api/opportunities', { params });
+      const res = await api.get('/api/opportunities', { params: { search, sport, limit, offset } });
       return { data: res.data, error: null };
     } catch (err) {
-      return { data: null, error: err.message };
+      return { data: null, error: err.response?.data?.message || 'Failed to load opportunities' };
     }
   },
 
-  getOpportunity: async (id) => {
+  async getOpportunity(id) {
     try {
       const res = await api.get(`/api/opportunities/${id}`);
       return { data: res.data, error: null };
     } catch (err) {
-      return { data: null, error: err.message };
+      return { data: null, error: err.response?.data?.message || 'Opportunity not found' };
     }
   },
 
-  createOpportunity: async (payload) => {
+  async createOpportunity(data) {
     try {
-      const res = await api.post('/api/opportunities', payload);
+      const res = await api.post('/api/opportunities', data);
       return { data: res.data, error: null };
     } catch (err) {
-      return { data: null, error: err.message };
+      return { data: null, error: err.response?.data?.errors || err.response?.data?.message || 'Failed to create opportunity' };
     }
   },
 
-  updateOpportunity: async (id, payload) => {
+  async updateOpportunity(id, data) {
     try {
-      const res = await api.put(`/api/opportunities/${id}`, payload);
+      const res = await api.put(`/api/opportunities/${id}`, data);
       return { data: res.data, error: null };
     } catch (err) {
-      return { data: null, error: err.message };
+      return { data: null, error: err.response?.data?.message || 'Failed to update opportunity' };
     }
   },
 
-  deleteOpportunity: async (id) => {
+  async deleteOpportunity(id) {
     try {
       const res = await api.delete(`/api/opportunities/${id}`);
       return { data: res.data, error: null };
     } catch (err) {
-      return { data: null, error: err.message };
+      return { data: null, error: err.response?.data?.message || 'Failed to delete opportunity' };
     }
   },
 };

@@ -1,36 +1,34 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors } from '../../constants/colors';
-import { typography } from '../../constants/typography';
+import { fontFamily, fontSize } from '../../constants/typography';
 import { spacing, borderRadius } from '../../constants/spacing';
 
-const VARIANTS = {
-  default: { bg: colors.surfaceElevated, text: colors.textSecondary, border: colors.border },
-  primary: { bg: 'rgba(255,60,60,0.12)',  text: colors.primary,        border: 'rgba(255,60,60,0.3)' },
-  success: { bg: 'rgba(0,200,83,0.12)',   text: colors.success,        border: 'rgba(0,200,83,0.3)' },
-  warning: { bg: 'rgba(255,179,0,0.12)',  text: colors.warning,        border: 'rgba(255,179,0,0.3)' },
-  error:   { bg: 'rgba(255,60,60,0.12)',  text: colors.error,          border: 'rgba(255,60,60,0.3)' },
-};
-
-export const Badge = React.memo(({ label, variant = 'default', style }) => {
-  const v = VARIANTS[variant] || VARIANTS.default;
+export function Badge({ label, variant = 'default', style }) {
   return (
-    <View style={[styles.badge, { backgroundColor: v.bg, borderColor: v.border }, style]}>
-      <Text style={[styles.text, { color: v.text }]}>{label}</Text>
+    <View style={[styles.badge, styles[variant], style]}>
+      <Text style={[styles.label, styles[`label_${variant}`]]}>{label}</Text>
     </View>
   );
-});
+}
 
 const styles = StyleSheet.create({
   badge: {
-    borderWidth: 1,
+    paddingHorizontal: spacing[2] + 2,
+    paddingVertical: spacing[1],
     borderRadius: borderRadius.full,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
     alignSelf: 'flex-start',
   },
-  text: {
-    ...typography.label,
-    fontSize: 11,
-  },
+  default: { backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border },
+  primary: { backgroundColor: colors.primary },
+  success: { backgroundColor: colors.success },
+  warning: { backgroundColor: colors.warning },
+  error: { backgroundColor: colors.error },
+
+  label: { fontFamily: fontFamily.medium, fontSize: fontSize.xs },
+  label_default: { color: colors.textSecondary },
+  label_primary: { color: colors.white },
+  label_success: { color: '#000' },
+  label_warning: { color: '#000' },
+  label_error: { color: colors.white },
 });

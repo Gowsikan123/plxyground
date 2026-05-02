@@ -1,28 +1,21 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import { authService } from '../services/authService';
-import { businessAuthService } from '../services/businessAuthService';
-
-const AUTH_TOKEN_KEY   = 'plxyground_token';
-const AUTH_USER_KEY    = 'plxyground_user';
-const AUTH_TYPE_KEY    = 'plxyground_user_type';
 
 export const useAuthStore = create((set, get) => ({
-  token:    null,
-  user:     null,
-  userType: null, // 'creator' | 'business'
+  user: null,
+  token: null,
+  userType: null,
   isLoading: true,
-  error:    null,
+  isAuthenticated: false,
 
   hydrate: async () => {
     try {
-      const [token, userRaw, userType] = await Promise.all([
-        SecureStore.getItemAsync(AUTH_TOKEN_KEY),
-        SecureStore.getItemAsync(AUTH_USER_KEY),
-        SecureStore.getItemAsync(AUTH_TYPE_KEY),
-      ]);
+      const token = await SecureStore.getItemAsync('authToken');
+      const userRaw = await SecureStore.getItemAsync('authUser');
       if (token && userRaw) {
-        set({ token, user: JSON.parse(userRaw), userType, isLoading: false });
+        const user = JSON.parse(userRaw);
+        set({ token, user, userType: user.type, isAuthenticated: true, isLoading: false });
       } else {
         set({ isLoading: false });
       }
@@ -31,78 +24,16 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
-  loginCreator: async (email, password) => {
-    set({ error: null });
-    const { data, error } = await authService.login(email, password);
-    if (error) { set({ error }); return { error }; }
-    await Promise.all([
-      SecureStore.setItemAsync(AUTH_TOKEN_KEY, data.token),
-      SecureStore.setItemAsync(AUTH_USER_KEY,  JSON.stringify(data.user)),
-      SecureStore.setItemAsync(AUTH_TYPE_KEY,  'creator'),
-    ]);
-    set({ token: data.token, user: data.user, userType: 'creator', error: null });
-    return { data };
+  setAuth: (token, user, userType) => {
+    set({ token, user, userType, isAuthenticated: true });
   },
 
-  signupCreator: async (payload) => {
-    set({ error: null });
-    const { data, error } = await authService.signup(payload);
-    if (error) { set({ error }); return { error }; }
-    await Promise.all([
-      SecureStore.setItemAsync(AUTH_TOKEN_KEY, data.token),
-      SecureStore.setItemAsync(AUTH_USER_KEY,  JSON.stringify(data.user)),
-      SecureStore.setItemAsync(AUTH_TYPE_KEY,  'creator'),
-    ]);
-    set({ token: data.token, user: data.user, userType: 'creator', error: null });
-    return { data };
-  },
-
-  loginBusiness: async (email, password) => {
-    set({ error: null });
-    const { data, error } = await businessAuthService.login(email, password);
-    if (error) { set({ error }); return { error }; }
-    await Promise.all([
-      SecureStore.setItemAsync(AUTH_TOKEN_KEY, data.token),
-      SecureStore.setItemAsync(AUTH_USER_KEY,  JSON.stringify(data.user)),
-      SecureStore.setItemAsync(AUTH_TYPE_KEY,  'business'),
-    ]);
-    set({ token: data.token, user: data.user, userType: 'business', error: null });
-    return { data };
-  },
-
-  signupBusiness: async (payload) => {
-    set({ error: null });
-    const { data, error } = await businessAuthService.signup(payload);
-    if (error) { set({ error }); return { error }; }
-    await Promise.all([
-      SecureStore.setItemAsync(AUTH_TOKEN_KEY, data.token),
-      SecureStore.setItemAsync(AUTH_USER_KEY,  JSON.stringify(data.user)),
-      SecureStore.setItemAsync(AUTH_TYPE_KEY,  'business'),
-    ]);
-    set({ token: data.token, user: data.user, userType: 'business', error: null });
-    return { data };
-  },
-
-  refreshUser: async () => {
-    const { token, userType } = get();
-    if (!token) return;
-    const svc = userType === 'business' ? businessAuthService : authService;
-    const { data, error } = await svc.me();
-    if (!error && data) {
-      const updated = { ...get().user, ...data };
-      await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(updated));
-      set({ user: updated });
-    }
+  updateUser: (updates) => {
+    set((state) => ({ user: { ...state.user, ...updates } }));
   },
 
   logout: async () => {
-    await Promise.all([
-      SecureStore.deleteItemAsync(AUTH_TOKEN_KEY),
-      SecureStore.deleteItemAsync(AUTH_USER_KEY),
-      SecureStore.deleteItemAsync(AUTH_TYPE_KEY),
-    ]);
-    set({ token: null, user: null, userType: null, error: null });
+    await authService.logout();
+    set({ user: null, token: null, userType: null, isAuthenticated: false });
   },
-
-  clearError: () => set({ error: null }),
 }));

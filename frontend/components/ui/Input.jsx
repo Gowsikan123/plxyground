@@ -1,63 +1,108 @@
-import React, { useState, useCallback, forwardRef } from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { colors } from '../../constants/colors';
-import { typography } from '../../constants/typography';
+import { fontFamily, fontSize } from '../../constants/typography';
 import { spacing, borderRadius } from '../../constants/spacing';
 
-export const Input = forwardRef(({ label, error, hint, secureToggle = false, icon, rightElement, containerStyle, inputStyle, ...props }, ref) => {
-  const [secure, setSecure] = useState(props.secureTextEntry ?? false);
-  const [focused, setFocused] = useState(false);
-
-  const toggleSecure = useCallback(() => setSecure(s => !s), []);
+export function Input({
+  label,
+  error,
+  placeholder,
+  value,
+  onChangeText,
+  secureTextEntry,
+  keyboardType,
+  autoCapitalize = 'none',
+  autoCorrect = false,
+  multiline = false,
+  numberOfLines = 1,
+  style,
+  inputStyle,
+  editable = true,
+  maxLength,
+  returnKeyType,
+  onSubmitEditing,
+  blurOnSubmit,
+  inputRef,
+}) {
+  const [showPassword, setShowPassword] = useState(false);
+  const isPassword = secureTextEntry !== undefined;
 
   return (
-    <View style={[styles.wrapper, containerStyle]}>
+    <View style={[styles.wrapper, style]}>
       {label && <Text style={styles.label}>{label}</Text>}
-      <View style={[styles.inputRow, focused && styles.focused, error && styles.errBorder]}>
-        {icon && <View style={styles.icon}>{icon}</View>}
+      <View style={[styles.inputContainer, error && styles.inputError, !editable && styles.inputDisabled]}>
         <TextInput
-          ref={ref}
-          style={[styles.input, inputStyle]}
+          ref={inputRef}
+          style={[
+            styles.input,
+            multiline && styles.multiline,
+            inputStyle,
+          ]}
+          placeholder={placeholder}
           placeholderTextColor={colors.textMuted}
-          secureTextEntry={secureToggle ? secure : props.secureTextEntry}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          {...props}
+          value={value}
+          onChangeText={onChangeText}
+          secureTextEntry={isPassword && !showPassword}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          autoCorrect={autoCorrect}
+          multiline={multiline}
+          numberOfLines={multiline ? numberOfLines : 1}
+          editable={editable}
+          maxLength={maxLength}
+          returnKeyType={returnKeyType}
+          onSubmitEditing={onSubmitEditing}
+          blurOnSubmit={blurOnSubmit}
         />
-        {secureToggle && (
-          <TouchableOpacity onPress={toggleSecure} style={styles.icon}>
-            <Text style={styles.toggleTxt}>{secure ? 'Show' : 'Hide'}</Text>
+        {isPassword && (
+          <TouchableOpacity onPress={() => setShowPassword((v) => !v)} style={styles.eyeBtn}>
+            <Text style={styles.eyeText}>{showPassword ? '🙈' : '👁️'}</Text>
           </TouchableOpacity>
         )}
-        {rightElement && <View style={styles.icon}>{rightElement}</View>}
       </View>
-      {error && <Text style={styles.error}>{error}</Text>}
-      {!error && hint && <Text style={styles.hint}>{hint}</Text>}
+      {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
-});
+}
 
 const styles = StyleSheet.create({
-  wrapper:    { marginBottom: spacing.md },
-  label:      { ...typography.label, marginBottom: spacing.xs, color: colors.textSecondary },
-  inputRow: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.surfaceElevated,
-    borderWidth: 1, borderColor: colors.border,
-    borderRadius: borderRadius.md,
-    minHeight: 48,
-    paddingHorizontal: spacing.md,
+  wrapper: { marginBottom: spacing[4] },
+  label: {
+    color: colors.textSecondary,
+    fontFamily: fontFamily.medium,
+    fontSize: fontSize.sm,
+    marginBottom: spacing[1] + 2,
   },
-  focused:    { borderColor: colors.primary },
-  errBorder:  { borderColor: colors.error },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing[4],
+  },
+  inputError: { borderColor: colors.error },
+  inputDisabled: { opacity: 0.5 },
   input: {
     flex: 1,
-    ...typography.body,
     color: colors.textPrimary,
-    paddingVertical: spacing.sm + 2,
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.base,
+    paddingVertical: spacing[3] + 2,
   },
-  icon:       { paddingHorizontal: spacing.xs },
-  toggleTxt:  { ...typography.caption, color: colors.primary },
-  error:      { ...typography.caption, color: colors.error,         marginTop: spacing.xs },
-  hint:       { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
+  multiline: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+    paddingTop: spacing[3],
+  },
+  eyeBtn: { paddingLeft: spacing[2] },
+  eyeText: { fontSize: fontSize.md },
+  errorText: {
+    color: colors.error,
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.xs,
+    marginTop: spacing[1],
+  },
 });
