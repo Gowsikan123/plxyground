@@ -3,6 +3,7 @@
   "outputDirectory": "dist",
   "installCommand": "npm install --legacy-peer-deps",
   "framework": null,
+  "ignoreCommand": "git diff HEAD~1 --name-only | grep -q '^frontend/' || exit 0",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
