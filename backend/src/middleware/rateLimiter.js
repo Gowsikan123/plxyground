@@ -7,7 +7,7 @@ const globalLimiter = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many requests. Please try again later.' },
+  message: { error: 'Too many requests, please try again later.' },
 });
 
 const authLimiter = rateLimit({
@@ -15,7 +15,15 @@ const authLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many auth attempts. Please try again later.' },
+  message: { error: 'Too many auth attempts, please wait before trying again.' },
 });
 
-module.exports = { globalLimiter, authLimiter };
+const uploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Upload limit reached. Try again in an hour.' },
+});
+
+module.exports = { globalLimiter, authLimiter, uploadLimiter };

@@ -4,70 +4,80 @@ const { verifyToken } = require('../utils/jwt');
 const { getPool } = require('../db/client');
 const logger = require('../logger');
 
-async function requireAuth(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Missing or invalid authorization header' });
-  }
-  const token = authHeader.slice(7);
-  try {
-    const payload = verifyToken(token);
-    const pool = getPool();
+function extractToken(req) {
+  const auth = req.headers.authorization || '';
+  if (auth.startsWith('Bearer ')) return auth.slice(7);
+  return null;
+}
 
-    if (payload.type === 'creator') {
-      const { rows } = await pool.query(
-        `SELECT ca.*, c.id AS creator_id, c.username, c.slug, c.display_name, c.bio, c.avatar_url, c.sport, c.location, c.follower_count, c.is_verified
-         FROM creator_accounts ca
-         JOIN creators c ON c.id = ca.creator_id
-         WHERE ca.id = $1`,
-        [payload.sub]
-      );
-      if (rows.length === 0) return res.status(401).json({ error: 'Account not found' });
-      if (rows[0].is_suspended) return res.status(403).json({ error: 'Account is suspended' });
-      req.user = rows[0];
-      req.userType = 'creator';
-      return next();
-    }
+async function requireAuth(req, res, next) {
+  const token = extractToken(req);
+  if (!token) return res.status(401).json({ error: 'No token provided' });
+
+  const { payload, error } = verifyToken(token, 'creator');
+  if (error) return res.status(401).json({ error: 'Invalid or expired token' });
+
+  try {
+    const pool = getPool();
+    let user = null;
 
     if (payload.type === 'business') {
       const { rows } = await pool.query(
-        `SELECT * FROM businesses WHERE id = $1`,
-        [payload.sub]
+        'SELECT id, email, company_name, is_suspended FROM businesses WHERE id = $1',
+        [payload.id],
       );
-      if (rows.length === 0) return res.status(401).json({ error: 'Account not found' });
-      if (rows[0].is_suspended) return res.status(403).json({ error: 'Account is suspended' });
-      req.user = rows[0];
-      req.userType = 'business';
-      return next();
+      user = rows[0];
+    } else {
+      const { rows } = await pool.query(
+        'SELECT id, email, username, is_suspended FROM creators WHERE id = $1',
+        [payload.id],
+      );
+      user = rows[0];
     }
 
-    return res.status(401).json({ error: 'Invalid token type' });
+    if (!user) return res.status(401).json({ error: 'Account not found' });
+    if (user.is_suspended) return res.status(403).json({ error: 'Account suspended' });
+
+    req.user = { ...user, type: payload.type };
+    next();
   } catch (err) {
-    logger.warn('requireAuth: token verification failed', { message: err.message });
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    logger.error('requireAuth db error', { message: err.message });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
 
 async function requireAdmin(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Missing or invalid authorization header' });
-  }
-  const token = authHeader.slice(7);
+  const token = extractToken(req);
+  if (!token) return res.status(401).json({ error: 'No token provided' });
+
+  const { payload, error } = verifyToken(token, 'admin');
+  if (error) return res.status(401).json({ error: 'Invalid or expired admin token' });
+
   try {
-    const payload = verifyToken(token);
-    if (payload.type !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-    const pool = getPool();
-    const { rows } = await pool.query('SELECT * FROM admins WHERE id = $1', [payload.sub]);
-    if (rows.length === 0) return res.status(403).json({ error: 'Admin account not found' });
-    req.admin = rows[0];
-    return next();
+    const { rows } = await getPool().query(
+      'SELECT id, username, role, is_active FROM admins WHERE id = $1',
+      [payload.id],
+    );
+    const admin = rows[0];
+    if (!admin) return res.status(401).json({ error: 'Admin not found' });
+    if (!admin.is_active) return res.status(403).json({ error: 'Admin account disabled' });
+
+    req.admin = admin;
+    next();
   } catch (err) {
-    logger.warn('requireAdmin: token verification failed', { message: err.message });
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    logger.error('requireAdmin db error', { message: err.message });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
 
-module.exports = { requireAuth, requireAdmin };
+function requireRole(...roles) {
+  return (req, res, next) => {
+    if (!req.admin) return res.status(401).json({ error: 'Not authenticated' });
+    if (!roles.includes(req.admin.role)) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+    next();
+  };
+}
+
+module.exports = { requireAuth, requireAdmin, requireRole };
