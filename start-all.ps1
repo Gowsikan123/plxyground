@@ -1,41 +1,39 @@
-Write-Host "🚀 Starting PLXYGROUND (Windows PowerShell)..."
+$Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-function Start-ServiceProcess($cwd, $command, $args) {
-  Push-Location $cwd
-  Start-Process -FilePath $command -ArgumentList $args -NoNewWindow -PassThru | Out-Null
-  Pop-Location
-}
+Write-Host "[PLXYGROUND] Starting all services..." -ForegroundColor Cyan
 
 # Backend
-Write-Host "Starting backend..."
-Start-ServiceProcess "c:\plxyground\backend" "npm" "install"
-Start-ServiceProcess "c:\plxyground\backend" "node" "src/index.js"
+$backendPath = Join-Path $Root "backend"
+if (-not (Test-Path (Join-Path $backendPath "node_modules"))) {
+  Write-Host "[backend] Installing dependencies..." -ForegroundColor Yellow
+  Push-Location $backendPath
+  npm install
+  Pop-Location
+}
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$backendPath'; npm run start" -WindowStyle Normal
+Write-Host "[backend] Window opened → http://localhost:3011" -ForegroundColor Green
 
 # Admin panel
-Write-Host "Starting admin panel..."
-Start-ServiceProcess "c:\plxyground\admin-panel" "npm" "install"
-Start-ServiceProcess "c:\plxyground\admin-panel" "node" "server.js"
+$adminPath = Join-Path $Root "admin-panel"
+if (-not (Test-Path (Join-Path $adminPath "node_modules"))) {
+  Write-Host "[admin-panel] Installing dependencies..." -ForegroundColor Yellow
+  Push-Location $adminPath
+  npm install
+  Pop-Location
+}
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$adminPath'; npm run start" -WindowStyle Normal
+Write-Host "[admin-panel] Window opened → http://localhost:3012" -ForegroundColor Green
 
 # Frontend
-Write-Host "Starting frontend..."
-Start-ServiceProcess "c:\plxyground\frontend" "npm" "install"
-Start-ServiceProcess "c:\plxyground\frontend" "npx" "expo start --web --port 19006"
+$frontendPath = Join-Path $Root "frontend"
+if (-not (Test-Path (Join-Path $frontendPath "node_modules"))) {
+  Write-Host "[frontend] Installing dependencies..." -ForegroundColor Yellow
+  Push-Location $frontendPath
+  npm install
+  Pop-Location
+}
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$frontendPath'; npm run start" -WindowStyle Normal
+Write-Host "[frontend] Window opened → http://localhost:19006" -ForegroundColor Green
 
-Start-Sleep -Seconds 8
-
-Write-Host "🔍 Health checks..."
-$backend = Invoke-WebRequest -UseBasicParsing -Uri http://localhost:3011/healthz -ErrorAction SilentlyContinue
-if ($backend -and $backend.StatusCode -eq 200) { Write-Host "✅ Backend healthy" } else { Write-Host "❌ Backend not healthy" }
-
-$admin = Invoke-WebRequest -UseBasicParsing -Uri http://localhost:3012 -ErrorAction SilentlyContinue
-if ($admin -and $admin.StatusCode -eq 200) { Write-Host "✅ Admin panel healthy" } else { Write-Host "❌ Admin panel not healthy" }
-
-$frontend = Invoke-WebRequest -UseBasicParsing -Uri http://localhost:19006 -ErrorAction SilentlyContinue
-if ($frontend -and $frontend.StatusCode -eq 200) { Write-Host "Frontend healthy" } else { Write-Host "Frontend not healthy" }
-
-Write-Host "===================================="
-Write-Host "  PLXYGROUND RUNNING"
-Write-Host "  Backend:  http://localhost:3011"
-Write-Host "  Frontend: http://localhost:19006"
-Write-Host "  Admin:    http://localhost:3012"
-Write-Host "===================================="
+Write-Host ""
+Write-Host "All three service windows launched." -ForegroundColor Cyan

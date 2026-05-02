@@ -16,7 +16,7 @@ PLXYGROUND is a monorepo for a sports creator platform with three runtime surfac
 - **Runtime:** Node.js 22
 - **API:** Express 5, JWT auth, helmet, cors, express-rate-limit
 - **Database:** PostgreSQL 16 (pg driver)
-- **Mobile:** Expo 54, React Native 0.76, Expo Router
+- **Mobile:** Expo 54, React Native 0.76, Expo Router v3
 - **Admin UI:** Vanilla HTML/CSS/JS
 - **CI:** GitHub Actions + Jest smoke tests
 
@@ -30,8 +30,6 @@ cd plxyground
 ```
 
 ### 2. Environment setup
-
-Copy and fill in the backend env file:
 
 ```bash
 cp backend/.env.example backend/.env
@@ -109,8 +107,9 @@ Default credentials after seeding:
 | Script | Description |
 |---|---|
 | `npm run start` | Start API server |
+| `npm run dev` | Start with --watch |
 | `npm run seed` | Seed database with sample data |
-| `npm run smoke` | Run Jest smoke test suite |
+| `npm run smoke` | Run smoke test suite |
 
 ### frontend
 
@@ -126,7 +125,6 @@ Default credentials after seeding:
 | Script | Description |
 |---|---|
 | `npm run start` | Serve admin UI on port 3012 |
-| `npm run test:e2e` | Playwright admin smoke test |
 
 ## API Endpoints
 
@@ -137,6 +135,7 @@ Default credentials after seeding:
 ### Creator Auth (`/api/auth`)
 - `POST /api/auth/signup`
 - `POST /api/auth/login`
+- `GET /api/auth/me`
 
 ### Business Auth (`/api/business`)
 - `POST /api/business/auth/signup`
@@ -144,33 +143,34 @@ Default credentials after seeding:
 - `GET /api/business/auth/me`
 
 ### Business Content (`/api/business/content`)
-- `POST /api/business/content` — create campaign content
-- `GET /api/business/content/mine` — list own content
+- `POST /api/business/content`
+- `GET /api/business/content/mine`
+- `PUT /api/business/content/:id`
 
 ### Public Content (`/api/content`)
-- `GET /api/content` — public feed (search, limit, offset)
-- `GET /api/content/:id` — single published post
-- `POST /api/content` — create post *(auth required)*
-- `PUT /api/content/:id` — update own post
-- `DELETE /api/content/:id` — delete own post
+- `GET /api/content`
+- `GET /api/content/:id`
+- `POST /api/content`
+- `PUT /api/content/:id`
+- `DELETE /api/content/:id`
 
 ### Creators (`/api/creators`)
-- `GET /api/creators` — list creators
-- `GET /api/creators/:id` — creator profile + posts
-- `GET /api/creators/slug/:slug` — profile by slug
-- `PUT /api/creators/:id` — update own profile
+- `GET /api/creators`
+- `GET /api/creators/:id`
+- `GET /api/creators/slug/:slug`
+- `PUT /api/creators/:id`
 
 ### Opportunities (`/api/opportunities`)
-- `GET /api/opportunities` — list published opportunities
-- `GET /api/opportunities/:id` — single opportunity
-- `POST /api/opportunities` — create *(auth required)*
-- `PUT /api/opportunities/:id` — update own
-- `DELETE /api/opportunities/:id` — delete own
+- `GET /api/opportunities`
+- `GET /api/opportunities/:id`
+- `POST /api/opportunities`
+- `PUT /api/opportunities/:id`
+- `DELETE /api/opportunities/:id`
 
 ### Admin (`/api/admin`)
 - `POST /api/admin/auth/login`
 - `POST /api/admin/auth/change-password`
-- `GET /api/admin/queue` — moderation queue
+- `GET /api/admin/queue`
 - `POST /api/admin/queue/bulk-action`
 - `GET /api/admin/content`
 - `PUT /api/admin/content/:id`
@@ -180,27 +180,26 @@ Default credentials after seeding:
 - `POST /api/admin/users/:id/reactivate`
 - `PUT /api/admin/users/:id/role`
 - `GET /api/admin/analytics`
+- `GET /api/admin/alerts`
 - `GET /api/admin/audit`
 - `GET /api/admin/audit/export`
-- `GET /api/admin/alerts`
 
 ## Architecture
 
 - API boots in `backend/src/index.js`, mounts all route modules, applies security middleware
 - PostgreSQL schema is defined and auto-created in `backend/src/db/setup.js`
-- Expo app uses `frontend/components/ApiClient.js` for API calls and `frontend/components/AuthContext.jsx` for auth state
+- Expo app uses file-based routing via `expo-router` v3
 - Admin panel is a single static page in `admin-panel/index.html` that calls the API via `fetch`
 - JWT tokens issued on login/signup — clients send `Authorization: Bearer <token>`
 
 ## CI
 
-Every push to `main` runs the backend Jest smoke suite via `.github/workflows/smoke.yml` against a real Postgres 16 instance.
+Every push to `main` runs the backend smoke suite via `.github/workflows/smoke.yml` against a real Postgres 16 instance.
 
-## Troubleshooting
+## Context
 
-| Problem | Fix |
-|---|---|
-| CORS errors | Add your origin to `CORS_ORIGIN` in `backend/.env` |
-| API unreachable on device | Set `EXPO_PUBLIC_API_BASE_URL` to your LAN IP |
-| Empty feed | Run `npm run seed` in `backend` |
-| Postgres not running | Run `backend/scripts/start-postgres.ps1` (Windows) |
+Built for: Basketball Nxtion (UK sports-tech startup)
+Developer: Gowi (placement student, T Level Digital)
+Platform target: iOS App Store + Google Play Store
+Backend deploy target: Railway or Render
+Database: PostgreSQL 16 (hosted on Railway/Supabase/Neon)

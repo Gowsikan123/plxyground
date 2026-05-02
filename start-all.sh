@@ -1,41 +1,43 @@
-#!/bin/bash
-echo "🚀 Starting PLXYGROUND..."
+#!/usr/bin/env bash
+set -e
 
-# Kill any existing processes on our ports
-lsof -ti:3011 | xargs kill -9 2>/dev/null || true
-lsof -ti:3012 | xargs kill -9 2>/dev/null || true
-lsof -ti:19006 | xargs kill -9 2>/dev/null || true
+ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Start backend
-cd backend && npm install && node src/index.js &
+echo "[PLXYGROUND] Starting all services..."
+
+# Backend
+cd "$ROOT_DIR/backend"
+if [ ! -d node_modules ]; then
+  echo "[backend] Installing dependencies..."
+  npm install
+fi
+npm run start > "$ROOT_DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
-echo "✅ Backend starting (PID $BACKEND_PID)"
+echo "[backend] Started (PID $BACKEND_PID) → http://localhost:3011"
 
-# Start admin panel
-cd ../admin-panel && npm install && node server.js &
+# Admin panel
+cd "$ROOT_DIR/admin-panel"
+if [ ! -d node_modules ]; then
+  echo "[admin-panel] Installing dependencies..."
+  npm install
+fi
+npm run start > "$ROOT_DIR/admin-panel.log" 2>&1 &
 ADMIN_PID=$!
-echo "✅ Admin panel starting (PID $ADMIN_PID)"
+echo "[admin-panel] Started (PID $ADMIN_PID) → http://localhost:3012"
 
-# Start frontend
-cd ../frontend && npm install && npx expo start --web --port 19006 &
+# Frontend
+cd "$ROOT_DIR/frontend"
+if [ ! -d node_modules ]; then
+  echo "[frontend] Installing dependencies..."
+  npm install
+fi
+npm run start > "$ROOT_DIR/frontend.log" 2>&1 &
 FRONTEND_PID=$!
-echo "✅ Frontend starting (PID $FRONTEND_PID)"
+echo "[frontend] Started (PID $FRONTEND_PID) → http://localhost:19006"
 
 echo ""
-echo "⏳ Waiting 10s for services to boot..."
-sleep 10
+echo "All services running. Logs: backend.log | admin-panel.log | frontend.log"
+echo "Press Ctrl+C to stop all."
 
-echo ""
-echo "🔍 Running health check..."
-curl -sf http://localhost:3011/healthz && echo "✅ Backend healthy" || echo "❌ Backend not responding"
-
-echo ""
-echo "===================================="
-echo "  PLXYGROUND RUNNING"
-echo "===================================="
-echo "  Backend:  http://localhost:3011"
-echo "  Frontend: http://localhost:19006"
-echo "  Admin:    http://localhost:3012"
-echo "===================================="
-
+trap "kill $BACKEND_PID $ADMIN_PID $FRONTEND_PID 2>/dev/null; echo 'All services stopped.'" INT
 wait
