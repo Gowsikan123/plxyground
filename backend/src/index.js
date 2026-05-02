@@ -5,7 +5,7 @@ const helmet = require('helmet');
 const cors = require('cors');
 const morgan = require('morgan');
 const config = require('./config');
-const setup = require('./db/setup');
+const { setupDatabase } = require('./db/setup');
 const { globalLimiter } = require('./middleware/rateLimiter');
 
 // Route imports
@@ -35,7 +35,7 @@ app.get('/healthz', (req, res) => res.json({ status: 'ok', uptime: process.uptim
 app.get('/', (req, res) => res.json({ name: 'PLXYGROUND API', version: '1.0.0' }));
 
 // Init DB then start
-setup().then(() => {
+setupDatabase().then(() => {
   // Creator auth + profile routes
   app.use('/api/auth', authRouter);
 
