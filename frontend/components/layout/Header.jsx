@@ -1,79 +1,60 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter, useNavigation } from 'expo-router';
 import { colors } from '../../constants/colors';
-import { fontFamily, fontSize } from '../../constants/typography';
+import { fontFamilies, fontSizes } from '../../constants/typography';
 import { spacing } from '../../constants/spacing';
 
-export function Header({ title, showLogo = false, rightAction, onBack }) {
-  const insets = useSafeAreaInsets();
-  const router = useRouter();
+const Header = React.memo(({ title, showLogo = false, rightAction, onBack, hideBack = false }) => {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const canGoBack = navigation.canGoBack();
 
-  const handleBack = () => {
-    if (onBack) {
-      onBack();
-    } else if (canGoBack) {
-      router.back();
-    }
-  };
-
   return (
-    <View style={[styles.container, { paddingTop: insets.top + spacing[2] }]}>
-      <View style={styles.inner}>
-        <View style={styles.left}>
-          {(canGoBack || onBack) && (
-            <TouchableOpacity onPress={handleBack} style={styles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Text style={styles.backIcon}>←</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+    <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
+      <View style={styles.left}>
+        {!hideBack && canGoBack ? (
+          <Pressable onPress={onBack || (() => navigation.goBack())} style={styles.backBtn} hitSlop={8}>
+            <Text style={styles.backArrow}>←</Text>
+          </Pressable>
+        ) : null}
+      </View>
 
-        <View style={styles.center}>
-          {showLogo ? (
-            <Text style={styles.logo}>PLXYGROUND</Text>
-          ) : (
-            <Text style={styles.title} numberOfLines={1}>{title}</Text>
-          )}
-        </View>
+      <View style={styles.center}>
+        {showLogo ? (
+          <Text style={styles.logo}>PLXYGROUND</Text>
+        ) : (
+          <Text style={styles.title}>{title}</Text>
+        )}
+      </View>
 
-        <View style={styles.right}>
-          {rightAction}
-        </View>
+      <View style={styles.right}>
+        {rightAction || null}
       </View>
     </View>
   );
-}
+});
+
+Header.displayName = 'Header';
+export default Header;
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: colors.background,
+  header: {
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    paddingBottom: spacing[2],
-  },
-  inner: {
+    paddingBottom: spacing.sm,
+    paddingHorizontal: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing[4],
-    height: 44,
+    justifyContent: 'space-between',
   },
-  left: { width: 44, justifyContent: 'center' },
+  left: { width: 44, alignItems: 'flex-start' },
   center: { flex: 1, alignItems: 'center' },
-  right: { width: 44, alignItems: 'flex-end', justifyContent: 'center' },
-  backBtn: { padding: spacing[1] },
-  backIcon: { color: colors.textPrimary, fontSize: 22 },
-  title: {
-    color: colors.textPrimary,
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.md,
-  },
-  logo: {
-    color: colors.primary,
-    fontFamily: fontFamily.displayExtraBold,
-    fontSize: fontSize.lg,
-    letterSpacing: 1.5,
-  },
+  right: { width: 44, alignItems: 'flex-end' },
+  backBtn: { padding: spacing.xs },
+  backArrow: { fontSize: fontSizes.xl, color: colors.textPrimary },
+  logo: { fontFamily: fontFamilies.heading, fontSize: fontSizes.xl, color: colors.primary, letterSpacing: 1.5 },
+  title: { fontFamily: fontFamilies.heading, fontSize: fontSizes.lg, color: colors.textPrimary },
 });

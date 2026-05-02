@@ -1,34 +1,37 @@
 import React from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { colors } from '../../constants/colors';
 import { spacing, borderRadius } from '../../constants/spacing';
 
-export function Card({ children, onPress, style, padding = true }) {
-  const containerStyle = [
-    styles.card,
-    padding && styles.padding,
-    style,
-  ];
-
+const Card = React.memo(({ children, style, onPress }) => {
   if (onPress) {
     return (
-      <TouchableOpacity onPress={onPress} style={containerStyle} activeOpacity={0.8}>
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [styles.card, pressed && styles.pressed, style]}
+      >
         {children}
-      </TouchableOpacity>
+      </Pressable>
     );
   }
+  return <View style={[styles.card, style]}>{children}</View>;
+});
 
-  return <View style={containerStyle}>{children}</View>;
-}
+Card.displayName = 'Card';
+export default Card;
 
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
     borderWidth: 1,
     borderColor: colors.border,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  padding: {
-    padding: spacing[4],
-  },
+  pressed: { opacity: 0.85 },
 });

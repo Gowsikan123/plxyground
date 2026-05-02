@@ -1,35 +1,34 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, View } from 'react-native';
-import { colors } from '../../constants/colors';
-import { borderRadius } from '../../constants/spacing';
+import { Animated, StyleSheet } from 'react-native';
 
-export function Skeleton({ width, height, style, borderRadius: br = borderRadius.sm }) {
-  const opacity = useRef(new Animated.Value(0.4)).current;
+const Skeleton = React.memo(({ width = '100%', height = 16, borderRadius = 6, style }) => {
+  const shimmer = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const animation = Animated.loop(
+    const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(opacity, { toValue: 1, duration: 800, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.4, duration: 800, useNativeDriver: true }),
-      ])
+        Animated.timing(shimmer, { toValue: 1, duration: 900, useNativeDriver: false }),
+        Animated.timing(shimmer, { toValue: 0, duration: 900, useNativeDriver: false }),
+      ]),
     );
-    animation.start();
-    return () => animation.stop();
-  }, []);
+    loop.start();
+    return () => loop.stop();
+  }, [shimmer]);
+
+  const bg = shimmer.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#1E1E1E', '#2A2A2A'],
+  });
 
   return (
     <Animated.View
       style={[
-        styles.skeleton,
-        { width, height, borderRadius: br, opacity },
+        { width, height, borderRadius, backgroundColor: bg },
         style,
       ]}
     />
   );
-}
-
-const styles = StyleSheet.create({
-  skeleton: {
-    backgroundColor: colors.surfaceElevated,
-  },
 });
+
+Skeleton.displayName = 'Skeleton';
+export default Skeleton;

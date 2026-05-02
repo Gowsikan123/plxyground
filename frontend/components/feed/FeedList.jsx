@@ -1,37 +1,34 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import { colors } from '../../constants/colors';
+import PostCard from './PostCard';
+import Skeleton from '../ui/Skeleton';
+import EmptyState from '../ui/EmptyState';
 import { spacing } from '../../constants/spacing';
-import { PostCard } from './PostCard';
-import { Skeleton } from '../ui/Skeleton';
-import { EmptyState } from '../ui/EmptyState';
 
-function PostSkeleton() {
+function SkeletonCard() {
   return (
     <View style={styles.skeletonCard}>
-      <Skeleton width="100%" height={180} borderRadius={0} />
-      <View style={styles.skeletonBody}>
-        <View style={styles.skeletonRow}>
-          <Skeleton width={34} height={34} borderRadius={17} />
-          <View style={{ flex: 1, gap: spacing[1] }}>
-            <Skeleton width="50%" height={12} />
-            <Skeleton width="30%" height={10} />
-          </View>
+      <View style={styles.skeletonRow}>
+        <Skeleton width={40} height={40} borderRadius={20} />
+        <View style={{ flex: 1, gap: 6 }}>
+          <Skeleton width="50%" height={12} />
+          <Skeleton width="30%" height={10} />
         </View>
-        <Skeleton width="90%" height={14} style={{ marginBottom: spacing[1] }} />
-        <Skeleton width="70%" height={14} style={{ marginBottom: spacing[2] }} />
-        <Skeleton width="60%" height={11} />
       </View>
+      <Skeleton width="80%" height={18} style={{ marginBottom: 8 }} />
+      <Skeleton width="100%" height={13} style={{ marginBottom: 4 }} />
+      <Skeleton width="70%" height={13} />
     </View>
   );
 }
 
-export function FeedList({ onRefresh, onLoadMore, isRefreshing, isLoading, isFetchingMore, posts, emptyTitle, emptyMessage, emptyIcon, emptyAction, emptyActionLabel }) {
-  if (isLoading && posts.length === 0) {
+const FeedList = React.memo(({ posts, isLoading, isRefreshing, hasMore, onRefresh, onLoadMore, ListHeaderComponent }) => {
+  if (isLoading && !posts.length) {
     return (
-      <View style={styles.skeletonContainer}>
-        {[...Array(4)].map((_, i) => <PostSkeleton key={i} />)}
+      <View style={styles.container}>
+        {ListHeaderComponent ? <ListHeaderComponent /> : null}
+        {[0, 1, 2, 3].map((i) => <SkeletonCard key={i} />)}
       </View>
     );
   }
@@ -41,44 +38,32 @@ export function FeedList({ onRefresh, onLoadMore, isRefreshing, isLoading, isFet
       data={posts}
       keyExtractor={(item) => String(item.id)}
       renderItem={({ item }) => <PostCard post={item} />}
-      estimatedItemSize={280}
+      estimatedItemSize={220}
       onEndReached={onLoadMore}
-      onEndReachedThreshold={0.4}
+      onEndReachedThreshold={0.5}
       onRefresh={onRefresh}
       refreshing={isRefreshing}
-      contentContainerStyle={styles.list}
+      ListHeaderComponent={ListHeaderComponent}
       ListEmptyComponent={
-        <EmptyState
-          icon={emptyIcon ?? '🏟️'}
-          title={emptyTitle ?? 'No posts yet'}
-          message={emptyMessage ?? 'Check back soon for new content.'}
-          actionLabel={emptyActionLabel}
-          onAction={emptyAction}
-        />
-      }
-      ListFooterComponent={
-        isFetchingMore ? (
-          <View style={styles.footer}>
-            <Skeleton width={200} height={12} style={{ alignSelf: 'center' }} />
-          </View>
+        !isLoading ? (
+          <EmptyState
+            icon="🏀"
+            title="No posts yet"
+            subtitle="Be the first to create content on PLXYGROUND!"
+          />
         ) : null
       }
+      contentContainerStyle={styles.list}
     />
   );
-}
+});
+
+FeedList.displayName = 'FeedList';
+export default FeedList;
 
 const styles = StyleSheet.create({
-  list: { padding: spacing[4] },
-  skeletonContainer: { padding: spacing[4], gap: spacing[3] },
-  skeletonCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-    marginBottom: spacing[3],
-  },
-  skeletonBody: { padding: spacing[4], gap: spacing[2] },
-  skeletonRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginBottom: spacing[2] },
-  footer: { paddingVertical: spacing[4] },
+  container: { flex: 1, padding: spacing.lg },
+  list: { padding: spacing.lg },
+  skeletonCard: { backgroundColor: '#141414', borderRadius: 20, padding: spacing.lg, marginBottom: spacing.md, gap: spacing.sm },
+  skeletonRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
 });

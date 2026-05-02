@@ -1,55 +1,28 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors } from '../../constants/colors';
-import { fontFamily, fontSize } from '../../constants/typography';
+import { fontFamilies, fontSizes } from '../../constants/typography';
 import { spacing } from '../../constants/spacing';
-import { Button } from './Button';
+import Button from './Button';
 
-export function EmptyState({ icon = '📭', title, message, actionLabel, onAction }) {
-  return (
-    <View style={styles.container}>
-      <Text style={styles.icon}>{icon}</Text>
-      <Text style={styles.title}>{title}</Text>
-      {message && <Text style={styles.message}>{message}</Text>}
-      {actionLabel && onAction && (
-        <Button
-          title={actionLabel}
-          onPress={onAction}
-          fullWidth={false}
-          style={styles.button}
-          size="sm"
-        />
-      )}
-    </View>
-  );
-}
+const EmptyState = React.memo(({ icon, title, subtitle, actionLabel, onAction }) => (
+  <View style={styles.container}>
+    {icon ? <Text style={styles.icon}>{icon}</Text> : null}
+    <Text style={styles.title}>{title}</Text>
+    {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+    {actionLabel && onAction ? (
+      <Button label={actionLabel} onPress={onAction} variant="primary" size="md" style={styles.action} />
+    ) : null}
+  </View>
+));
+
+EmptyState.displayName = 'EmptyState';
+export default EmptyState;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing[8],
-    paddingVertical: spacing[12],
-  },
-  icon: {
-    fontSize: 48,
-    marginBottom: spacing[4],
-  },
-  title: {
-    color: colors.textPrimary,
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.lg,
-    textAlign: 'center',
-    marginBottom: spacing[2],
-  },
-  message: {
-    color: colors.textSecondary,
-    fontFamily: fontFamily.regular,
-    fontSize: fontSize.base,
-    textAlign: 'center',
-    lineHeight: fontSize.base * 1.6,
-    marginBottom: spacing[5],
-  },
-  button: { marginTop: spacing[2] },
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xxxl },
+  icon: { fontSize: 48, marginBottom: spacing.lg },
+  title: { fontFamily: fontFamilies.heading, fontSize: fontSizes.lg, color: colors.textPrimary, textAlign: 'center', marginBottom: spacing.sm },
+  subtitle: { fontFamily: fontFamilies.body, fontSize: fontSizes.md, color: colors.textSecondary, textAlign: 'center', lineHeight: fontSizes.md * 1.5 },
+  action: { marginTop: spacing.xl },
 });

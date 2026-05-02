@@ -1,42 +1,48 @@
 import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../../constants/colors';
-import { fontFamily, fontSize } from '../../constants/typography';
+import { fontFamilies, fontSizes } from '../../constants/typography';
 
-export function Avatar({ uri, name, size = 40, style }) {
-  const initials = name
-    ? name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()
-    : '?';
+const SIZES = { sm: 32, md: 44, lg: 64, xl: 96 };
+const BG_COLORS = ['#C0392B', '#2980B9', '#8E44AD', '#27AE60', '#E67E22', '#16A085'];
 
-  const containerStyle = {
-    width: size,
-    height: size,
-    borderRadius: size / 2,
-    backgroundColor: colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  };
+function colorFor(name = '') {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash += name.charCodeAt(i);
+  return BG_COLORS[hash % BG_COLORS.length];
+}
 
-  const textStyle = {
-    color: colors.textSecondary,
-    fontFamily: fontFamily.bold,
-    fontSize: size * 0.36,
-  };
+const Avatar = React.memo(({ uri, name = '', size = 'md', style }) => {
+  const dim = SIZES[size] || SIZES.md;
+  const initials = (name || '?')
+    .trim()
+    .split(' ')
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('');
+  const textSize = dim < 40 ? fontSizes.xs : dim < 60 ? fontSizes.sm : fontSizes.md;
 
+  if (uri) {
+    return (
+      <Image
+        source={{ uri }}
+        style={[{ width: dim, height: dim, borderRadius: dim / 2 }, style]}
+      />
+    );
+  }
   return (
-    <View style={[containerStyle, style]}>
-      {uri ? (
-        <Image
-          source={{ uri }}
-          style={{ width: size, height: size }}
-          resizeMode="cover"
-        />
-      ) : (
-        <Text style={textStyle}>{initials}</Text>
-      )}
+    <View
+      style={[
+        { width: dim, height: dim, borderRadius: dim / 2, backgroundColor: colorFor(name), alignItems: 'center', justifyContent: 'center' },
+        style,
+      ]}
+    >
+      <Text style={{ fontFamily: fontFamilies.bodyMedium, fontSize: textSize, color: colors.white }}>
+        {initials}
+      </Text>
     </View>
   );
-}
+});
+
+Avatar.displayName = 'Avatar';
+export default Avatar;

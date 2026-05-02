@@ -1,34 +1,31 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors } from '../../constants/colors';
-import { fontFamily, fontSize } from '../../constants/typography';
+import { fontFamilies, fontSizes } from '../../constants/typography';
 import { spacing, borderRadius } from '../../constants/spacing';
 
-export function Badge({ label, variant = 'default', style }) {
+const VARIANTS = {
+  success: { bg: 'rgba(0,200,83,0.12)', text: colors.success },
+  warning: { bg: 'rgba(255,179,0,0.12)', text: colors.warning },
+  error:   { bg: 'rgba(255,60,60,0.12)', text: colors.error },
+  info:    { bg: 'rgba(41,128,185,0.15)', text: '#5dade2' },
+  default: { bg: colors.surfaceElevated, text: colors.textSecondary },
+};
+
+const Badge = React.memo(({ label, variant = 'default', size = 'sm', style }) => {
+  const v = VARIANTS[variant] || VARIANTS.default;
+  const fontSize = size === 'xs' ? fontSizes.xs - 1 : fontSizes.xs;
   return (
-    <View style={[styles.badge, styles[variant], style]}>
-      <Text style={[styles.label, styles[`label_${variant}`]]}>{label}</Text>
+    <View style={[styles.badge, { backgroundColor: v.bg }, style]}>
+      <Text style={[styles.text, { color: v.text, fontSize }]}>{label}</Text>
     </View>
   );
-}
+});
+
+Badge.displayName = 'Badge';
+export default Badge;
 
 const styles = StyleSheet.create({
-  badge: {
-    paddingHorizontal: spacing[2] + 2,
-    paddingVertical: spacing[1],
-    borderRadius: borderRadius.full,
-    alignSelf: 'flex-start',
-  },
-  default: { backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border },
-  primary: { backgroundColor: colors.primary },
-  success: { backgroundColor: colors.success },
-  warning: { backgroundColor: colors.warning },
-  error: { backgroundColor: colors.error },
-
-  label: { fontFamily: fontFamily.medium, fontSize: fontSize.xs },
-  label_default: { color: colors.textSecondary },
-  label_primary: { color: colors.white },
-  label_success: { color: '#000' },
-  label_warning: { color: '#000' },
-  label_error: { color: colors.white },
+  badge: { paddingVertical: 2, paddingHorizontal: spacing.sm, borderRadius: borderRadius.full, alignSelf: 'flex-start' },
+  text: { fontFamily: fontFamilies.bodyMedium },
 });

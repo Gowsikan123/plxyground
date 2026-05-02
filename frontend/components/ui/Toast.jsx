@@ -1,84 +1,82 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { createContext, useContext, useCallback, useRef, useState } from 'react';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../../constants/colors';
-import { fontFamily, fontSize } from '../../constants/typography';
-import { spacing } from '../../constants/spacing';
+import { fontFamilies, fontSizes } from '../../constants/typography';
+import { spacing, borderRadius } from '../../constants/spacing';
 
-export function Toast({ message, type = 'info', visible, onHide, duration = 3000 }) {
-  const translateY = useRef(new Animated.Value(-100)).current;
-  const insets = useSafeAreaInsets();
+const ToastContext = createContext(null);
 
-  useEffect(() => {
-    if (visible) {
-      Animated.spring(translateY, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 80,
-        friction: 10,
-      }).start();
+export function ToastProvider({ children }) {
+  const [toasts, setToasts] = useState([]);
+  const idRef = useRef(0);
 
-      const timer = setTimeout(() => {
-        Animated.timing(translateY, {
-          toValue: -100,
-          duration: 300,
-          useNativeDriver: true,
-        }).start(() => onHide?.());
-      }, duration);
+  const showToast = useCallback((message, type = 'info') => {
+    const id = ++idRef.current;
+    const anim = new Animated.Value(0);
+    setToasts((prev) => [...prev, { id, message, type, anim }]);
 
-      return () => clearTimeout(timer);
-    }
-  }, [visible]);
+    Animated.timing(anim, { toValue: 1, duration: 250, useNativeDriver: true }).start();
 
-  const bgColor = {
-    success: colors.success,
-    error: colors.error,
-    warning: colors.warning,
-    info: colors.surfaceElevated,
-  }[type];
+    setTimeout(() => {
+      Animated.timing(anim, { toValue: 0, duration: 250, useNativeDriver: true }).start(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      });
+    }, 3000);
+  }, []);
 
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        { top: insets.top + spacing[2], backgroundColor: bgColor, transform: [{ translateY }] },
-      ]}
-    >
-      <Text style={styles.message}>{message}</Text>
-      <TouchableOpacity onPress={onHide} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-        <Text style={styles.close}>✕</Text>
-      </TouchableOpacity>
-    </Animated.View>
+    <ToastContext.Provider value={showToast}>
+      {children}
+      <View style={styles.container} pointerEvents="none">
+        {toasts.map((t) => (
+          <Animated.View
+            key={t.id}
+            style={[
+              styles.toast,
+              t.type === 'success' && styles.success,
+              t.type === 'error' && styles.error,
+              t.type === 'info' && styles.info,
+              { opacity: t.anim, transform: [{ translateY: t.anim.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] }) }] },
+            ]}
+          >
+            <Text style={styles.text}>{t.message}</Text>
+          </Animated.View>
+        ))}
+      </View>
+    </ToastContext.Provider>
   );
+}
+
+export function useToast() {
+  const ctx = useContext(ToastContext);
+  if (!ctx) throw new Error('useToast must be used inside ToastProvider');
+  return ctx;
 }
 
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    left: spacing[4],
-    right: spacing[4],
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing[4],
-    paddingVertical: spacing[3],
-    borderRadius: 10,
+    top: 60,
+    left: spacing.lg,
+    right: spacing.lg,
     zIndex: 9999,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    alignItems: 'center',
+    gap: spacing.sm,
   },
-  message: {
-    color: colors.textPrimary,
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.sm,
-    flex: 1,
-    marginRight: spacing[2],
+  toast: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
+    maxWidth: 340,
+    alignSelf: 'center',
   },
-  close: {
-    color: colors.textSecondary,
-    fontSize: fontSize.sm,
+  text: {
+    fontFamily: fontFamilies.bodyMedium,
+    fontSize: fontSizes.sm,
+    color: colors.white,
+    textAlign: 'center',
   },
+  success: { backgroundColor: '#0e4d25' },
+  error: { backgroundColor: '#5a0d0d' },
+  info: { backgroundColor: '#1a1a2e' },
 });
