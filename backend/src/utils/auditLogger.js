@@ -1,24 +1,26 @@
 'use strict';
-const pool = require('../db/client');
+
+const { getPool } = require('../db/client');
 const logger = require('../logger');
 
-async function log({ actor_type, actor_id, action, target_type, target_id, metadata, ip_address }) {
+async function log({ actor_type, actor_id = null, action, target_type = null, target_id = null, metadata = null, ip_address = null }) {
   try {
+    const pool = getPool();
     await pool.query(
       `INSERT INTO audit_log (actor_type, actor_id, action, target_type, target_id, metadata, ip_address)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         actor_type,
-        actor_id || null,
+        actor_id,
         action,
-        target_type || null,
-        target_id || null,
+        target_type,
+        target_id,
         metadata ? JSON.stringify(metadata) : null,
-        ip_address || null,
+        ip_address,
       ]
     );
   } catch (err) {
-    logger.error('Audit log write failed', err.message);
+    logger.error('auditLogger: failed to write audit entry', { message: err.message, action });
   }
 }
 

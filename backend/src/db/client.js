@@ -1,21 +1,29 @@
 'use strict';
+
 const { Pool } = require('pg');
 const config = require('../config');
 const logger = require('../logger');
 
-const pool = new Pool({
-  connectionString: config.databaseUrl,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
+let pool;
 
-pool.on('connect', () => {
-  logger.info('PostgreSQL client connected');
-});
+function getPool() {
+  if (!pool) {
+    pool = new Pool({
+      connectionString: config.databaseUrl,
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+    });
 
-pool.on('error', (err) => {
-  logger.error('Unexpected PostgreSQL client error', err.message);
-});
+    pool.on('connect', () => {
+      logger.info('PostgreSQL pool: new client connected');
+    });
 
-module.exports = pool;
+    pool.on('error', (err) => {
+      logger.error('PostgreSQL pool error', { message: err.message });
+    });
+  }
+  return pool;
+}
+
+module.exports = { getPool };

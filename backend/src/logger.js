@@ -1,25 +1,25 @@
 'use strict';
 
-const levels = { info: 'INFO', warn: 'WARN', error: 'ERROR' };
+const LEVELS = { info: 'INFO', warn: 'WARN', error: 'ERROR' };
 
-function formatMessage(level, message, meta) {
+function format(level, message, meta) {
   const ts = new Date().toISOString();
-  const base = `[${ts}] [${level}] ${message}`;
-  if (meta !== undefined) {
-    return `${base} ${typeof meta === 'object' ? JSON.stringify(meta) : meta}`;
+  const base = `[${ts}] [${LEVELS[level]}] ${message}`;
+  if (meta && Object.keys(meta).length > 0) {
+    return `${base} ${JSON.stringify(meta)}`;
   }
   return base;
 }
 
 const logger = {
-  info(message, meta) {
-    process.stdout.write(formatMessage(levels.info, message, meta) + '\n');
+  info(message, meta = {}) {
+    process.stdout.write(format('info', message, meta) + '\n');
   },
-  warn(message, meta) {
-    process.stderr.write(formatMessage(levels.warn, message, meta) + '\n');
+  warn(message, meta = {}) {
+    process.stdout.write(format('warn', message, meta) + '\n');
   },
-  error(message, meta) {
-    process.stderr.write(formatMessage(levels.error, message, meta) + '\n');
+  error(message, meta = {}) {
+    process.stderr.write(format('error', message, meta) + '\n');
   },
 };
 
