@@ -1,6 +1,7 @@
 'use strict';
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const { body } = require('express-validator');
 const pool = require('../db/client');
 const { signToken } = require('../utils/jwt');
@@ -9,8 +10,13 @@ const { authLimiter } = require('../middleware/rateLimiter');
 const { requireAuth } = require('../middleware/auth');
 const { generateUniqueSlug } = require('../utils/slugify');
 const audit = require('../utils/auditLogger');
+const { sendPasswordReset } = require('../utils/mailer');
 
 const router = express.Router();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SIGNUP
+// ─────────────────────────────────────────────────────────────────────────────
 
 router.post(
   '/signup',
@@ -54,6 +60,10 @@ router.post(
   }
 );
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LOGIN
+// ─────────────────────────────────────────────────────────────────────────────
+
 router.post(
   '/login',
   authLimiter,
@@ -96,6 +106,10 @@ router.post(
   }
 );
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PROFILE
+// ─────────────────────────────────────────────────────────────────────────────
+
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const u = req.user;
@@ -137,6 +151,131 @@ router.patch(
       return res.json(result.rows[0]);
     } catch {
       return res.status(500).json({ error: 'Profile update failed' });
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PASSWORD RESET FLOW
+//
+// Step 1 — POST /api/auth/forgot-password
+//   User submits their email. We generate a secure random token, hash it
+//   (so the raw token is never stored), save the hash + 1hr expiry to the DB,
+//   then email the raw token as part of a link.
+//   Always returns 200 regardless of whether the email exists — this prevents
+//   attackers from using this endpoint to discover registered email addresses.
+//
+// Step 2 — POST /api/auth/reset-password
+//   User submits the raw token from the email + their new password.
+//   We hash the token, look it up in the DB, check it hasn't expired,
+//   update the password, and clear the token so it can't be reused.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// POST /api/auth/forgot-password
+router.post(
+  '/forgot-password',
+  authLimiter,
+  [body('email').isEmail().normalizeEmail().withMessage('Valid email required')],
+  validate,
+  async (req, res) => {
+    // Always respond 200 — never reveal whether the email is registered
+    const successResponse = () => res.json({
+      message: 'If that email is registered, a reset link has been sent.'
+    });
+
+    try {
+      const { email } = req.body;
+      const { rows } = await pool.query(
+        'SELECT id FROM creator_accounts WHERE email = $1 LIMIT 1',
+        [email]
+      );
+
+      // Email not found — return success anyway (anti-enumeration)
+      if (!rows.length) return successResponse();
+
+      const accountId = rows[0].id;
+
+      // Generate a cryptographically secure 32-byte random token
+      const rawToken = crypto.randomBytes(32).toString('hex'); // 64 hex chars
+
+      // Hash it before storing — if the DB is ever leaked, tokens are useless
+      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+      // Store hash + expiry (1 hour from now)
+      await pool.query(
+        `UPDATE creator_accounts
+         SET reset_token_hash = $1, reset_token_expires_at = NOW() + INTERVAL '1 hour'
+         WHERE id = $2`,
+        [tokenHash, accountId]
+      );
+
+      // Send the raw token in the email link
+      await sendPasswordReset(email, rawToken);
+
+      await audit.log({
+        actor_type: 'creator', actor_id: accountId,
+        action: 'PASSWORD_RESET_REQUESTED', ip_address: req.ip,
+      });
+
+      return successResponse();
+    } catch (err) {
+      // Still return 200 — don't leak server errors to potential attackers
+      console.error('forgot-password error:', err.message);
+      return successResponse();
+    }
+  }
+);
+
+// POST /api/auth/reset-password
+router.post(
+  '/reset-password',
+  authLimiter,
+  [
+    body('token').notEmpty().withMessage('Token required'),
+    body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const { token, password } = req.body;
+
+      // Hash the incoming raw token to compare against the stored hash
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+      const { rows } = await pool.query(
+        `SELECT id FROM creator_accounts
+         WHERE reset_token_hash = $1
+           AND reset_token_expires_at > NOW()
+         LIMIT 1`,
+        [tokenHash]
+      );
+
+      if (!rows.length) {
+        return res.status(400).json({ error: 'Reset token is invalid or has expired.' });
+      }
+
+      const accountId = rows[0].id;
+      const newHash = await bcrypt.hash(password, 12);
+
+      // Update password and clear the reset token so it can't be reused
+      await pool.query(
+        `UPDATE creator_accounts
+         SET password_hash = $1,
+             reset_token_hash = NULL,
+             reset_token_expires_at = NULL
+         WHERE id = $2`,
+        [newHash, accountId]
+      );
+
+      await audit.log({
+        actor_type: 'creator', actor_id: accountId,
+        action: 'PASSWORD_RESET_COMPLETED', ip_address: req.ip,
+      });
+
+      return res.json({ message: 'Password reset successfully. You can now log in.' });
+    } catch (err) {
+      console.error('reset-password error:', err.message);
+      return res.status(500).json({ error: 'Password reset failed.' });
     }
   }
 );
