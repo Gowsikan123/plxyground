@@ -1,42 +1,57 @@
-import { API_BASE_URL, ENDPOINTS } from '../constants/api';
+import axios from 'axios';
+import Constants from 'expo-constants';
+
+const BASE_URL = Constants.expoConfig?.extra?.apiUrl
+  || process.env.EXPO_PUBLIC_API_URL
+  || 'http://localhost:3001';
+
+const api = axios.create({
+  baseURL: BASE_URL,
+  timeout: 15000,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept':       'application/json',
+  },
+});
+
+// ---- Request interceptor: attach Bearer token ----
+api.interceptors.request.use(
+  (config) => {
+    // Token is injected at runtime by authStore.setToken()
+    if (api._authToken) {
+      config.headers.Authorization = `Bearer ${api._authToken}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// ---- Response interceptor: normalise errors ----
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status  = error.response?.status;
+    const message = error.response?.data?.error || error.message || 'An unexpected error occurred';
+
+    // 401 — token expired or invalid; signal to auth store
+    if (status === 401) {
+      api._onUnauthorised?.();
+    }
+
+    const normalised = new Error(message);
+    normalised.status  = status;
+    normalised.data    = error.response?.data || null;
+    return Promise.reject(normalised);
+  }
+);
 
 /**
- * Central API service — all fetch calls go through here.
- * Uses API_BASE_URL from constants/api.js (single source of truth).
- *
- * Usage:
- *   import api from '../services/api';
- *   const data = await api.get(ENDPOINTS.CREATORS);
- *   const result = await api.post(ENDPOINTS.LOGIN, { email, password });
+ * Call once during app boot with the stored JWT and an
+ * optional callback to run when a 401 is received.
  */
-
-const request = async (method, path, body = null, token = null) => {
-  const headers = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
-  const options = { method, headers };
-  if (body) options.body = JSON.stringify(body);
-
-  const res = await fetch(`${API_BASE_URL}${path}`, options);
-  const data = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    const err = new Error(data.error || data.message || 'Request failed');
-    err.status = res.status;
-    err.data = data;
-    throw err;
-  }
-
-  return data;
-};
-
-const api = {
-  get:    (path, token)        => request('GET',    path, null, token),
-  post:   (path, body, token)  => request('POST',   path, body, token),
-  put:    (path, body, token)  => request('PUT',    path, body, token),
-  patch:  (path, body, token)  => request('PATCH',  path, body, token),
-  delete: (path, token)        => request('DELETE', path, null, token),
-};
+export function configureApi({ token, onUnauthorised }) {
+  api._authToken        = token || null;
+  api._onUnauthorised   = onUnauthorised || null;
+}
 
 export default api;
-export { API_BASE_URL, ENDPOINTS };

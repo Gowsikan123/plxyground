@@ -1,28 +1,48 @@
+// PLXYGROUND — Design token: Colors
 export const Colors = {
-  background: '#0A0A0A',
-  surface: '#141414',
-  surfaceElevated: '#1C1C1C',
-  border: '#2A2A2A',
-  borderMuted: '#1E1E1E',
+  // Brand
+  primary:        '#FF5C00',
+  primaryLight:   '#FF8040',
+  primaryDark:    '#CC4900',
 
-  primary: '#FF3D00',
-  primaryDark: '#CC3100',
-  primaryLight: '#FF6E40',
+  // Backgrounds
+  bg:             '#0D0D0D',
+  surface:        '#141414',
+  surface2:       '#1A1A1A',
+  surfaceOffset:  '#222222',
+  border:         '#2C2C2C',
+  divider:        '#252525',
 
-  text: '#FFFFFF',
-  textMuted: '#A0A0A0',
-  textFaint: '#505050',
+  // Text
+  text:           '#F0F0F0',
+  textMuted:      '#9B9B9B',
+  textFaint:      '#4A4A4A',
+  textInverse:    '#0D0D0D',
 
-  success: '#22C55E',
-  warning: '#F59E0B',
-  error: '#EF4444',
-  info: '#3B82F6',
+  // Semantic
+  success:        '#22C55E',
+  successLight:   '#DCFCE7',
+  warning:        '#F59E0B',
+  warningLight:   '#FEF3C7',
+  error:          '#EF4444',
+  errorLight:     '#FEE2E2',
+  info:           '#3B82F6',
+  infoLight:      '#DBEAFE',
 
-  verified: '#3B82F6',
+  // Accent
+  accent:         '#FF5C00',
+  accentMuted:    'rgba(255, 92, 0, 0.15)',
 
-  gradient: {
-    primary: ['#FF3D00', '#FF6E40'],
-    dark: ['#0A0A0A', '#141414'],
-    card: ['rgba(0,0,0,0)', 'rgba(0,0,0,0.85)'],
-  },
+  // Utility
+  transparent:    'transparent',
+  white:          '#FFFFFF',
+  black:          '#000000',
+
+  // Status badges
+  badgePending:   { bg: '#2C2000', text: '#F59E0B' },
+  badgeApproved:  { bg: '#052E16', text: '#22C55E' },
+  badgeRejected:  { bg: '#2D0A0A', text: '#EF4444' },
+  badgeLive:      { bg: '#1A0030', text: '#A78BFA' },
 };
+
+export default Colors;
