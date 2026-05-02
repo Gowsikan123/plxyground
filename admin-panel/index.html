@@ -4,837 +4,1250 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PLXYGROUND Admin</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg:           #0a0a0a;
-      --surface:      #111111;
-      --surface-2:    #181818;
-      --surface-3:    #1f1f1f;
+      --bg:           #0d0d0f;
+      --surface:      #141416;
+      --surface-2:    #1a1a1d;
+      --surface-3:    #212126;
       --border:       rgba(255,255,255,0.07);
-      --border-hover: rgba(255,255,255,0.13);
-      --text:         #e8e8e8;
-      --text-muted:   #888;
-      --text-faint:   #444;
-      --primary:      #3b82f6;
-      --primary-hover:#2563eb;
-      --success:      #22c55e;
-      --warning:      #f59e0b;
-      --error:        #ef4444;
-      --radius-sm:    6px;
-      --radius-md:    10px;
-      --radius-lg:    14px;
-      --font-body:    'Inter', sans-serif;
-      --font-mono:    'JetBrains Mono', monospace;
+      --border-hover: rgba(255,255,255,0.14);
+      --text:         #e8e8ea;
+      --text-muted:   #7a7a85;
+      --text-faint:   #44444d;
+      --accent:       #f97316;
+      --accent-hover: #fb923c;
+      --accent-dim:   rgba(249,115,22,0.12);
+      --green:        #22c55e;
+      --green-dim:    rgba(34,197,94,0.12);
+      --red:          #ef4444;
+      --red-dim:      rgba(239,68,68,0.12);
+      --yellow:       #eab308;
+      --yellow-dim:   rgba(234,179,8,0.12);
+      --blue:         #3b82f6;
+      --blue-dim:     rgba(59,130,246,0.12);
+      --radius:       8px;
+      --radius-lg:    12px;
       --sidebar-w:    220px;
       --header-h:     56px;
-      --transition:   150ms cubic-bezier(0.16,1,0.3,1);
+      --transition:   160ms cubic-bezier(0.16,1,0.3,1);
+      --shadow:       0 4px 24px rgba(0,0,0,0.4);
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
-    body { font-family: var(--font-body); font-size: 14px; color: var(--text); background: var(--bg); min-height: 100dvh; }
-    button { cursor: pointer; font: inherit; border: none; background: none; color: inherit; }
-    input, textarea, select { font: inherit; color: inherit; background: none; border: none; outline: none; }
+    html { -webkit-font-smoothing: antialiased; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
     a { color: inherit; text-decoration: none; }
-    img { display: block; max-width: 100%; }
-    table { border-collapse: collapse; width: 100%; }
-    :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: var(--radius-sm); }
-    .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
-
-    /* ─── LAYOUT ─────────────────────────────────────────── */
-    #app { display: flex; min-height: 100dvh; }
-    #login-screen { display: flex; align-items: center; justify-content: center; min-height: 100dvh; background: var(--bg); }
-    #main-layout { display: flex; flex: 1; width: 100%; }
-
-    /* ─── SIDEBAR ────────────────────────────────────────── */
-    .sidebar {
-      width: var(--sidebar-w); min-height: 100dvh; background: var(--surface);
-      border-right: 1px solid var(--border); display: flex; flex-direction: column;
-      position: fixed; top: 0; left: 0; z-index: 100;
-    }
-    .sidebar-logo {
-      padding: 18px 20px 14px; border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; gap: 10px;
-    }
-    .sidebar-logo svg { flex-shrink: 0; }
-    .sidebar-logo-text { font-size: 15px; font-weight: 700; letter-spacing: 0.04em; color: var(--text); }
-    .sidebar-logo-badge { font-size: 9px; font-weight: 600; background: var(--primary); color: #fff; padding: 1px 5px; border-radius: 3px; letter-spacing: 0.06em; margin-top: 1px; }
-    .sidebar-nav { flex: 1; padding: 10px 10px; display: flex; flex-direction: column; gap: 2px; }
-    .nav-item {
-      display: flex; align-items: center; gap: 10px; padding: 8px 10px;
-      border-radius: var(--radius-sm); font-size: 13px; font-weight: 500;
-      color: var(--text-muted); cursor: pointer;
-      transition: background var(--transition), color var(--transition);
-    }
-    .nav-item:hover { background: var(--surface-2); color: var(--text); }
-    .nav-item.active { background: rgba(59,130,246,0.12); color: var(--primary); }
-    .nav-item svg { opacity: 0.7; flex-shrink: 0; }
-    .nav-item.active svg { opacity: 1; }
-    .nav-badge {
-      margin-left: auto; font-size: 10px; font-weight: 700; min-width: 18px; height: 18px;
-      background: var(--error); color: #fff; border-radius: 9px; display: flex;
-      align-items: center; justify-content: center; padding: 0 5px;
-    }
-    .sidebar-footer { padding: 12px 10px; border-top: 1px solid var(--border); }
-    .admin-chip {
-      display: flex; align-items: center; gap: 8px; padding: 8px 10px;
-      border-radius: var(--radius-sm); background: var(--surface-2);
-    }
-    .admin-avatar {
-      width: 28px; height: 28px; border-radius: 50%;
-      background: var(--primary); display: flex; align-items: center; justify-content: center;
-      font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
-    }
-    .admin-name { font-size: 12px; font-weight: 600; color: var(--text); }
-    .admin-role { font-size: 10px; color: var(--text-muted); }
-    .btn-logout {
-      margin-left: auto; padding: 4px 8px; border-radius: var(--radius-sm);
-      font-size: 11px; color: var(--text-muted); background: var(--surface-3);
-      transition: background var(--transition), color var(--transition);
-    }
-    .btn-logout:hover { background: rgba(239,68,68,0.12); color: var(--error); }
-
-    /* ─── MAIN CONTENT ───────────────────────────────────── */
-    .main-content {
-      margin-left: var(--sidebar-w); flex: 1; min-height: 100dvh;
-      display: flex; flex-direction: column;
-    }
-    .topbar {
-      height: var(--header-h); background: var(--surface); border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; padding: 0 24px; gap: 12px; position: sticky; top: 0; z-index: 50;
-    }
-    .topbar-title { font-size: 15px; font-weight: 600; color: var(--text); }
-    .topbar-sub { font-size: 12px; color: var(--text-muted); margin-left: 2px; }
-    .topbar-spacer { flex: 1; }
-    .page-body { flex: 1; padding: 24px; max-width: 1300px; width: 100%; }
-
-    /* ─── CARDS ──────────────────────────────────────────── */
-    .card {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius-lg); padding: 20px;
-    }
-    .card-sm { padding: 14px 16px; }
-
-    /* ─── KPI GRID ───────────────────────────────────────── */
-    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
-    .kpi-card {
-      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
-      padding: 16px 18px;
-    }
-    .kpi-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 8px; }
-    .kpi-value { font-size: 28px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1; }
-    .kpi-sub { font-size: 11px; color: var(--text-muted); margin-top: 5px; }
-    .kpi-warn .kpi-value { color: var(--warning); }
-    .kpi-err .kpi-value { color: var(--error); }
-    .kpi-ok .kpi-value { color: var(--success); }
-
-    /* ─── TABLE ──────────────────────────────────────────── */
-    .table-wrap { overflow-x: auto; border-radius: var(--radius-lg); border: 1px solid var(--border); }
-    .data-table { width: 100%; }
-    .data-table th {
-      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em;
-      color: var(--text-muted); padding: 10px 14px; text-align: left;
-      background: var(--surface-2); border-bottom: 1px solid var(--border); white-space: nowrap;
-    }
-    .data-table td { padding: 11px 14px; font-size: 13px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-    .data-table tr:last-child td { border-bottom: none; }
-    .data-table tr:hover td { background: var(--surface-2); }
-    .data-table .mono { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
-
-    /* ─── BADGES ─────────────────────────────────────────── */
-    .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
-    .badge-success { background: rgba(34,197,94,0.12); color: var(--success); }
-    .badge-warning { background: rgba(245,158,11,0.12); color: var(--warning); }
-    .badge-error   { background: rgba(239,68,68,0.12);  color: var(--error); }
-    .badge-info    { background: rgba(59,130,246,0.12);  color: var(--primary); }
-    .badge-neutral { background: var(--surface-3); color: var(--text-muted); }
-
-    /* ─── BUTTONS ────────────────────────────────────────── */
-    .btn {
-      display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px;
-      border-radius: var(--radius-sm); font-size: 13px; font-weight: 500;
-      transition: background var(--transition), color var(--transition), opacity var(--transition);
-      white-space: nowrap;
-    }
-    .btn:disabled { opacity: 0.45; pointer-events: none; }
-    .btn-primary { background: var(--primary); color: #fff; }
-    .btn-primary:hover { background: var(--primary-hover); }
-    .btn-ghost { background: transparent; color: var(--text-muted); }
-    .btn-ghost:hover { background: var(--surface-2); color: var(--text); }
-    .btn-danger { background: rgba(239,68,68,0.1); color: var(--error); }
-    .btn-danger:hover { background: rgba(239,68,68,0.2); }
-    .btn-success { background: rgba(34,197,94,0.1); color: var(--success); }
-    .btn-success:hover { background: rgba(34,197,94,0.2); }
-    .btn-sm { padding: 4px 10px; font-size: 12px; }
-
-    /* ─── INPUTS ─────────────────────────────────────────── */
-    .field { margin-bottom: 14px; }
-    .field label { display: block; font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 5px; }
-    .inp {
-      width: 100%; padding: 9px 12px; background: var(--surface-3);
-      border: 1px solid var(--border); border-radius: var(--radius-sm);
-      font-size: 13px; color: var(--text);
+    button { cursor: pointer; font: inherit; border: none; background: none; color: inherit; }
+    input, textarea, select {
+      font: inherit;
+      color: var(--text);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 12px;
+      outline: none;
       transition: border-color var(--transition);
     }
-    .inp:focus { border-color: var(--primary); }
-    .inp.error-inp { border-color: var(--error); }
-    .inp-row { display: flex; gap: 8px; }
-    .inp-row .inp { flex: 1; }
+    input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+    select option { background: var(--surface-2); }
 
-    /* ─── LOGIN ──────────────────────────────────────────── */
-    .login-box { width: 100%; max-width: 380px; }
-    .login-logo { text-align: center; margin-bottom: 32px; }
-    .login-logo-mark {
-      display: inline-flex; align-items: center; justify-content: center;
-      width: 52px; height: 52px; border-radius: 14px;
-      background: var(--primary); margin-bottom: 14px;
+    /* ── Layout ── */
+    #app { display: flex; flex: 1; }
+    #sidebar {
+      width: var(--sidebar-w);
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0; left: 0;
+      height: 100vh;
+      z-index: 100;
     }
-    .login-title { font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
-    .login-sub { font-size: 13px; color: var(--text-muted); }
-    .login-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 28px; }
-    .login-error { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 12px; color: var(--error); margin-bottom: 14px; display: none; }
-    .login-error.show { display: block; }
+    .sidebar-logo {
+      height: var(--header-h);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      border-bottom: 1px solid var(--border);
+      gap: 10px;
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: 0.04em;
+    }
+    .logo-mark {
+      width: 28px; height: 28px;
+      background: var(--accent);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 800; color: #fff;
+      flex-shrink: 0;
+    }
+    .sidebar-nav { flex: 1; padding: 12px 10px; overflow-y: auto; }
+    .nav-section-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: var(--text-faint);
+      text-transform: uppercase;
+      padding: 8px 10px 4px;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 10px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background var(--transition), color var(--transition);
+      user-select: none;
+    }
+    .nav-item:hover { background: var(--surface-2); color: var(--text); }
+    .nav-item.active { background: var(--accent-dim); color: var(--accent); font-weight: 600; }
+    .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+    .nav-badge {
+      margin-left: auto;
+      background: var(--red);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 99px;
+      min-width: 18px;
+      text-align: center;
+    }
+    .sidebar-footer {
+      padding: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .admin-chip {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px;
+      border-radius: var(--radius);
+      background: var(--surface-2);
+    }
+    .admin-avatar {
+      width: 28px; height: 28px;
+      background: var(--accent);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .admin-info { flex: 1; min-width: 0; }
+    .admin-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .admin-role { font-size: 10px; color: var(--text-faint); }
+    .btn-logout { color: var(--text-faint); padding: 4px; border-radius: 4px; }
+    .btn-logout:hover { color: var(--red); }
 
-    /* ─── TOAST ──────────────────────────────────────────── */
-    #toast-container { position: fixed; top: 18px; right: 18px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+    /* ── Main area ── */
+    #main {
+      margin-left: var(--sidebar-w);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    #header {
+      height: var(--header-h);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      gap: 16px;
+      position: sticky; top: 0;
+      z-index: 50;
+    }
+    .page-title { font-size: 15px; font-weight: 600; flex: 1; }
+    .header-actions { display: flex; align-items: center; gap: 8px; }
+    #content { padding: 24px; flex: 1; }
+
+    /* ── Login screen ── */
+    #login-screen {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      z-index: 999;
+      align-items: center;
+      justify-content: center;
+    }
+    #login-screen.visible { display: flex; }
+    .login-card {
+      width: 360px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+    }
+    .login-logo {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 28px;
+      font-size: 16px; font-weight: 700;
+    }
+    .login-card h2 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+    .login-card p { color: var(--text-muted); font-size: 13px; margin-bottom: 24px; }
+    .form-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+    .form-field label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+    .form-field input { width: 100%; }
+    .login-error {
+      font-size: 12px; color: var(--red);
+      background: var(--red-dim);
+      border-radius: var(--radius);
+      padding: 8px 12px;
+      margin-bottom: 12px;
+      display: none;
+    }
+    .login-error.visible { display: block; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 8px 16px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 600;
+      transition: background var(--transition), opacity var(--transition);
+      white-space: nowrap;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+    .btn-ghost { background: var(--surface-2); color: var(--text-muted); }
+    .btn-ghost:hover { background: var(--surface-3); color: var(--text); }
+    .btn-danger { background: var(--red-dim); color: var(--red); }
+    .btn-danger:hover { background: var(--red); color: #fff; }
+    .btn-success { background: var(--green-dim); color: var(--green); }
+    .btn-success:hover { background: var(--green); color: #fff; }
+    .btn-full { width: 100%; }
+
+    /* ── Cards & grids ── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+    }
+    .kpi-label { font-size: 11px; font-weight: 600; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+    .kpi-value { font-size: 28px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+    .kpi-sub { font-size: 12px; color: var(--text-muted); }
+    .kpi-card.accent .kpi-value { color: var(--accent); }
+    .kpi-card.green .kpi-value { color: var(--green); }
+    .kpi-card.blue .kpi-value { color: var(--blue); }
+    .kpi-card.yellow .kpi-value { color: var(--yellow); }
+    .kpi-card.red .kpi-value { color: var(--red); }
+
+    /* ── Table ── */
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    .table-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .table-title { font-weight: 600; font-size: 14px; flex: 1; min-width: 120px; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      text-align: left;
+      padding: 10px 16px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background var(--transition); }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface-2); }
+    tbody td { padding: 12px 16px; font-size: 13px; vertical-align: middle; }
+    .table-footer {
+      padding: 12px 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-muted);
+      gap: 12px;
+    }
+    .pagination { display: flex; gap: 6px; align-items: center; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-flex; align-items: center;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .badge-green { background: var(--green-dim); color: var(--green); }
+    .badge-red { background: var(--red-dim); color: var(--red); }
+    .badge-yellow { background: var(--yellow-dim); color: var(--yellow); }
+    .badge-blue { background: var(--blue-dim); color: var(--blue); }
+    .badge-gray { background: var(--surface-3); color: var(--text-muted); }
+    .badge-orange { background: var(--accent-dim); color: var(--accent); }
+
+    /* ── Toast ── */
+    #toast-container {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      display: flex; flex-direction: column; gap: 8px;
+      z-index: 9999;
+    }
     .toast {
-      padding: 11px 16px; border-radius: var(--radius-md); font-size: 13px; font-weight: 500;
-      max-width: 320px; pointer-events: all; animation: toastIn 0.2s ease;
+      background: var(--surface-3);
+      border: 1px solid var(--border-hover);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      font-size: 13px;
+      box-shadow: var(--shadow);
+      display: flex; align-items: center; gap: 10px;
+      min-width: 260px;
+      animation: slideIn 0.2s ease;
     }
-    @keyframes toastIn { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
-    .toast-success { background: #14532d; color: #bbf7d0; border: 1px solid #166534; }
-    .toast-error   { background: #450a0a; color: #fca5a5; border: 1px solid #7f1d1d; }
-    .toast-info    { background: #1e3a5f; color: #93c5fd; border: 1px solid #1d4ed8; }
+    .toast.success { border-left: 3px solid var(--green); }
+    .toast.error   { border-left: 3px solid var(--red); }
+    .toast.info    { border-left: 3px solid var(--blue); }
+    @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-    /* ─── MODALS ─────────────────────────────────────────── */
+    /* ── Modal ── */
     .modal-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 500;
-      display: flex; align-items: center; justify-content: center; padding: 20px;
-      opacity: 0; pointer-events: none; transition: opacity var(--transition);
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 500;
+      display: flex; align-items: center; justify-content: center;
+      display: none;
     }
-    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal-overlay.visible { display: flex; }
     .modal {
-      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
-      padding: 24px; width: 100%; max-width: 480px;
-      transform: scale(0.97); transition: transform var(--transition);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      width: 480px;
+      max-width: 95vw;
+      box-shadow: var(--shadow);
     }
-    .modal-overlay.open .modal { transform: scale(1); }
-    .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
-    .modal-title { font-size: 15px; font-weight: 600; }
-    .modal-close { padding: 4px; border-radius: var(--radius-sm); color: var(--text-muted); }
-    .modal-close:hover { background: var(--surface-2); color: var(--text); }
-    .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+    .modal-title { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+    .modal-body { color: var(--text-muted); font-size: 13px; margin-bottom: 20px; line-height: 1.6; }
+    .modal-footer { display: flex; gap: 8px; justify-content: flex-end; }
 
-    /* ─── FILTERS ROW ────────────────────────────────────── */
-    .filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
-    .filter-select {
-      padding: 7px 10px; background: var(--surface-2); border: 1px solid var(--border);
-      border-radius: var(--radius-sm); font-size: 12px; color: var(--text-muted);
-      cursor: pointer; transition: border-color var(--transition);
+    /* ── Misc ── */
+    .empty-state {
+      text-align: center;
+      padding: 60px 24px;
+      color: var(--text-faint);
     }
-    .filter-select:focus { border-color: var(--primary); color: var(--text); }
-    .filter-search {
-      padding: 7px 12px; background: var(--surface-2); border: 1px solid var(--border);
-      border-radius: var(--radius-sm); font-size: 12px; color: var(--text);
-      min-width: 200px; transition: border-color var(--transition);
+    .empty-state svg { width: 40px; height: 40px; margin: 0 auto 12px; opacity: 0.4; }
+    .empty-state p { font-size: 13px; margin-top: 4px; }
+    .loading-row td { text-align: center; padding: 40px; color: var(--text-faint); }
+    .checkbox-col { width: 40px; }
+    input[type="checkbox"] {
+      width: 14px; height: 14px; padding: 0;
+      accent-color: var(--accent);
+      cursor: pointer;
     }
-    .filter-search:focus { border-color: var(--primary); }
-    .filter-search::placeholder { color: var(--text-faint); }
-    .spacer { flex: 1; }
-
-    /* ─── BULK BAR ───────────────────────────────────────── */
-    .bulk-bar {
-      display: none; align-items: center; gap: 10px; padding: 10px 16px;
-      background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2);
-      border-radius: var(--radius-md); margin-bottom: 14px; font-size: 13px;
+    .search-input { width: 200px; }
+    .filter-select { width: 140px; }
+    .content-preview {
+      max-width: 300px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text-muted);
     }
-    .bulk-bar.show { display: flex; }
-    .bulk-count { font-weight: 600; color: var(--primary); }
-
-    /* ─── EMPTY STATE ────────────────────────────────────── */
-    .empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
-    .empty-icon { font-size: 36px; margin-bottom: 12px; }
-    .empty h3 { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
-    .empty p { font-size: 13px; }
-
-    /* ─── PAGINATION ─────────────────────────────────────── */
-    .pagination { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 16px; }
-    .page-btn { padding: 5px 10px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 500; background: var(--surface-2); color: var(--text-muted); transition: background var(--transition), color var(--transition); }
-    .page-btn:hover { background: var(--surface-3); color: var(--text); }
-    .page-btn.active { background: var(--primary); color: #fff; }
-    .page-info { font-size: 12px; color: var(--text-muted); }
-
-    /* ─── SECTION HEADER ─────────────────────────────────── */
-    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-    .section-title { font-size: 15px; font-weight: 600; color: var(--text); }
-    .section-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-
-    /* ─── CONTENT PREVIEW ───────────────────────────────── */
-    .content-body-preview { font-size: 12px; color: var(--text-muted); max-width: 320px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-
-    /* ─── AUDIT LOG ──────────────────────────────────────── */
-    .audit-meta { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); max-width: 260px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-
-    /* ─── TABS ───────────────────────────────────────────── */
-    .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
-    .tab-btn { padding: 8px 14px; font-size: 13px; font-weight: 500; color: var(--text-muted); border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer; transition: color var(--transition), border-color var(--transition); }
-    .tab-btn:hover { color: var(--text); }
-    .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
-
-    /* ─── LOADING SPINNER ────────────────────────────────── */
-    .spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.6s linear infinite; margin: 40px auto; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .section { display: none; }
+    .section.active { display: block; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+    .stat-table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    .stat-table-title { font-size: 13px; font-weight: 600; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-section-title { font-size: 13px; font-weight: 600; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    .settings-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      max-width: 480px;
+    }
   </style>
 </head>
 <body>
-<div id="app"></div>
-<div id="toast-container"></div>
 
-<div id="modal-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-  <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title" id="modal-title"></span>
-      <button class="modal-close" onclick="closeModal()" aria-label="Close">&times;</button>
+<!-- Login Screen -->
+<div id="login-screen" class="visible">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-mark">PX</div>
+      PLXYGROUND
     </div>
-    <div id="modal-body"></div>
-    <div class="modal-footer" id="modal-footer"></div>
+    <h2>Admin Sign In</h2>
+    <p>Restricted access — authorised personnel only</p>
+    <div id="login-error" class="login-error"></div>
+    <div class="form-field">
+      <label>Email</label>
+      <input type="email" id="login-email" placeholder="admin@plxyground.com" autocomplete="email" />
+    </div>
+    <div class="form-field">
+      <label>Password</label>
+      <input type="password" id="login-password" placeholder="Password" autocomplete="current-password" />
+    </div>
+    <button class="btn btn-primary btn-full" id="btn-login">Sign In</button>
   </div>
 </div>
 
+<!-- App Shell -->
+<div id="app" style="display:none">
+  <aside id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">PX</div>
+      PLXYGROUND
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <div class="nav-item active" data-section="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </div>
+      <div class="nav-section-label">Moderation</div>
+      <div class="nav-item" data-section="queue">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><path d="M21 12c0 4.97-4.03 9-9 9S3 16.97 3 12 7.03 3 12 3s9 4.03 9 9z"/></svg>
+        Queue
+        <span class="nav-badge" id="queue-badge" style="display:none">0</span>
+      </div>
+      <div class="nav-item" data-section="content">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+        Content
+      </div>
+      <div class="nav-section-label">Users</div>
+      <div class="nav-item" data-section="creators">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Creators
+      </div>
+      <div class="nav-item" data-section="businesses">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+        Businesses
+      </div>
+      <div class="nav-section-label">System</div>
+      <div class="nav-item" data-section="analytics">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+        Analytics
+      </div>
+      <div class="nav-item" data-section="audit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+        Audit Log
+      </div>
+      <div class="nav-item" data-section="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-chip">
+        <div class="admin-avatar" id="admin-avatar">A</div>
+        <div class="admin-info">
+          <div class="admin-name" id="admin-name">Admin</div>
+          <div class="admin-role" id="admin-role">super_admin</div>
+        </div>
+        <button class="btn-logout" id="btn-logout" title="Sign out">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <div id="main">
+    <header id="header">
+      <div class="page-title" id="page-title">Dashboard</div>
+      <div class="header-actions" id="header-actions"></div>
+    </header>
+    <div id="content">
+
+      <!-- DASHBOARD -->
+      <section class="section active" id="section-dashboard">
+        <div class="kpi-grid" id="kpi-grid">
+          <div class="kpi-card accent"><div class="kpi-label">Total Creators</div><div class="kpi-value" id="kpi-creators">—</div></div>
+          <div class="kpi-card blue"><div class="kpi-label">Total Businesses</div><div class="kpi-value" id="kpi-businesses">—</div></div>
+          <div class="kpi-card green"><div class="kpi-label">Approved Content</div><div class="kpi-value" id="kpi-content">—</div></div>
+          <div class="kpi-card yellow"><div class="kpi-label">Active Opportunities</div><div class="kpi-value" id="kpi-opps">—</div></div>
+          <div class="kpi-card red"><div class="kpi-label">Pending Queue</div><div class="kpi-value" id="kpi-queue">—</div><div class="kpi-sub">needs review</div></div>
+        </div>
+        <div class="two-col">
+          <div class="stat-table-wrap">
+            <div class="stat-table-title">Content by Type</div>
+            <table><thead><tr><th>Type</th><th>Count</th></tr></thead><tbody id="tbl-by-type"></tbody></table>
+          </div>
+          <div class="stat-table-wrap">
+            <div class="stat-table-title">Top Creators</div>
+            <table><thead><tr><th>Creator</th><th>Sport</th><th>Posts</th></tr></thead><tbody id="tbl-top-creators"></tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- QUEUE -->
+      <section class="section" id="section-queue">
+        <div class="table-wrap">
+          <div class="table-header">
+            <div class="table-title">Pending Content <span id="queue-count" style="color:var(--text-faint);font-weight:400"></span></div>
+            <button class="btn btn-sm btn-success" id="btn-bulk-approve" disabled>Approve Selected</button>
+            <button class="btn btn-sm btn-danger" id="btn-bulk-reject" disabled>Reject Selected</button>
+          </div>
+          <table>
+            <thead><tr>
+              <th class="checkbox-col"><input type="checkbox" id="queue-check-all" /></th>
+              <th>Title</th><th>Creator</th><th>Sport</th><th>Type</th><th>Submitted</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="tbl-queue"></tbody>
+          </table>
+          <div class="table-footer">
+            <span id="queue-info"></span>
+            <div class="pagination">
+              <button class="btn btn-sm btn-ghost" id="queue-prev">Prev</button>
+              <span id="queue-page">1</span>
+              <button class="btn btn-sm btn-ghost" id="queue-next">Next</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CONTENT -->
+      <section class="section" id="section-content">
+        <div class="table-wrap">
+          <div class="table-header">
+            <div class="table-title">All Content</div>
+            <input class="search-input" id="content-search" placeholder="Search title…" />
+            <select class="filter-select" id="content-status-filter">
+              <option value="">All statuses</option>
+              <option value="approved">Approved</option>
+              <option value="pending">Pending</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+          <table>
+            <thead><tr><th>Title</th><th>Creator</th><th>Sport</th><th>Type</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+            <tbody id="tbl-content"></tbody>
+          </table>
+          <div class="table-footer">
+            <span id="content-info"></span>
+            <div class="pagination">
+              <button class="btn btn-sm btn-ghost" id="content-prev">Prev</button>
+              <span id="content-page">1</span>
+              <button class="btn btn-sm btn-ghost" id="content-next">Next</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CREATORS -->
+      <section class="section" id="section-creators">
+        <div class="table-wrap">
+          <div class="table-header">
+            <div class="table-title">Creators</div>
+            <input class="search-input" id="creators-search" placeholder="Search…" />
+            <button class="btn btn-sm btn-ghost" id="btn-refresh-creators">Refresh</button>
+          </div>
+          <table>
+            <thead><tr><th>Username</th><th>Display Name</th><th>Sport</th><th>Followers</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+            <tbody id="tbl-creators"></tbody>
+          </table>
+          <div class="table-footer">
+            <span id="creators-info"></span>
+            <div class="pagination">
+              <button class="btn btn-sm btn-ghost" id="creators-prev">Prev</button>
+              <span id="creators-page">1</span>
+              <button class="btn btn-sm btn-ghost" id="creators-next">Next</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- BUSINESSES -->
+      <section class="section" id="section-businesses">
+        <div class="table-wrap">
+          <div class="table-header">
+            <div class="table-title">Businesses</div>
+            <input class="search-input" id="businesses-search" placeholder="Search…" />
+            <button class="btn btn-sm btn-ghost" id="btn-refresh-businesses">Refresh</button>
+          </div>
+          <table>
+            <thead><tr><th>Business Name</th><th>Email</th><th>Industry</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+            <tbody id="tbl-businesses"></tbody>
+          </table>
+          <div class="table-footer">
+            <span id="businesses-info"></span>
+            <div class="pagination">
+              <button class="btn btn-sm btn-ghost" id="businesses-prev">Prev</button>
+              <span id="businesses-page">1</span>
+              <button class="btn btn-sm btn-ghost" id="businesses-next">Next</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ANALYTICS -->
+      <section class="section" id="section-analytics">
+        <div class="kpi-grid" id="analytics-kpi-grid">
+          <div class="kpi-card accent"><div class="kpi-label">Total Creators</div><div class="kpi-value" id="a-kpi-creators">—</div></div>
+          <div class="kpi-card blue"><div class="kpi-label">Total Businesses</div><div class="kpi-value" id="a-kpi-businesses">—</div></div>
+          <div class="kpi-card green"><div class="kpi-label">Approved Content</div><div class="kpi-value" id="a-kpi-content">—</div></div>
+          <div class="kpi-card yellow"><div class="kpi-label">Active Opportunities</div><div class="kpi-value" id="a-kpi-opps">—</div></div>
+          <div class="kpi-card red"><div class="kpi-label">Pending Queue</div><div class="kpi-value" id="a-kpi-queue">—</div></div>
+        </div>
+        <div class="two-col">
+          <div class="stat-table-wrap">
+            <div class="stat-table-title">Content by Status</div>
+            <table><thead><tr><th>Status</th><th>Count</th></tr></thead><tbody id="tbl-by-status"></tbody></table>
+          </div>
+          <div class="stat-table-wrap">
+            <div class="stat-table-title">Creator Signups (Last 30 Days)</div>
+            <table><thead><tr><th>Date</th><th>Signups</th></tr></thead><tbody id="tbl-signups"></tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- AUDIT LOG -->
+      <section class="section" id="section-audit">
+        <div class="table-wrap">
+          <div class="table-header">
+            <div class="table-title">Audit Log</div>
+            <select class="filter-select" id="audit-actor-filter">
+              <option value="">All actors</option>
+              <option value="admin">Admin</option>
+              <option value="creator">Creator</option>
+              <option value="business">Business</option>
+            </select>
+            <input class="search-input" id="audit-action-filter" placeholder="Filter action…" />
+            <button class="btn btn-sm btn-ghost" id="btn-export-audit">Export JSON</button>
+          </div>
+          <table>
+            <thead><tr><th>Time</th><th>Actor</th><th>Type</th><th>Action</th><th>Metadata</th></tr></thead>
+            <tbody id="tbl-audit"></tbody>
+          </table>
+          <div class="table-footer">
+            <span id="audit-info"></span>
+            <div class="pagination">
+              <button class="btn btn-sm btn-ghost" id="audit-prev">Prev</button>
+              <span id="audit-page">1</span>
+              <button class="btn btn-sm btn-ghost" id="audit-next">Next</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section class="section" id="section-settings">
+        <div class="settings-card">
+          <div class="form-section-title">Change Password</div>
+          <div class="form-field">
+            <label>Current Password</label>
+            <input type="password" id="pw-current" placeholder="Current password" />
+          </div>
+          <div class="form-field">
+            <label>New Password</label>
+            <input type="password" id="pw-new" placeholder="Min 8 characters" />
+          </div>
+          <div class="form-field">
+            <label>Confirm New Password</label>
+            <input type="password" id="pw-confirm" placeholder="Repeat new password" />
+          </div>
+          <div id="pw-error" class="login-error"></div>
+          <button class="btn btn-primary" id="btn-change-pw">Update Password</button>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Confirm Action</div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="form-field" id="modal-reason-wrap" style="display:none">
+      <label>Rejection Reason (optional)</label>
+      <input type="text" id="modal-reason" placeholder="Reason…" />
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="modal-confirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
 <script>
-// ─── STATE ───────────────────────────────────────────────────────────────────
-const API = 'http://localhost:3001/api';
-const state = {
-  token: sessionStorage.getItem('plxy_admin_token') || null,
-  admin: JSON.parse(sessionStorage.getItem('plxy_admin') || 'null'),
-  page: 'dashboard',
-  queuePage: 1, usersPage: 1, contentPage: 1, auditPage: 1,
-  selectedQueueIds: new Set(),
-  queueFilter: 'pending',
-  usersTab: 'creator',
-  usersSearch: '',
-  contentStatus: '',
-  auditFilter: '',
-  analytics: null,
-};
+(function () {
+  'use strict';
 
-// ─── API HELPER ──────────────────────────────────────────────────────────────
-async function api(method, path, body) {
-  const opts = {
-    method,
-    headers: { 'Content-Type': 'application/json', ...(state.token ? { Authorization: `Bearer ${state.token}` } : {}) },
+  const API = (window.API_BASE || 'http://localhost:3011') + '/api';
+  let token = null;
+  let currentAdmin = null;
+  let activeSection = 'dashboard';
+
+  // ── State per section ──
+  const state = {
+    queue:      { offset: 0, limit: 20, total: 0 },
+    content:    { offset: 0, limit: 20, total: 0, search: '', status: '' },
+    creators:   { offset: 0, limit: 20, total: 0, search: '' },
+    businesses: { offset: 0, limit: 20, total: 0, search: '' },
+    audit:      { offset: 0, limit: 50, total: 0, actor_type: '', action: '' },
   };
-  if (body) opts.body = JSON.stringify(body);
-  const res = await fetch(API + path, opts);
-  const data = await res.json();
-  if (res.status === 401) { logout(); return null; }
-  return { ok: res.ok, status: res.status, data };
-}
 
-// ─── TOAST ───────────────────────────────────────────────────────────────────
-function toast(msg, type = 'info') {
-  const el = document.createElement('div');
-  el.className = `toast toast-${type}`;
-  el.textContent = msg;
-  document.getElementById('toast-container').appendChild(el);
-  setTimeout(() => el.remove(), 3500);
-}
-
-// ─── MODAL ───────────────────────────────────────────────────────────────────
-function openModal(title, bodyHtml, footerHtml) {
-  document.getElementById('modal-title').textContent = title;
-  document.getElementById('modal-body').innerHTML = bodyHtml;
-  document.getElementById('modal-footer').innerHTML = footerHtml || '';
-  document.getElementById('modal-overlay').classList.add('open');
-}
-function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
-document.getElementById('modal-overlay').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeModal(); });
-
-// ─── AUTH ─────────────────────────────────────────────────────────────────────
-function logout() {
-  state.token = null; state.admin = null;
-  sessionStorage.removeItem('plxy_admin_token');
-  sessionStorage.removeItem('plxy_admin');
-  render();
-}
-
-async function handleLogin(e) {
-  e.preventDefault();
-  const btn = document.getElementById('login-btn');
-  const errEl = document.getElementById('login-error');
-  btn.disabled = true; btn.textContent = 'Signing in…';
-  errEl.classList.remove('show');
-
-  const email = document.getElementById('login-email').value.trim();
-  const password = document.getElementById('login-password').value;
-
-  const res = await api('POST', '/admin/auth/login', { email, password });
-  btn.disabled = false; btn.textContent = 'Sign in';
-
-  if (!res || !res.ok) {
-    errEl.textContent = res?.data?.error || 'Login failed. Check your credentials.';
-    errEl.classList.add('show');
-    return;
+  // ── Helpers ──
+  function $(id) { return document.getElementById(id); }
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+  function fmtDateTime(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  }
+  function statusBadge(s) {
+    const map = { approved: 'green', pending: 'yellow', rejected: 'red', active: 'green', closed: 'gray' };
+    return `<span class="badge badge-${map[s] || 'gray'}">${s}</span>`;
+  }
+  function suspendBadge(suspended, verified) {
+    if (suspended) return '<span class="badge badge-red">Suspended</span>';
+    if (verified) return '<span class="badge badge-green">Verified</span>';
+    return '<span class="badge badge-gray">Active</span>';
   }
 
-  state.token = res.data.token;
-  state.admin = res.data.admin;
-  sessionStorage.setItem('plxy_admin_token', state.token);
-  sessionStorage.setItem('plxy_admin', JSON.stringify(state.admin));
-  render();
-  loadDashboard();
-}
+  // ── Toast ──
+  function toast(msg, type = 'info') {
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.textContent = msg;
+    $('toast-container').appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+  }
 
-// ─── NAVIGATION ──────────────────────────────────────────────────────────────
-function navigate(page) {
-  state.page = page;
-  renderMain();
-  const loaders = { dashboard: loadDashboard, queue: loadQueue, users: loadUsers, content: loadAdminContent, audit: loadAudit };
-  loaders[page]?.();
-}
+  // ── Modal ──
+  let _modalResolve = null;
+  function confirm(title, body, showReason = false) {
+    return new Promise(resolve => {
+      $('modal-title').textContent = title;
+      $('modal-body').textContent = body;
+      $('modal-reason-wrap').style.display = showReason ? 'block' : 'none';
+      $('modal-reason').value = '';
+      $('confirm-modal').classList.add('visible');
+      _modalResolve = resolve;
+    });
+  }
+  $('modal-cancel').onclick = () => { $('confirm-modal').classList.remove('visible'); _modalResolve && _modalResolve(null); };
+  $('modal-confirm').onclick = () => {
+    const reason = $('modal-reason').value || null;
+    $('confirm-modal').classList.remove('visible');
+    _modalResolve && _modalResolve(reason !== null || true ? { confirmed: true, reason } : null);
+  };
 
-// ─── RENDER ROOT ─────────────────────────────────────────────────────────────
-function render() {
-  const app = document.getElementById('app');
-  if (!state.token) { app.innerHTML = renderLogin(); return; }
-  app.innerHTML = `
-    <div id="main-layout">
-      ${renderSidebar()}
-      <div class="main-content">
-        <div class="topbar" id="topbar"></div>
-        <div class="page-body" id="page-body"></div>
-      </div>
-    </div>`;
-  renderMain();
-}
+  // ── API fetch ──
+  async function api(method, path, body) {
+    const opts = {
+      method,
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(API + path, opts);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  }
 
-// ─── LOGIN PAGE ───────────────────────────────────────────────────────────────
-function renderLogin() {
-  return `<div id="login-screen" style="display:flex;align-items:center;justify-content:center;min-height:100dvh;">
-  <div class="login-box">
-    <div class="login-logo">
-      <div class="login-logo-mark">
-        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="4" y="4" width="9" height="9" rx="2" fill="white" opacity="0.9"/><rect x="15" y="4" width="9" height="9" rx="2" fill="white" opacity="0.5"/><rect x="4" y="15" width="9" height="9" rx="2" fill="white" opacity="0.5"/><rect x="15" y="15" width="9" height="9" rx="2" fill="white" opacity="0.2"/></svg>
-      </div>
-      <div class="login-title">PLXYGROUND</div>
-      <div class="login-sub">Admin Panel — sign in to continue</div>
-    </div>
-    <div class="login-card">
-      <div class="login-error" id="login-error"></div>
-      <form onsubmit="handleLogin(event)">
-        <div class="field"><label for="login-email">Email address</label><input id="login-email" class="inp" type="email" placeholder="admin@plxyground.io" autocomplete="email" required /></div>
-        <div class="field"><label for="login-password">Password</label><input id="login-password" class="inp" type="password" placeholder="••••••••" autocomplete="current-password" required /></div>
-        <button id="login-btn" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:6px;" type="submit">Sign in</button>
-      </form>
-    </div>
-  </div>
-</div>`;
-}
+  // ── Auth ──
+  $('btn-login').onclick = async () => {
+    const email = $('login-email').value.trim();
+    const password = $('login-password').value;
+    const errEl = $('login-error');
+    errEl.classList.remove('visible');
+    $('btn-login').disabled = true;
+    try {
+      const data = await api('POST', '/admin/auth/login', { email, password });
+      token = data.token;
+      currentAdmin = data.admin;
+      showApp();
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.classList.add('visible');
+    } finally {
+      $('btn-login').disabled = false;
+    }
+  };
+  $('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn-login').click(); });
 
-// ─── SIDEBAR ─────────────────────────────────────────────────────────────────
-const NAV = [
-  { id:'dashboard', label:'Dashboard',  icon:'<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>' },
-  { id:'queue',     label:'Mod Queue',   icon:'<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>', badge: true },
-  { id:'content',   label:'Content',     icon:'<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>' },
-  { id:'users',     label:'Users',       icon:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>' },
-  { id:'audit',     label:'Audit Log',   icon:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>' },
-  { id:'settings',  label:'Settings',    icon:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>' },
-];
+  $('btn-logout').onclick = () => {
+    token = null; currentAdmin = null;
+    document.getElementById('app').style.display = 'none';
+    $('login-screen').classList.add('visible');
+    $('login-email').value = ''; $('login-password').value = '';
+  };
 
-function renderSidebar() {
-  const initials = (state.admin?.username || 'A').slice(0,2).toUpperCase();
-  const pending = state.analytics?.pendingQueue || 0;
-  return `<aside class="sidebar">
-  <div class="sidebar-logo">
-    <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="3" y="3" width="9" height="9" rx="2" fill="#3b82f6" opacity="0.9"/><rect x="16" y="3" width="9" height="9" rx="2" fill="#3b82f6" opacity="0.5"/><rect x="3" y="16" width="9" height="9" rx="2" fill="#3b82f6" opacity="0.5"/><rect x="16" y="16" width="9" height="9" rx="2" fill="#3b82f6" opacity="0.2"/></svg>
-    <div><div class="sidebar-logo-text">PLXYGROUND</div><div class="sidebar-logo-badge">ADMIN</div></div>
-  </div>
-  <nav class="sidebar-nav" role="navigation">
-    ${NAV.map(n => `
-      <button class="nav-item${state.page === n.id ? ' active' : ''}" onclick="navigate('${n.id}')" aria-current="${state.page === n.id ? 'page' : 'false'}">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${n.icon}</svg>
-        ${n.label}
-        ${n.badge && pending > 0 ? `<span class="nav-badge">${pending}</span>` : ''}
-      </button>`).join('')}
-  </nav>
-  <div class="sidebar-footer">
-    <div class="admin-chip">
-      <div class="admin-avatar">${initials}</div>
-      <div><div class="admin-name">${state.admin?.username || 'Admin'}</div><div class="admin-role">${state.admin?.role || 'moderator'}</div></div>
-      <button class="btn-logout" onclick="logout()">Sign out</button>
-    </div>
-  </div>
-</aside>`;
-}
+  function showApp() {
+    $('login-screen').classList.remove('visible');
+    document.getElementById('app').style.display = 'flex';
+    $('admin-avatar').textContent = (currentAdmin.email || 'A')[0].toUpperCase();
+    $('admin-name').textContent = currentAdmin.email;
+    $('admin-role').textContent = currentAdmin.role || 'admin';
+    navigate('dashboard');
+  }
 
-// ─── TOPBAR ───────────────────────────────────────────────────────────────────
-const PAGE_META = {
-  dashboard: { title: 'Dashboard',    sub: 'Overview & analytics' },
-  queue:     { title: 'Moderation Queue', sub: 'Review pending content' },
-  content:   { title: 'Content',      sub: 'All platform content' },
-  users:     { title: 'Users',        sub: 'Creators & businesses' },
-  audit:     { title: 'Audit Log',    sub: 'All system activity' },
-  settings:  { title: 'Settings',     sub: 'Account & preferences' },
-};
-
-function renderMain() {
-  const meta = PAGE_META[state.page] || {};
-  const topbar = document.getElementById('topbar');
-  if (topbar) topbar.innerHTML = `<span class="topbar-title">${meta.title}</span><span class="topbar-sub">${meta.sub}</span><span class="topbar-spacer"></span><span style="font-size:11px;color:var(--text-faint)">${new Date().toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})}</span>`;
-  document.getElementById('sidebar')?.replaceWith;
-  document.querySelector('.sidebar')?.remove();
-  document.getElementById('main-layout').insertAdjacentHTML('afterbegin', renderSidebar());
-  const body = document.getElementById('page-body');
-  if (body) body.innerHTML = '<div class="spinner"></div>';
-}
-
-// ─── DASHBOARD ────────────────────────────────────────────────────────────────
-async function loadDashboard() {
-  const res = await api('GET', '/admin/analytics');
-  if (!res?.ok) { document.getElementById('page-body').innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><h3>Failed to load analytics</h3><p>Check that the backend API is running.</p></div>'; return; }
-  state.analytics = res.data;
-  const a = res.data;
-  document.getElementById('page-body').innerHTML = `
-  <div class="kpi-grid">
-    <div class="kpi-card"><div class="kpi-label">Creators</div><div class="kpi-value">${a.creators}</div><div class="kpi-sub">Active accounts</div></div>
-    <div class="kpi-card"><div class="kpi-label">Businesses</div><div class="kpi-value">${a.businesses}</div><div class="kpi-sub">Active accounts</div></div>
-    <div class="kpi-card kpi-ok"><div class="kpi-label">Approved Posts</div><div class="kpi-value">${a.content.approved}</div><div class="kpi-sub">Live on feed</div></div>
-    <div class="kpi-card kpi-warn"><div class="kpi-label">Pending Review</div><div class="kpi-value">${a.pendingQueue}</div><div class="kpi-sub">In queue</div></div>
-    <div class="kpi-card kpi-err"><div class="kpi-label">Flagged</div><div class="kpi-value">${a.flaggedContent}</div><div class="kpi-sub">Needs attention</div></div>
-    <div class="kpi-card"><div class="kpi-label">Open Opportunities</div><div class="kpi-value">${a.opportunities.open}</div><div class="kpi-sub">of ${a.opportunities.total} total</div></div>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">
-    <div class="card">
-      <div class="section-header"><div><div class="section-title">Top Sports</div><div class="section-sub">By approved content count</div></div></div>
-      ${a.topSports.length ? `<div style="display:flex;flex-direction:column;gap:8px">
-        ${a.topSports.map(s => `<div style="display:flex;align-items:center;justify-content:space-between">
-          <span style="font-size:13px">${s.sport}</span>
-          <span style="font-size:12px;font-weight:600;color:var(--primary)">${s.count}</span>
-        </div>`).join('')}</div>` : '<div class="empty" style="padding:20px 0"><p>No content yet</p></div>'}
-    </div>
-    <div class="card">
-      <div class="section-header"><div><div class="section-title">30-Day Signups</div><div class="section-sub">Creator registrations</div></div></div>
-      ${a.signupTrend.length ? `<div style="display:flex;flex-direction:column;gap:6px">
-        ${a.signupTrend.slice(-8).map(d => `<div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:11px;color:var(--text-muted);width:80px">${new Date(d.day).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</span>
-          <div style="flex:1;height:6px;background:var(--surface-3);border-radius:3px;overflow:hidden"><div style="height:100%;background:var(--primary);border-radius:3px;width:${Math.min(100,d.count*20)}%"></div></div>
-          <span style="font-size:11px;font-weight:600">${d.count}</span>
-        </div>`).join('')}</div>` : '<div class="empty" style="padding:20px 0"><p>No data yet</p></div>'}
-    </div>
-  </div>
-  ${a.pendingQueue > 0 ? `<div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:var(--radius-md);padding:14px 18px;display:flex;align-items:center;justify-content:space-between">
-    <span style="font-size:13px;color:var(--warning);font-weight:500">⚠️ ${a.pendingQueue} post${a.pendingQueue !== 1 ? 's' : ''} waiting for moderation</span>
-    <button class="btn btn-sm" style="background:rgba(245,158,11,0.15);color:var(--warning)" onclick="navigate('queue')">Review now →</button>
-  </div>` : ''}`;
-  document.querySelector('.sidebar')?.remove();
-  document.getElementById('main-layout').insertAdjacentHTML('afterbegin', renderSidebar());
-}
-
-// ─── MOD QUEUE ────────────────────────────────────────────────────────────────
-async function loadQueue() {
-  const res = await api('GET', `/admin/queue?status=${state.queueFilter}&page=${state.queuePage}&limit=20`);
-  if (!res?.ok) return;
-  const items = res.data.queue;
-  state.selectedQueueIds.clear();
-
-  document.getElementById('page-body').innerHTML = `
-  <div class="filters">
-    <select class="filter-select" onchange="state.queueFilter=this.value;state.queuePage=1;loadQueue()">
-      <option value="pending" ${state.queueFilter==='pending'?'selected':''}>Pending</option>
-      <option value="approved" ${state.queueFilter==='approved'?'selected':''}>Approved</option>
-      <option value="rejected" ${state.queueFilter==='rejected'?'selected':''}>Rejected</option>
-    </select>
-    <span class="spacer"></span>
-    ${state.queueFilter === 'pending' && items.length ? `<button class="btn btn-sm btn-ghost" onclick="selectAllQueue()">Select all</button>` : ''}
-  </div>
-  <div id="bulk-bar" class="bulk-bar">
-    <span class="bulk-count" id="bulk-count">0 selected</span>
-    <button class="btn btn-sm btn-success" onclick="bulkAction('approve')">✓ Approve all</button>
-    <button class="btn btn-sm btn-danger" onclick="bulkAction('reject')">✗ Reject all</button>
-  </div>
-  ${items.length === 0 ? `<div class="empty"><div class="empty-icon">${state.queueFilter==='pending'?'✅':'📋'}</div><h3>${state.queueFilter==='pending'?'Queue is clear!':'No items here'}</h3><p>${state.queueFilter==='pending'?'All content has been reviewed.':'Adjust the filter above.'}</p></div>` : `
-  <div class="table-wrap">
-  <table class="data-table">
-    <thead><tr>
-      ${state.queueFilter === 'pending' ? '<th style="width:36px"><input type="checkbox" id="queue-check-all" onchange="toggleAllQueue(this.checked)" /></th>' : ''}
-      <th>Content</th><th>Creator</th><th>Sport</th><th>Tags</th><th>Submitted</th>
-      ${state.queueFilter === 'pending' ? '<th>Actions</th>' : '<th>Status</th>'}
-    </tr></thead>
-    <tbody id="queue-tbody">
-      ${items.map(item => `<tr id="qrow-${item.id}">
-        ${state.queueFilter === 'pending' ? `<td><input type="checkbox" class="queue-cb" value="${item.id}" onchange="toggleQueueItem(${item.id}, this.checked)" /></td>` : ''}
-        <td>
-          <div style="font-weight:500;font-size:13px;max-width:240px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(item.title)}</div>
-          <div class="content-body-preview">${esc(item.body || '—')}</div>
-        </td>
-        <td><span style="font-size:13px">${esc(item.display_name || item.username)}</span><br><span class="mono">@${esc(item.username)}</span></td>
-        <td>${item.sport ? `<span class="badge badge-info">${esc(item.sport)}</span>` : '—'}</td>
-        <td>${(item.tags||[]).map(t=>`<span class="badge badge-neutral">${esc(t)}</span>`).join(' ') || '—'}</td>
-        <td class="mono">${fmtDate(item.created_at)}</td>
-        ${state.queueFilter === 'pending' ? `<td style="white-space:nowrap">
-          <button class="btn btn-sm btn-success" onclick="moderateItem(${item.id},'approve')">✓ Approve</button>
-          <button class="btn btn-sm btn-danger" onclick="moderateItem(${item.id},'reject')">✗ Reject</button>
-        </td>` : `<td><span class="badge ${item.status==='approved'?'badge-success':'badge-error'}">${item.status}</span></td>`}
-      </tr>`).join('')}
-    </tbody>
-  </table></div>`}
-  `;
-}
-
-function toggleQueueItem(id, checked) {
-  checked ? state.selectedQueueIds.add(id) : state.selectedQueueIds.delete(id);
-  const bar = document.getElementById('bulk-bar');
-  const count = document.getElementById('bulk-count');
-  if (bar) { bar.classList.toggle('show', state.selectedQueueIds.size > 0); }
-  if (count) count.textContent = `${state.selectedQueueIds.size} selected`;
-}
-
-function toggleAllQueue(checked) {
-  document.querySelectorAll('.queue-cb').forEach(cb => { cb.checked = checked; toggleQueueItem(parseInt(cb.value), checked); });
-}
-
-function selectAllQueue() {
-  const allCb = document.getElementById('queue-check-all');
-  if (allCb) { allCb.checked = true; toggleAllQueue(true); }
-}
-
-async function moderateItem(queueId, action) {
-  const row = document.getElementById(`qrow-${queueId}`);
-  const res = await api('PATCH', `/admin/queue/${queueId}`, { action });
-  if (!res?.ok) { toast(res?.data?.error || 'Action failed', 'error'); return; }
-  toast(`Post ${action}d successfully`, 'success');
-  if (row) row.remove();
-  if (state.analytics) { state.analytics.pendingQueue = Math.max(0, state.analytics.pendingQueue - 1); document.querySelector('.sidebar')?.remove(); document.getElementById('main-layout').insertAdjacentHTML('afterbegin', renderSidebar()); }
-}
-
-async function bulkAction(action) {
-  const ids = [...state.selectedQueueIds];
-  if (!ids.length) return;
-  const res = await api('POST', '/admin/queue/bulk', { ids, action });
-  if (!res?.ok) { toast(res?.data?.error || 'Bulk action failed', 'error'); return; }
-  toast(`${res.data.processed} post(s) ${action}d`, 'success');
-  state.selectedQueueIds.clear();
-  loadQueue();
-}
-
-// ─── CONTENT ──────────────────────────────────────────────────────────────────
-async function loadAdminContent() {
-  const params = new URLSearchParams({ page: state.contentPage, limit: 20 });
-  if (state.contentStatus) params.set('status', state.contentStatus);
-  const res = await api('GET', `/admin/content?${params}`);
-  if (!res?.ok) return;
-  const items = res.data.content;
-
-  document.getElementById('page-body').innerHTML = `
-  <div class="filters">
-    <select class="filter-select" onchange="state.contentStatus=this.value;state.contentPage=1;loadAdminContent()">
-      <option value="">All statuses</option>
-      <option value="approved" ${state.contentStatus==='approved'?'selected':''}>Approved</option>
-      <option value="pending" ${state.contentStatus==='pending'?'selected':''}>Pending</option>
-      <option value="rejected" ${state.contentStatus==='rejected'?'selected':''}>Rejected</option>
-    </select>
-  </div>
-  ${items.length === 0 ? `<div class="empty"><div class="empty-icon">📭</div><h3>No content found</h3><p>Try a different filter.</p></div>` : `
-  <div class="table-wrap"><table class="data-table">
-    <thead><tr><th>Title</th><th>Creator</th><th>Sport</th><th>Status</th><th>Flagged</th><th>Views</th><th>Created</th><th>Actions</th></tr></thead>
-    <tbody>
-      ${items.map(c => `<tr>
-        <td><div style="max-width:220px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:500">${esc(c.title)}</div></td>
-        <td><span style="font-size:12px">@${esc(c.username)}</span></td>
-        <td>${c.sport ? `<span class="badge badge-info">${esc(c.sport)}</span>` : '—'}</td>
-        <td><span class="badge ${c.status==='approved'?'badge-success':c.status==='pending'?'badge-warning':'badge-error'}">${c.status}</span></td>
-        <td>${c.is_flagged ? '<span class="badge badge-error">⚠ Flagged</span>' : '<span class="badge badge-neutral">Clean</span>'}</td>
-        <td class="mono">${c.view_count}</td>
-        <td class="mono">${fmtDate(c.created_at)}</td>
-        <td style="white-space:nowrap">
-          ${c.is_flagged ? `<button class="btn btn-sm btn-ghost" onclick="flagContent(${c.id},false)">Unflag</button>` : `<button class="btn btn-sm btn-ghost" onclick="flagContent(${c.id},true)">Flag</button>`}
-          <button class="btn btn-sm btn-danger" onclick="deleteContent(${c.id})">Delete</button>
-        </td>
-      </tr>`).join('')}
-    </tbody>
-  </table></div>`}`;
-}
-
-async function flagContent(id, flagged) {
-  const res = await api('PATCH', `/admin/content/${id}/flag`, { flagged });
-  if (res?.ok) { toast(flagged ? 'Content flagged' : 'Flag removed', 'success'); loadAdminContent(); }
-  else toast(res?.data?.error || 'Failed', 'error');
-}
-
-async function deleteContent(id) {
-  openModal('Delete content', '<p style="font-size:13px;color:var(--text-muted)">Are you sure you want to permanently delete this post? This cannot be undone.</p>',
-    `<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-danger" onclick="confirmDeleteContent(${id})">Delete permanently</button>`);
-}
-
-async function confirmDeleteContent(id) {
-  closeModal();
-  const res = await api('DELETE', `/admin/content/${id}`);
-  if (res?.ok) { toast('Post deleted', 'success'); loadAdminContent(); }
-  else toast(res?.data?.error || 'Failed', 'error');
-}
-
-// ─── USERS ────────────────────────────────────────────────────────────────────
-async function loadUsers() {
-  const params = new URLSearchParams({ type: state.usersTab, page: state.usersPage, limit: 20 });
-  if (state.usersSearch) params.set('search', state.usersSearch);
-  const res = await api('GET', `/admin/users?${params}`);
-  if (!res?.ok) return;
-  const users = res.data.users;
-  const isCreator = state.usersTab === 'creator';
-
-  document.getElementById('page-body').innerHTML = `
-  <div class="tabs">
-    <button class="tab-btn${isCreator?' active':''}" onclick="state.usersTab='creator';state.usersPage=1;loadUsers()">Creators</button>
-    <button class="tab-btn${!isCreator?' active':''}" onclick="state.usersTab='business';state.usersPage=1;loadUsers()">Businesses</button>
-  </div>
-  <div class="filters">
-    <input class="filter-search" placeholder="Search ${isCreator ? 'creators' : 'businesses'}…" value="${esc(state.usersSearch)}" oninput="state.usersSearch=this.value;state.usersPage=1;loadUsers()" />
-  </div>
-  ${users.length === 0 ? `<div class="empty"><div class="empty-icon">👤</div><h3>No ${isCreator?'creators':'businesses'} found</h3><p>Try a different search.</p></div>` : `
-  <div class="table-wrap"><table class="data-table">
-    <thead><tr>
-      <th>${isCreator ? 'Username' : 'Company'}</th><th>Email</th>
-      ${isCreator ? '<th>Sport</th>' : '<th>Website</th>'}
-      <th>Verified</th><th>Status</th><th>Joined</th><th>Actions</th>
-    </tr></thead>
-    <tbody>
-      ${users.map(u => `<tr>
-        <td><span style="font-weight:500">${esc(isCreator ? u.display_name || u.username : u.company_name)}</span>${isCreator?`<br><span class="mono">@${esc(u.username)}</span>`:''}</td>
-        <td class="mono" style="font-size:12px">${esc(u.email)}</td>
-        <td>${isCreator ? (u.sport ? `<span class="badge badge-info">${esc(u.sport)}</span>` : '—') : (u.website ? `<a href="${esc(u.website)}" target="_blank" style="color:var(--primary);font-size:12px">${esc(u.website.replace(/https?:\/\//,''))}</a>` : '—')}</td>
-        <td>${u.is_verified ? '<span class="badge badge-success">✓ Verified</span>' : '<span class="badge badge-neutral">Unverified</span>'}</td>
-        <td>${u.is_suspended ? '<span class="badge badge-error">Suspended</span>' : '<span class="badge badge-success">Active</span>'}</td>
-        <td class="mono">${fmtDate(u.created_at)}</td>
-        <td style="white-space:nowrap">
-          ${u.is_verified ? `<button class="btn btn-sm btn-ghost" onclick="verifyUser('${state.usersTab}',${u.id},false)">Unverify</button>` : `<button class="btn btn-sm btn-success" onclick="verifyUser('${state.usersTab}',${u.id},true)">Verify</button>`}
-          ${u.is_suspended ? `<button class="btn btn-sm btn-success" onclick="suspendUser('${state.usersTab}',${u.id},false)">Reactivate</button>` : `<button class="btn btn-sm btn-danger" onclick="suspendUser('${state.usersTab}',${u.id},true)">Suspend</button>`}
-        </td>
-      </tr>`).join('')}
-    </tbody>
-  </table></div>`}`;
-}
-
-async function suspendUser(type, id, suspended) {
-  const res = await api('PATCH', `/admin/users/${type}/${id}/suspend`, { suspended });
-  if (res?.ok) { toast(suspended ? 'User suspended' : 'User reactivated', 'success'); loadUsers(); }
-  else toast(res?.data?.error || 'Failed', 'error');
-}
-
-async function verifyUser(type, id, verified) {
-  const res = await api('PATCH', `/admin/users/${type}/${id}/verify`, { verified });
-  if (res?.ok) { toast(verified ? 'User verified ✓' : 'Verification removed', 'success'); loadUsers(); }
-  else toast(res?.data?.error || 'Failed', 'error');
-}
-
-// ─── AUDIT LOG ────────────────────────────────────────────────────────────────
-async function loadAudit() {
-  const params = new URLSearchParams({ page: state.auditPage, limit: 50 });
-  if (state.auditFilter) params.set('actor_type', state.auditFilter);
-  const res = await api('GET', `/admin/audit?${params}`);
-  if (!res?.ok) return;
-  const log = res.data.log;
-
-  document.getElementById('page-body').innerHTML = `
-  <div class="filters">
-    <select class="filter-select" onchange="state.auditFilter=this.value;state.auditPage=1;loadAudit()">
-      <option value="">All actors</option>
-      <option value="admin" ${state.auditFilter==='admin'?'selected':''}>Admins</option>
-      <option value="creator" ${state.auditFilter==='creator'?'selected':''}>Creators</option>
-      <option value="business" ${state.auditFilter==='business'?'selected':''}>Businesses</option>
-    </select>
-    <span class="spacer"></span>
-    <button class="btn btn-sm btn-ghost" onclick="exportAuditLog()">↓ Export JSON</button>
-  </div>
-  ${log.length === 0 ? `<div class="empty"><div class="empty-icon">📋</div><h3>No audit entries</h3><p>System activity will appear here.</p></div>` : `
-  <div class="table-wrap"><table class="data-table">
-    <thead><tr><th>Timestamp</th><th>Actor</th><th>Action</th><th>Target</th><th>IP</th><th>Metadata</th></tr></thead>
-    <tbody>
-      ${log.map(e => `<tr>
-        <td class="mono">${fmtDateFull(e.created_at)}</td>
-        <td><span class="badge ${e.actor_type==='admin'?'badge-error':e.actor_type==='creator'?'badge-info':'badge-warning'}">${esc(e.actor_type||'system')}</span><br><span class="mono">#${e.actor_id||'—'}</span></td>
-        <td><code style="font-family:var(--font-mono);font-size:11px;color:var(--text)">${esc(e.action)}</code></td>
-        <td class="mono">${e.target_type ? `${esc(e.target_type)} #${e.target_id}` : '—'}</td>
-        <td class="mono">${esc(e.ip_address||'—')}</td>
-        <td><span class="audit-meta">${JSON.stringify(e.metadata) !== '{}' ? esc(JSON.stringify(e.metadata)) : '—'}</span></td>
-      </tr>`).join('')}
-    </tbody>
-  </table></div>`}
-  <div class="pagination">
-    ${state.auditPage > 1 ? `<button class="page-btn" onclick="state.auditPage--;loadAudit()">← Prev</button>` : ''}
-    <span class="page-info">Page ${state.auditPage}</span>
-    ${log.length === 50 ? `<button class="page-btn" onclick="state.auditPage++;loadAudit()">Next →</button>` : ''}
-  </div>`;
-}
-
-function exportAuditLog() {
-  api('GET', `/admin/audit?limit=200&page=1${state.auditFilter?'&actor_type='+state.auditFilter:''}`).then(res => {
-    if (!res?.ok) return;
-    const blob = new Blob([JSON.stringify(res.data.log, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = `plxy-audit-${Date.now()}.json`; a.click();
-    toast('Audit log exported', 'success');
+  // ── Navigation ──
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.addEventListener('click', () => navigate(el.dataset.section));
   });
-}
 
-// ─── SETTINGS ─────────────────────────────────────────────────────────────────
-function loadSettings() {
-  document.getElementById('page-body').innerHTML = `
-  <div style="max-width:480px">
-    <div class="card" style="margin-bottom:16px">
-      <div class="section-header"><div class="section-title">Account</div></div>
-      <div style="display:flex;align-items:center;gap:12px;padding:4px 0">
-        <div class="admin-avatar" style="width:44px;height:44px;font-size:15px">${(state.admin?.username||'A').slice(0,2).toUpperCase()}</div>
-        <div>
-          <div style="font-weight:600">${esc(state.admin?.username||'')}</div>
-          <div style="font-size:12px;color:var(--text-muted)">${esc(state.admin?.email||'')} &bull; ${esc(state.admin?.role||'')}</div>
-        </div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="section-header"><div class="section-title">Change Password</div></div>
-      <div id="pwd-msg"></div>
-      <form onsubmit="handleChangePwd(event)">
-        <div class="field"><label>Current password</label><input class="inp" id="pwd-current" type="password" required /></div>
-        <div class="field"><label>New password</label><input class="inp" id="pwd-new" type="password" minlength="8" required /></div>
-        <div class="field"><label>Confirm new password</label><input class="inp" id="pwd-confirm" type="password" minlength="8" required /></div>
-        <button class="btn btn-primary" type="submit">Update password</button>
-      </form>
-    </div>
-  </div>`;
-}
+  function navigate(section) {
+    activeSection = section;
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.section === section));
+    document.querySelectorAll('.section').forEach(el => el.classList.toggle('active', el.id === `section-${section}`));
+    const titles = { dashboard:'Dashboard', queue:'Moderation Queue', content:'Content', creators:'Creators', businesses:'Businesses', analytics:'Analytics', audit:'Audit Log', settings:'Settings' };
+    $('page-title').textContent = titles[section] || section;
+    $('header-actions').innerHTML = '';
+    switch (section) {
+      case 'dashboard': loadDashboard(); break;
+      case 'queue': loadQueue(); break;
+      case 'content': loadContent(); break;
+      case 'creators': loadCreators(); break;
+      case 'businesses': loadBusinesses(); break;
+      case 'analytics': loadAnalytics(); break;
+      case 'audit': loadAudit(); break;
+    }
+  }
 
-async function handleChangePwd(e) {
-  e.preventDefault();
-  const current = document.getElementById('pwd-current').value;
-  const newPwd = document.getElementById('pwd-new').value;
-  const confirm = document.getElementById('pwd-confirm').value;
-  const msg = document.getElementById('pwd-msg');
-  if (newPwd !== confirm) { msg.innerHTML = '<div style="color:var(--error);font-size:12px;margin-bottom:12px">Passwords do not match</div>'; return; }
-  const res = await api('PATCH', '/admin/auth/password', { current_password: current, new_password: newPwd });
-  if (res?.ok) { toast('Password updated successfully', 'success'); e.target.reset(); msg.innerHTML = ''; }
-  else { msg.innerHTML = `<div style="color:var(--error);font-size:12px;margin-bottom:12px">${esc(res?.data?.error||'Failed to update password')}</div>`; }
-}
+  // ── Dashboard ──
+  async function loadDashboard() {
+    try {
+      const [kpis, content] = await Promise.all([
+        api('GET', '/admin/analytics'),
+        api('GET', '/admin/analytics/content'),
+      ]);
+      $('kpi-creators').textContent = kpis.kpis.total_creators;
+      $('kpi-businesses').textContent = kpis.kpis.total_businesses;
+      $('kpi-content').textContent = kpis.kpis.approved_content;
+      $('kpi-opps').textContent = kpis.kpis.active_opportunities;
+      $('kpi-queue').textContent = kpis.kpis.pending_queue;
+      if (kpis.kpis.pending_queue > 0) {
+        $('queue-badge').textContent = kpis.kpis.pending_queue;
+        $('queue-badge').style.display = 'inline';
+      }
+      $('tbl-by-type').innerHTML = content.by_type.map(r =>
+        `<tr><td><span class="badge badge-blue">${r.content_type}</span></td><td>${r.count}</td></tr>`
+      ).join('') || '<tr><td colspan="2" class="loading-row">No data</td></tr>';
+      $('tbl-top-creators').innerHTML = content.top_creators.map(r =>
+        `<tr><td>${r.display_name}</td><td><span class="badge badge-gray">${r.sport}</span></td><td>${r.content_count}</td></tr>`
+      ).join('') || '<tr><td colspan="3" class="loading-row">No data</td></tr>';
+    } catch (e) { toast(e.message, 'error'); }
+  }
 
-// ─── UTILS ────────────────────────────────────────────────────────────────────
-function esc(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function fmtDate(d) { return new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); }
-function fmtDateFull(d) { return new Date(d).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}); }
+  // ── Queue ──
+  let queueSelected = new Set();
 
-// override navigate for settings which has no async loader
-const _origNavigate = navigate;
-window.navigate = function(page) {
-  state.page = page;
-  renderMain();
-  if (page === 'settings') { loadSettings(); return; }
-  const loaders = { dashboard: loadDashboard, queue: loadQueue, users: loadUsers, content: loadAdminContent, audit: loadAudit };
-  loaders[page]?.();
-};
+  async function loadQueue() {
+    const s = state.queue;
+    $('tbl-queue').innerHTML = '<tr class="loading-row"><td colspan="7">Loading…</td></tr>';
+    try {
+      const data = await api('GET', `/admin/queue?limit=${s.limit}&offset=${s.offset}`);
+      s.total = data.total;
+      $('queue-count').textContent = `(${s.total} pending)`;
+      $('queue-info').textContent = `Showing ${s.offset + 1}–${Math.min(s.offset + s.limit, s.total)} of ${s.total}`;
+      $('queue-page').textContent = Math.floor(s.offset / s.limit) + 1;
+      $('queue-prev').disabled = s.offset === 0;
+      $('queue-next').disabled = s.offset + s.limit >= s.total;
+      queueSelected.clear();
+      $('queue-check-all').checked = false;
+      updateBulkButtons();
 
-// ─── BOOT ─────────────────────────────────────────────────────────────────────
-render();
-if (state.token) loadDashboard();
+      if (data.queue.length === 0) {
+        $('tbl-queue').innerHTML = '<tr><td colspan="7"><div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><p>Queue is clear — nothing to review</p></div></td></tr>';
+        return;
+      }
+
+      $('tbl-queue').innerHTML = data.queue.map(item => `
+        <tr data-id="${item.id}">
+          <td><input type="checkbox" class="queue-cb" data-id="${item.id}" /></td>
+          <td><div style="font-weight:600">${escHtml(item.title)}</div><div class="content-preview">${escHtml(item.body)}</div></td>
+          <td>${escHtml(item.display_name)}<br><span style="color:var(--text-faint);font-size:11px">@${escHtml(item.username)}</span></td>
+          <td><span class="badge badge-orange">${escHtml(item.sport || '—')}</span></td>
+          <td><span class="badge badge-blue">${escHtml(item.content_type)}</span></td>
+          <td style="white-space:nowrap">${fmtDate(item.created_at)}</td>
+          <td style="white-space:nowrap">
+            <button class="btn btn-sm btn-success" onclick="queueAction(${item.id},'approve')">Approve</button>
+            <button class="btn btn-sm btn-danger" onclick="queueAction(${item.id},'reject')">Reject</button>
+          </td>
+        </tr>
+      `).join('');
+
+      document.querySelectorAll('.queue-cb').forEach(cb => {
+        cb.addEventListener('change', () => {
+          if (cb.checked) queueSelected.add(parseInt(cb.dataset.id));
+          else queueSelected.delete(parseInt(cb.dataset.id));
+          updateBulkButtons();
+        });
+      });
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  function updateBulkButtons() {
+    const has = queueSelected.size > 0;
+    $('btn-bulk-approve').disabled = !has;
+    $('btn-bulk-reject').disabled = !has;
+    if (has) {
+      $('btn-bulk-approve').textContent = `Approve (${queueSelected.size})`;
+      $('btn-bulk-reject').textContent = `Reject (${queueSelected.size})`;
+    } else {
+      $('btn-bulk-approve').textContent = 'Approve Selected';
+      $('btn-bulk-reject').textContent = 'Reject Selected';
+    }
+  }
+
+  $('queue-check-all').onchange = function() {
+    document.querySelectorAll('.queue-cb').forEach(cb => {
+      cb.checked = this.checked;
+      if (this.checked) queueSelected.add(parseInt(cb.dataset.id));
+      else queueSelected.delete(parseInt(cb.dataset.id));
+    });
+    updateBulkButtons();
+  };
+
+  window.queueAction = async (id, action) => {
+    const showReason = action === 'reject';
+    const result = await confirm(
+      action === 'approve' ? 'Approve Content' : 'Reject Content',
+      action === 'approve' ? 'This content will go live on the public feed.' : 'This content will be rejected and the creator notified.',
+      showReason
+    );
+    if (!result || !result.confirmed) return;
+    try {
+      await api('PATCH', `/admin/queue/${id}`, { action, rejection_reason: result.reason });
+      toast(`Content ${action}d`, 'success');
+      loadQueue();
+      loadDashboard();
+    } catch (e) { toast(e.message, 'error'); }
+  };
+
+  $('btn-bulk-approve').onclick = async () => {
+    if (!queueSelected.size) return;
+    const result = await confirm('Bulk Approve', `Approve ${queueSelected.size} selected items?`);
+    if (!result || !result.confirmed) return;
+    try {
+      const data = await api('POST', '/admin/queue/bulk', { ids: [...queueSelected], action: 'approve' });
+      toast(`${data.updated} items approved`, 'success');
+      loadQueue(); loadDashboard();
+    } catch (e) { toast(e.message, 'error'); }
+  };
+
+  $('btn-bulk-reject').onclick = async () => {
+    if (!queueSelected.size) return;
+    const result = await confirm('Bulk Reject', `Reject ${queueSelected.size} selected items?`, true);
+    if (!result || !result.confirmed) return;
+    try {
+      const data = await api('POST', '/admin/queue/bulk', { ids: [...queueSelected], action: 'reject', rejection_reason: result.reason });
+      toast(`${data.updated} items rejected`, 'success');
+      loadQueue(); loadDashboard();
+    } catch (e) { toast(e.message, 'error'); }
+  };
+
+  $('queue-prev').onclick = () => { state.queue.offset = Math.max(0, state.queue.offset - state.queue.limit); loadQueue(); };
+  $('queue-next').onclick = () => { state.queue.offset += state.queue.limit; loadQueue(); };
+
+  // ── Content ──
+  let contentSearchTimer;
+  $('content-search').addEventListener('input', function() {
+    clearTimeout(contentSearchTimer);
+    contentSearchTimer = setTimeout(() => { state.content.search = this.value; state.content.offset = 0; loadContent(); }, 400);
+  });
+  $('content-status-filter').addEventListener('change', function() {
+    state.content.status = this.value; state.content.offset = 0; loadContent();
+  });
+
+  async function loadContent() {
+    const s = state.content;
+    const params = new URLSearchParams({ limit: s.limit, offset: s.offset });
+    if (s.status) params.set('status', s.status);
+    $('tbl-content').innerHTML = '<tr class="loading-row"><td colspan="7">Loading…</td></tr>';
+    try {
+      const data = await api('GET', `/admin/content?${params}`);
+      $('content-info').textContent = `Showing ${s.offset + 1}–${Math.min(s.offset + s.limit, s.offset + data.content.length)} results`;
+      $('content-page').textContent = Math.floor(s.offset / s.limit) + 1;
+      $('content-prev').disabled = s.offset === 0;
+      $('content-next').disabled = data.content.length < s.limit;
+
+      if (data.content.length === 0) { $('tbl-content').innerHTML = '<tr><td colspan="7"><div class="empty-state"><p>No content found</p></div></td></tr>'; return; }
+
+      $('tbl-content').innerHTML = data.content.map(c => `
+        <tr>
+          <td><div style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(c.title)}</div></td>
+          <td>${escHtml(c.display_name)}</td>
+          <td><span class="badge badge-orange">${escHtml(c.sport || '—')}</span></td>
+          <td><span class="badge badge-blue">${escHtml(c.content_type)}</span></td>
+          <td>${statusBadge(c.status)}</td>
+          <td style="white-space:nowrap">${fmtDate(c.created_at)}</td>
+          <td><button class="btn btn-sm btn-danger" onclick="deleteContent(${c.id})">Delete</button></td>
+        </tr>
+      `).join('');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  window.deleteContent = async (id) => {
+    const result = await confirm('Delete Content', 'This will permanently delete this content. This cannot be undone.');
+    if (!result || !result.confirmed) return;
+    try {
+      await api('DELETE', `/admin/content/${id}`);
+      toast('Content deleted', 'success');
+      loadContent();
+    } catch (e) { toast(e.message, 'error'); }
+  };
+
+  $('content-prev').onclick = () => { state.content.offset = Math.max(0, state.content.offset - state.content.limit); loadContent(); };
+  $('content-next').onclick = () => { state.content.offset += state.content.limit; loadContent(); };
+
+  // ── Creators ──
+  let creatorsSearchTimer;
+  $('creators-search').addEventListener('input', function() {
+    clearTimeout(creatorsSearchTimer);
+    creatorsSearchTimer = setTimeout(() => { state.creators.search = this.value; state.creators.offset = 0; loadCreators(); }, 400);
+  });
+  $('btn-refresh-creators').onclick = () => loadCreators();
+
+  async function loadCreators() {
+    const s = state.creators;
+    const params = new URLSearchParams({ limit: s.limit, offset: s.offset });
+    if (s.search) params.set('search', s.search);
+    $('tbl-creators').innerHTML = '<tr class="loading-row"><td colspan="7">Loading…</td></tr>';
+    try {
+      const data = await api('GET', `/admin/users/creators?${params}`);
+      $('creators-info').textContent = `${data.creators.length} creators`;
+      $('creators-page').textContent = Math.floor(s.offset / s.limit) + 1;
+      $('creators-prev').disabled = s.offset === 0;
+      $('creators-next').disabled = data.creators.length < s.limit;
+
+      if (data.creators.length === 0) { $('tbl-creators').innerHTML = '<tr><td colspan="7"><div class="empty-state"><p>No creators found</p></div></td></tr>'; return; }
+
+      $('tbl-creators').innerHTML = data.creators.map(c => `
+        <tr>
+          <td>@${escHtml(c.username)}</td>
+          <td>${escHtml(c.display_name)}</td>
+          <td><span class="badge badge-orange">${escHtml(c.sport || '—')}</span></td>
+          <td>${c.follower_count || 0}</td>
+          <td>${suspendBadge(c.is_suspended, c.is_verified)}</td>
+          <td style="white-space:nowrap">${fmtDate(c.created_at)}</td>
+          <td style="white-space:nowrap;display:flex;gap:4px">
+            ${!c.is_verified ? `<button class="btn btn-sm btn-ghost" onclick="verifyCreator(${c.id})">Verify</button>` : ''}
+            ${!c.is_suspended
+              ? `<button class="btn btn-sm btn-danger" onclick="suspendCreator(${c.id})">Suspend</button>`
+              : `<button class="btn btn-sm btn-success" onclick="reactivateCreator(${c.id})">Reactivate</button>`
+            }
+          </td>
+        </tr>
+      `).join('');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  window.verifyCreator = async (id) => {
+    const result = await confirm('Verify Creator', 'Grant this creator a verified badge?');
+    if (!result || !result.confirmed) return;
+    try { await api('PATCH', `/admin/users/creators/${id}/verify`); toast('Creator verified', 'success'); loadCreators(); }
+    catch (e) { toast(e.message, 'error'); }
+  };
+  window.suspendCreator = async (id) => {
+    const result = await confirm('Suspend Creator', 'This will prevent the creator from logging in.', true);
+    if (!result || !result.confirmed) return;
+    try { await api('PATCH', `/admin/users/creators/${id}/suspend`, { reason: result.reason }); toast('Creator suspended', 'success'); loadCreators(); }
+    catch (e) { toast(e.message, 'error'); }
+  };
+  window.reactivateCreator = async (id) => {
+    const result = await confirm('Reactivate Creator', 'Restore this creator\'s access?');
+    if (!result || !result.confirmed) return;
+    try { await api('PATCH', `/admin/users/creators/${id}/reactivate`); toast('Creator reactivated', 'success'); loadCreators(); }
+    catch (e) { toast(e.message, 'error'); }
+  };
+
+  $('creators-prev').onclick = () => { state.creators.offset = Math.max(0, state.creators.offset - state.creators.limit); loadCreators(); };
+  $('creators-next').onclick = () => { state.creators.offset += state.creators.limit; loadCreators(); };
+
+  // ── Businesses ──
+  let bizSearchTimer;
+  $('businesses-search').addEventListener('input', function() {
+    clearTimeout(bizSearchTimer);
+    bizSearchTimer = setTimeout(() => { state.businesses.search = this.value; state.businesses.offset = 0; loadBusinesses(); }, 400);
+  });
+  $('btn-refresh-businesses').onclick = () => loadBusinesses();
+
+  async function loadBusinesses() {
+    const s = state.businesses;
+    const params = new URLSearchParams({ limit: s.limit, offset: s.offset });
+    if (s.search) params.set('search', s.search);
+    $('tbl-businesses').innerHTML = '<tr class="loading-row"><td colspan="6">Loading…</td></tr>';
+    try {
+      const data = await api('GET', `/admin/users/businesses?${params}`);
+      $('businesses-info').textContent = `${data.businesses.length} businesses`;
+      $('businesses-page').textContent = Math.floor(s.offset / s.limit) + 1;
+      $('businesses-prev').disabled = s.offset === 0;
+      $('businesses-next').disabled = data.businesses.length < s.limit;
+
+      if (data.businesses.length === 0) { $('tbl-businesses').innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>No businesses found</p></div></td></tr>'; return; }
+
+      $('tbl-businesses').innerHTML = data.businesses.map(b => `
+        <tr>
+          <td>${escHtml(b.business_name)}</td>
+          <td style="color:var(--text-muted)">${escHtml(b.email)}</td>
+          <td><span class="badge badge-blue">${escHtml(b.industry || '—')}</span></td>
+          <td>${suspendBadge(b.is_suspended, b.is_verified)}</td>
+          <td style="white-space:nowrap">${fmtDate(b.created_at)}</td>
+          <td style="white-space:nowrap;display:flex;gap:4px">
+            ${!b.is_suspended
+              ? `<button class="btn btn-sm btn-danger" onclick="suspendBusiness(${b.id})">Suspend</button>`
+              : `<button class="btn btn-sm btn-success" onclick="reactivateBusiness(${b.id})">Reactivate</button>`
+            }
+          </td>
+        </tr>
+      `).join('');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  window.suspendBusiness = async (id) => {
+    const result = await confirm('Suspend Business', 'This will prevent the business from logging in.');
+    if (!result || !result.confirmed) return;
+    try { await api('PATCH', `/admin/users/businesses/${id}/suspend`); toast('Business suspended', 'success'); loadBusinesses(); }
+    catch (e) { toast(e.message, 'error'); }
+  };
+  window.reactivateBusiness = async (id) => {
+    const result = await confirm('Reactivate Business', 'Restore this business\'s access?');
+    if (!result || !result.confirmed) return;
+    try { await api('PATCH', `/admin/users/businesses/${id}/reactivate`); toast('Business reactivated', 'success'); loadBusinesses(); }
+    catch (e) { toast(e.message, 'error'); }
+  };
+
+  $('businesses-prev').onclick = () => { state.businesses.offset = Math.max(0, state.businesses.offset - state.businesses.limit); loadBusinesses(); };
+  $('businesses-next').onclick = () => { state.businesses.offset += state.businesses.limit; loadBusinesses(); };
+
+  // ── Analytics ──
+  async function loadAnalytics() {
+    try {
+      const [kpis, content] = await Promise.all([api('GET', '/admin/analytics'), api('GET', '/admin/analytics/content')]);
+      $('a-kpi-creators').textContent = kpis.kpis.total_creators;
+      $('a-kpi-businesses').textContent = kpis.kpis.total_businesses;
+      $('a-kpi-content').textContent = kpis.kpis.approved_content;
+      $('a-kpi-opps').textContent = kpis.kpis.active_opportunities;
+      $('a-kpi-queue').textContent = kpis.kpis.pending_queue;
+      $('tbl-by-status').innerHTML = content.by_status.map(r =>
+        `<tr><td>${statusBadge(r.status)}</td><td>${r.count}</td></tr>`
+      ).join('');
+      $('tbl-signups').innerHTML = kpis.creator_signups_30d.map(r =>
+        `<tr><td>${fmtDate(r.day)}</td><td>${r.count}</td></tr>`
+      ).join('') || '<tr><td colspan="2" style="color:var(--text-faint);padding:12px">No signups in last 30 days</td></tr>';
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  // ── Audit ──
+  let auditActionTimer;
+  $('audit-actor-filter').addEventListener('change', function() { state.audit.actor_type = this.value; state.audit.offset = 0; loadAudit(); });
+  $('audit-action-filter').addEventListener('input', function() {
+    clearTimeout(auditActionTimer);
+    auditActionTimer = setTimeout(() => { state.audit.action = this.value; state.audit.offset = 0; loadAudit(); }, 400);
+  });
+
+  async function loadAudit() {
+    const s = state.audit;
+    const params = new URLSearchParams({ limit: s.limit, offset: s.offset });
+    if (s.actor_type) params.set('actor_type', s.actor_type);
+    if (s.action) params.set('action', s.action);
+    $('tbl-audit').innerHTML = '<tr class="loading-row"><td colspan="5">Loading…</td></tr>';
+    try {
+      const data = await api('GET', `/admin/audit?${params}`);
+      s.total = data.total;
+      $('audit-info').textContent = `${data.total} total entries`;
+      $('audit-page').textContent = Math.floor(s.offset / s.limit) + 1;
+      $('audit-prev').disabled = s.offset === 0;
+      $('audit-next').disabled = s.offset + s.limit >= s.total;
+
+      if (data.logs.length === 0) { $('tbl-audit').innerHTML = '<tr><td colspan="5"><div class="empty-state"><p>No audit entries found</p></div></td></tr>'; return; }
+
+      $('tbl-audit').innerHTML = data.logs.map(l => `
+        <tr>
+          <td style="white-space:nowrap;color:var(--text-muted)">${fmtDateTime(l.created_at)}</td>
+          <td>${l.actor_id}</td>
+          <td><span class="badge badge-gray">${escHtml(l.actor_type)}</span></td>
+          <td><code style="font-size:11px;background:var(--surface-3);padding:2px 6px;border-radius:4px">${escHtml(l.action)}</code></td>
+          <td style="font-size:11px;color:var(--text-muted);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(JSON.stringify(l.metadata || {}))}</td>
+        </tr>
+      `).join('');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  $('btn-export-audit').onclick = async () => {
+    try {
+      const res = await fetch(`${API}/admin/audit/export`, { headers: { Authorization: `Bearer ${token}` } });
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `audit-export-${Date.now()}.json`;
+      a.click();
+      toast('Audit log exported', 'success');
+    } catch (e) { toast('Export failed', 'error'); }
+  };
+
+  $('audit-prev').onclick = () => { state.audit.offset = Math.max(0, state.audit.offset - state.audit.limit); loadAudit(); };
+  $('audit-next').onclick = () => { state.audit.offset += state.audit.limit; loadAudit(); };
+
+  // ── Settings ──
+  $('btn-change-pw').onclick = async () => {
+    const current = $('pw-current').value;
+    const next = $('pw-new').value;
+    const confirm2 = $('pw-confirm').value;
+    const errEl = $('pw-error');
+    errEl.classList.remove('visible');
+
+    if (next !== confirm2) { errEl.textContent = 'Passwords do not match'; errEl.classList.add('visible'); return; }
+    if (next.length < 8) { errEl.textContent = 'New password must be at least 8 characters'; errEl.classList.add('visible'); return; }
+
+    try {
+      await api('POST', '/admin/auth/change-password', { current_password: current, new_password: next });
+      toast('Password updated successfully', 'success');
+      $('pw-current').value = ''; $('pw-new').value = ''; $('pw-confirm').value = '';
+    } catch (e) { errEl.textContent = e.message; errEl.classList.add('visible'); }
+  };
+
+  // ── XSS guard ──
+  function escHtml(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+})();
 </script>
 </body>
 </html>
