@@ -1,25 +1,23 @@
 'use strict';
 const request = require('supertest');
 const { createApp } = require('../src/app');
-const { readEnv } = require('../src/config/env');
 const setup = require('../src/db/setup');
 
 let app;
-const uniqueId = Date.now();
-const email = `testuser.${uniqueId}@plxyground.local`;
+const uid = Date.now();
+const email = `smoke.${uid}@plxyground.local`;
+let token;
 
 beforeAll(async () => {
   await setup();
-  app = createApp(readEnv());
+  app = createApp();
 }, 30000);
 
-describe('Auth — signup / login / me', () => {
-  let token;
-
-  it('signs up a creator', async () => {
+describe('Creator auth', () => {
+  it('signs up a new creator', async () => {
     const res = await request(app).post('/api/auth/signup').send({
-      username: `testuser${uniqueId}`,
-      display_name: 'Test User',
+      username: `smokeuser${uid}`,
+      display_name: 'Smoke User',
       email,
       password: 'Password123!',
     });
@@ -29,10 +27,10 @@ describe('Auth — signup / login / me', () => {
     token = res.body.data.token;
   });
 
-  it('rejects duplicate email on second signup', async () => {
+  it('rejects duplicate email signup with 409', async () => {
     const res = await request(app).post('/api/auth/signup').send({
-      username: `testuser${uniqueId}b`,
-      display_name: 'Test User 2',
+      username: `smokeuser${uid}b`,
+      display_name: 'Smoke User 2',
       email,
       password: 'Password123!',
     });
@@ -49,7 +47,7 @@ describe('Auth — signup / login / me', () => {
     token = res.body.data.token;
   });
 
-  it('rejects wrong password', async () => {
+  it('rejects wrong password with 401', async () => {
     const res = await request(app).post('/api/auth/login').send({
       email,
       password: 'WrongPassword!',
@@ -57,7 +55,7 @@ describe('Auth — signup / login / me', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns current user on GET /api/auth/me', async () => {
+  it('GET /api/auth/me returns user when authenticated', async () => {
     const res = await request(app)
       .get('/api/auth/me')
       .set('Authorization', `Bearer ${token}`);
@@ -65,7 +63,7 @@ describe('Auth — signup / login / me', () => {
     expect(res.body.data).toBeDefined();
   });
 
-  it('rejects /api/auth/me without token', async () => {
+  it('GET /api/auth/me returns 401 without token', async () => {
     const res = await request(app).get('/api/auth/me');
     expect(res.status).toBe(401);
   });
