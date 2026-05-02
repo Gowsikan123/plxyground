@@ -1,7 +1,11 @@
 {
   "name": "plxyground-admin",
   "version": "1.0.0",
+  "description": "PLXYGROUND Admin Panel",
+  "main": "server.js",
   "scripts": {
-    "start": "node server.js"
-  }
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {}
 }
