@@ -1,39 +1,43 @@
 ---
-name: 🐛 Bug Report
+name: Bug Report
 about: Something is broken — help us fix it
+title: '[BUG] '
 labels: bug
 assignees: ''
 ---
 
-## What happened?
+## Describe the Bug
 
-<!-- A clear description of the bug -->
+<!-- A clear and concise description of what the bug is -->
 
-## Steps to reproduce
+## Steps to Reproduce
 
 1. 
 2. 
 3. 
 
-## Expected behaviour
+## Expected Behaviour
 
-<!-- What should have happened -->
+<!-- What should have happened? -->
 
-## Actual behaviour
+## Actual Behaviour
 
-<!-- What actually happened -->
+<!-- What actually happened? Include error messages, stack traces, screenshots -->
+
+```
+// Paste error output here
+```
 
 ## Environment
 
-- Service affected: <!-- backend / frontend / admin-panel -->
-- Node version:
-- OS:
-- Expo SDK (if frontend):
+| Key | Value |
+|---|---|
+| OS | |
+| Node.js version | |
+| npm version | |
+| Service affected | `backend` / `frontend` / `admin-panel` |
+| `NODE_ENV` | `development` / `production` |
 
-## Logs / Screenshots
+## Additional Context
 
-<!-- Paste relevant logs here -->
-
-## Additional context
-
-<!-- Anything else that might help -->
+<!-- Any other context, screenshots, or logs -->

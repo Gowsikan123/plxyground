@@ -1,28 +1,38 @@
 ---
-name: 🚀 Feature Request
-about: Suggest a new feature or improvement
+name: Feature Request
+about: Propose a new feature or improvement
+title: '[FEAT] '
 labels: enhancement
 assignees: ''
 ---
 
-## What problem does this solve?
+## Problem / Motivation
 
-<!-- Describe the problem or gap -->
+<!-- What problem does this feature solve? Why is it needed? -->
 
-## Proposed solution
+## Proposed Solution
 
-<!-- How should this work? -->
+<!-- How would you implement this? Be as specific as possible -->
 
-## Alternatives considered
+## Alternatives Considered
 
-<!-- Any other approaches you thought of? -->
+<!-- What other approaches did you consider, and why did you rule them out? -->
 
-## Acceptance criteria
+## Scope
+
+- [ ] Backend route change or addition
+- [ ] Frontend screen or component
+- [ ] Admin panel
+- [ ] Database schema change
+- [ ] Documentation only
+
+## Acceptance Criteria
+
+<!-- How will we know this feature is complete? List specific, testable criteria -->
 
 - [ ] 
 - [ ] 
-- [ ] 
 
-## Additional context
+## Additional Context
 
-<!-- Mockups, links, related issues -->
+<!-- Mockups, diagrams, links to similar features elsewhere -->
