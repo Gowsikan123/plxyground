@@ -1,63 +1,59 @@
 'use strict';
 
-const express = require('express');
-const bcrypt = require('bcrypt');
+const { Router } = require('express');
 const { body } = require('express-validator');
-const { getPool } = require('../db/client');
+const bcrypt = require('bcryptjs');
+const pool = require('../db/client');
 const { signToken } = require('../utils/jwt');
-const { uniqueSlug } = require('../utils/slugify');
-const { writeAudit } = require('../utils/auditLogger');
-const { validate } = require('../middleware/validate');
 const { requireAuth } = require('../middleware/auth');
+const validate = require('../middleware/validate');
 const { authLimiter } = require('../middleware/rateLimiter');
-const { bcryptRounds } = require('../config');
-const logger = require('../logger');
+const slugify = require('../utils/slugify');
+const auditLog = require('../utils/auditLogger');
 
-const router = express.Router();
+const router = Router();
 
-// POST /api/business/signup
+// POST /api/business/auth/signup
 router.post(
   '/signup',
   authLimiter,
   [
-    body('company_name').trim().isLength({ min: 2, max: 150 }),
     body('email').isEmail().normalizeEmail(),
     body('password').isLength({ min: 8 }),
-    body('website').optional().isURL(),
-    body('bio').optional().trim().isLength({ max: 500 }),
+    body('companyname').notEmpty().trim(),
   ],
   validate,
   async (req, res) => {
     try {
-      const { company_name, email, password, website, bio } = req.body;
-      const pool = getPool();
+      const { email, password, companyname, industry, website, location } = req.body;
 
-      const { rows: exists } = await pool.query('SELECT id FROM businesses WHERE email = $1', [email]);
-      if (exists.length) return res.status(409).json({ error: 'Email already registered' });
+      const existing = await pool.query('SELECT id FROM businesses WHERE email = $1', [email]);
+      if (existing.rows.length > 0) {
+        return res.status(409).json({ error: 'Email already in use' });
+      }
 
-      const password_hash = await bcrypt.hash(password, bcryptRounds);
-      const slug = await uniqueSlug(company_name, 'businesses');
+      const slug = await slugify(companyname, 'businesses');
+      const passwordhash = await bcrypt.hash(password, 12);
 
       const { rows } = await pool.query(
-        `INSERT INTO businesses (company_name, email, password_hash, website, bio, slug)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING id, company_name, email, website, bio, slug, created_at`,
-        [company_name, email, password_hash, website || null, bio || null, slug],
+        `INSERT INTO businesses (email, passwordhash, companyname, slug, industry, website, location)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING id, email, companyname, slug, bio, logourl, industry, website, location, isemailverified, createdat`,
+        [email, passwordhash, companyname, slug, industry || null, website || null, location || null]
       );
 
       const business = rows[0];
       const token = signToken({ id: business.id, type: 'business' });
-      writeAudit({ actorId: business.id, actorType: 'business', action: 'signup', ip: req.ip });
+      auditLog({ actorType: 'business', actorId: business.id, action: 'BUSINESS_SIGNUP', ipAddress: req.ip });
 
-      return res.status(201).json({ token, user: business });
+      return res.status(201).json({ token, business });
     } catch (err) {
-      logger.error('business signup error', { message: err.message });
-      return res.status(500).json({ error: 'Internal server error' });
+      return res.status(500).json({ error: 'Signup failed', detail: err.message });
     }
-  },
+  }
 );
 
-// POST /api/business/login
+// POST /api/business/auth/login
 router.post(
   '/login',
   authLimiter,
@@ -69,41 +65,142 @@ router.post(
   async (req, res) => {
     try {
       const { email, password } = req.body;
-      const { rows } = await getPool().query(
-        'SELECT id, email, company_name, password_hash, bio, logo_url, slug, website, is_suspended FROM businesses WHERE email = $1',
-        [email],
+
+      const { rows } = await pool.query(
+        `SELECT id, email, passwordhash, companyname, slug, bio, logourl,
+                industry, website, location, issuspended, isemailverified, createdat
+         FROM businesses WHERE email = $1`,
+        [email]
       );
+
+      if (rows.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
+
       const business = rows[0];
-      if (!business) return res.status(401).json({ error: 'Invalid credentials' });
-      if (business.is_suspended) return res.status(403).json({ error: 'Account suspended' });
-
-      const valid = await bcrypt.compare(password, business.password_hash);
+      const valid = await bcrypt.compare(password, business.passwordhash);
       if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+      if (business.issuspended) return res.status(403).json({ error: 'Account suspended' });
 
-      const { password_hash, ...safe } = business;
+      await pool.query('UPDATE businesses SET lastlogin = NOW() WHERE id = $1', [business.id]);
+
       const token = signToken({ id: business.id, type: 'business' });
-      writeAudit({ actorId: business.id, actorType: 'business', action: 'login', ip: req.ip });
+      auditLog({ actorType: 'business', actorId: business.id, action: 'BUSINESS_LOGIN', ipAddress: req.ip });
 
-      return res.json({ token, user: safe });
+      const { passwordhash: _p, ...safeData } = business;
+      return res.json({ token, business: safeData });
     } catch (err) {
-      logger.error('business login error', { message: err.message });
-      return res.status(500).json({ error: 'Internal server error' });
+      return res.status(500).json({ error: 'Login failed', detail: err.message });
     }
-  },
+  }
 );
 
-// GET /api/business/me
+// GET /api/business/auth/me
 router.get('/me', requireAuth, async (req, res) => {
-  if (req.user.type !== 'business') return res.status(403).json({ error: 'Not a business account' });
   try {
-    const { rows } = await getPool().query(
-      'SELECT id, company_name, email, bio, logo_url, slug, website, is_verified, created_at FROM businesses WHERE id = $1',
-      [req.user.id],
+    if (req.actor.type !== 'business') {
+      return res.status(403).json({ error: 'Business token required' });
+    }
+    const { rows } = await pool.query(
+      `SELECT id, email, companyname, slug, bio, logourl, industry, website,
+              location, issuspended, isemailverified, createdat
+       FROM businesses WHERE id = $1`,
+      [req.actor.id]
     );
-    return res.json({ user: rows[0] });
+    if (rows.length === 0) return res.status(404).json({ error: 'Business not found' });
+    return res.json({ business: rows[0] });
   } catch (err) {
-    logger.error('business me error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Failed to fetch profile', detail: err.message });
+  }
+});
+
+// GET /api/business/content
+router.get('/content', requireAuth, async (req, res) => {
+  try {
+    if (req.actor.type !== 'business') {
+      return res.status(403).json({ error: 'Business token required' });
+    }
+    const { rows } = await pool.query(
+      `SELECT id, title, body, mediaurl, budgetrange, targetsport, status, createdat, updatedat
+       FROM business_content WHERE businessid = $1 ORDER BY createdat DESC`,
+      [req.actor.id]
+    );
+    return res.json({ content: rows });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch content', detail: err.message });
+  }
+});
+
+// POST /api/business/content
+router.post(
+  '/content',
+  requireAuth,
+  [body('title').notEmpty().trim()],
+  validate,
+  async (req, res) => {
+    try {
+      if (req.actor.type !== 'business') {
+        return res.status(403).json({ error: 'Business token required' });
+      }
+      const { title, body: bodyText, mediaurl, budgetrange, targetsport } = req.body;
+      const { rows } = await pool.query(
+        `INSERT INTO business_content (businessid, title, body, mediaurl, budgetrange, targetsport)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
+        [req.actor.id, title, bodyText || null, mediaurl || null, budgetrange || null, targetsport || null]
+      );
+      await pool.query(
+        `INSERT INTO moderation_queue (contenttype, contentid) VALUES ('business_content', $1)`,
+        [rows[0].id]
+      );
+      auditLog({ actorType: 'business', actorId: req.actor.id, action: 'BUSINESS_CONTENT_CREATE', targetType: 'business_content', targetId: rows[0].id });
+      return res.status(201).json({ content: rows[0] });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to create content', detail: err.message });
+    }
+  }
+);
+
+// PATCH /api/business/content/:id
+router.patch('/content/:id', requireAuth, async (req, res) => {
+  try {
+    if (req.actor.type !== 'business') {
+      return res.status(403).json({ error: 'Business token required' });
+    }
+    const { id } = req.params;
+    const { title, body: bodyText, mediaurl, budgetrange, targetsport } = req.body;
+    const { rows } = await pool.query(
+      `UPDATE business_content
+       SET title = COALESCE($1, title),
+           body = COALESCE($2, body),
+           mediaurl = COALESCE($3, mediaurl),
+           budgetrange = COALESCE($4, budgetrange),
+           targetsport = COALESCE($5, targetsport),
+           updatedat = NOW()
+       WHERE id = $6 AND businessid = $7
+       RETURNING *`,
+      [title || null, bodyText || null, mediaurl || null, budgetrange || null, targetsport || null, id, req.actor.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Content not found' });
+    return res.json({ content: rows[0] });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to update content', detail: err.message });
+  }
+});
+
+// DELETE /api/business/content/:id
+router.delete('/content/:id', requireAuth, async (req, res) => {
+  try {
+    if (req.actor.type !== 'business') {
+      return res.status(403).json({ error: 'Business token required' });
+    }
+    const { rows } = await pool.query(
+      `UPDATE business_content SET status = 'deleted', updatedat = NOW()
+       WHERE id = $1 AND businessid = $2 RETURNING id`,
+      [req.params.id, req.actor.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Content not found' });
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to delete content', detail: err.message });
   }
 });
 

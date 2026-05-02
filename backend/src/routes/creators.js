@@ -1,112 +1,108 @@
 'use strict';
 
-const express = require('express');
-const { param, body, query } = require('express-validator');
-const { getPool } = require('../db/client');
+const { Router } = require('express');
+const { query } = require('express-validator');
+const pool = require('../db/client');
 const { requireAuth } = require('../middleware/auth');
-const { validate } = require('../middleware/validate');
-const { uniqueSlug } = require('../utils/slugify');
-const logger = require('../logger');
+const validate = require('../middleware/validate');
 
-const router = express.Router();
+const router = Router();
 
-// GET /api/creators — list all (public)
+// GET /api/creators
 router.get(
   '/',
-  [query('sport').optional().trim(), query('search').optional().trim(), query('page').optional().isInt({ min: 1 }).toInt(), query('limit').optional().isInt({ min: 1, max: 50 }).toInt()],
+  [
+    query('limit').optional().isInt({ min: 1, max: 50 }),
+    query('offset').optional().isInt({ min: 0 }),
+  ],
   validate,
   async (req, res) => {
     try {
-      const page = req.query.page || 1;
-      const limit = req.query.limit || 20;
-      const offset = (page - 1) * limit;
-      const conditions = ['is_suspended = FALSE'];
-      const params = [];
+      const limit = parseInt(req.query.limit, 10) || 20;
+      const offset = parseInt(req.query.offset, 10) || 0;
+      const search = req.query.search || '';
+      const sport = req.query.sport || '';
 
-      if (req.query.sport) { params.push(req.query.sport); conditions.push(`sport = $${params.length}`); }
-      if (req.query.search) { params.push(`%${req.query.search}%`); conditions.push(`(username ILIKE $${params.length} OR display_name ILIKE $${params.length})`); }
-
-      params.push(limit, offset);
-      const { rows } = await getPool().query(
-        `SELECT id, username, display_name, bio, sport, avatar_url, slug, follower_count, is_verified, created_at
-         FROM creators WHERE ${conditions.join(' AND ')}
-         ORDER BY follower_count DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
-        params,
+      const { rows } = await pool.query(
+        `SELECT id, username, slug, displayname, bio, avatarurl, sport, location,
+                followercount, isverified, createdat
+         FROM creators
+         WHERE ($1 = '' OR displayname ILIKE '%' || $1 || '%' OR username ILIKE '%' || $1 || '%')
+           AND ($2 = '' OR sport ILIKE $2)
+         ORDER BY followercount DESC
+         LIMIT $3 OFFSET $4`,
+        [search, sport, limit, offset]
       );
-      return res.json({ creators: rows, page, limit });
-    } catch (err) {
-      logger.error('list creators error', { message: err.message });
-      return res.status(500).json({ error: 'Internal server error' });
-    }
-  },
-);
 
-// GET /api/creators/:id
-router.get('/:id', [param('id').isInt().toInt()], validate, async (req, res) => {
-  try {
-    const { rows } = await getPool().query(
-      'SELECT id, username, display_name, bio, sport, avatar_url, slug, follower_count, is_verified, created_at FROM creators WHERE id = $1 AND is_suspended = FALSE',
-      [req.params.id],
-    );
-    if (!rows.length) return res.status(404).json({ error: 'Creator not found' });
-    return res.json({ creator: rows[0] });
-  } catch (err) {
-    logger.error('get creator error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+      const { rows: countRows } = await pool.query(
+        `SELECT COUNT(*) FROM creators
+         WHERE ($1 = '' OR displayname ILIKE '%' || $1 || '%' OR username ILIKE '%' || $1 || '%')
+           AND ($2 = '' OR sport ILIKE $2)`,
+        [search, sport]
+      );
+
+      return res.json({ creators: rows, total: parseInt(countRows[0].count, 10), limit, offset });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to fetch creators', detail: err.message });
+    }
   }
-});
+);
 
 // GET /api/creators/slug/:slug
 router.get('/slug/:slug', async (req, res) => {
   try {
-    const { rows } = await getPool().query(
-      'SELECT id, username, display_name, bio, sport, avatar_url, slug, follower_count, is_verified, created_at FROM creators WHERE slug = $1 AND is_suspended = FALSE',
-      [req.params.slug],
+    const { rows } = await pool.query(
+      `SELECT id, username, slug, displayname, bio, avatarurl, sport, location,
+              followercount, isverified, createdat
+       FROM creators WHERE slug = $1`,
+      [req.params.slug]
     );
-    if (!rows.length) return res.status(404).json({ error: 'Creator not found' });
+    if (rows.length === 0) return res.status(404).json({ error: 'Creator not found' });
     return res.json({ creator: rows[0] });
   } catch (err) {
-    logger.error('get creator by slug error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Failed to fetch creator', detail: err.message });
   }
 });
 
-// PATCH /api/creators/me — update own profile
-router.patch(
-  '/me',
-  requireAuth,
-  [
-    body('display_name').optional().trim().isLength({ max: 100 }),
-    body('bio').optional().trim().isLength({ max: 500 }),
-    body('sport').optional().trim().isLength({ max: 50 }),
-    body('avatar_url').optional().isURL(),
-  ],
-  validate,
-  async (req, res) => {
-    if (req.user.type !== 'creator') return res.status(403).json({ error: 'Not a creator account' });
-    try {
-      const { display_name, bio, sport, avatar_url } = req.body;
-      let slug = undefined;
-      if (display_name) slug = await uniqueSlug(display_name, 'creators', 'slug', req.user.id);
+// GET /api/creators/:id
+router.get('/:id', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, username, slug, displayname, bio, avatarurl, sport, location,
+              followercount, isverified, createdat
+       FROM creators WHERE id = $1`,
+      [req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Creator not found' });
+    return res.json({ creator: rows[0] });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch creator', detail: err.message });
+  }
+});
 
-      const { rows } = await getPool().query(
-        `UPDATE creators SET
-           display_name = COALESCE($1, display_name),
-           bio = COALESCE($2, bio),
-           sport = COALESCE($3, sport),
-           avatar_url = COALESCE($4, avatar_url),
-           slug = COALESCE($5, slug),
-           updated_at = NOW()
-         WHERE id = $6
-         RETURNING id, username, display_name, bio, sport, avatar_url, slug`,
-        [display_name || null, bio || null, sport || null, avatar_url || null, slug || null, req.user.id],
-      );
-      return res.json({ creator: rows[0] });
-    } catch (err) {
-      logger.error('update creator error', { message: err.message });
-      return res.status(500).json({ error: 'Internal server error' });
+// PATCH /api/creators/:id
+router.patch('/:id', requireAuth, async (req, res) => {
+  try {
+    if (req.actor.type !== 'creator' || req.actor.id !== parseInt(req.params.id, 10)) {
+      return res.status(403).json({ error: 'Forbidden' });
     }
-  },
-);
+    const { displayname, bio, avatarurl, sport, location } = req.body;
+    const { rows } = await pool.query(
+      `UPDATE creators
+       SET displayname = COALESCE($1, displayname),
+           bio = COALESCE($2, bio),
+           avatarurl = COALESCE($3, avatarurl),
+           sport = COALESCE($4, sport),
+           location = COALESCE($5, location)
+       WHERE id = $6
+       RETURNING id, username, slug, displayname, bio, avatarurl, sport, location, followercount, isverified, createdat`,
+      [displayname || null, bio || null, avatarurl || null, sport || null, location || null, req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Creator not found' });
+    return res.json({ creator: rows[0] });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to update profile', detail: err.message });
+  }
+});
 
 module.exports = router;
