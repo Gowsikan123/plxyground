@@ -2,7 +2,9 @@ name: Smoke Tests
 
 on:
   push:
-    branches: [main, master]
+    branches:
+      - main
+      - master
   pull_request:
 
 jobs:
@@ -27,17 +29,19 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Install backend deps
+      - name: Install backend dependencies
         run: npm install
         working-directory: backend
 
-      - name: Run smoke tests
+      - name: Run backend smoke suite
         run: npm run smoke
         working-directory: backend
         env:
