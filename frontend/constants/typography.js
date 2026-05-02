@@ -1,45 +1,44 @@
-// PLXYGROUND — Design token: Typography
-export const Typography = {
-  // Font families
-  fontDisplay: 'SpaceGrotesk-Bold',
-  fontBody:    'Inter-Regular',
-  fontMono:    'JetBrainsMono-Regular',
+import { Platform } from 'react-native';
 
-  // Font weights
-  thin:        '100',
-  light:       '300',
-  regular:     '400',
-  medium:      '500',
-  semibold:    '600',
-  bold:        '700',
-  extrabold:   '800',
-  black:       '900',
-
-  // Font sizes (px / dp)
-  xs:    11,
-  sm:    13,
-  base:  15,
-  md:    15,
-  lg:    17,
-  xl:    20,
-  '2xl': 24,
-  '3xl': 30,
-  '4xl': 36,
-  '5xl': 48,
-
-  // Line heights
-  tight:   1.2,
-  snug:    1.375,
-  normal:  1.5,
-  relaxed: 1.625,
-  loose:   2,
-
-  // Letter spacing
-  tighter: -0.8,
-  normal_tracking: 0,
-  wide:    0.4,
-  wider:   0.8,
-  widest:  1.6,
+export const fontFamily = {
+  syne: {
+    regular:     'Syne_400Regular',
+    medium:      'Syne_500Medium',
+    semiBold:    'Syne_600SemiBold',
+    bold:        'Syne_700Bold',
+    extraBold:   'Syne_800ExtraBold',
+  },
+  dmSans: {
+    regular:     'DMSans_400Regular',
+    medium:      'DMSans_500Medium',
+    semiBold:    'DMSans_600SemiBold',
+    bold:        'DMSans_700Bold',
+  },
+  system: Platform.select({ ios: 'System', android: 'Roboto', default: 'System' }),
 };
 
-export default Typography;
+export const fontSize = {
+  xs:   11,
+  sm:   13,
+  base: 15,
+  md:   17,
+  lg:   19,
+  xl:   22,
+  '2xl': 26,
+  '3xl': 32,
+  display: 40,
+};
+
+export const lineHeight = {
+  tight:   1.2,
+  normal:  1.5,
+  relaxed: 1.7,
+};
+
+export const fontWeight = {
+  regular:  '400',
+  medium:   '500',
+  semiBold: '600',
+  bold:     '700',
+  extraBold:'800',
+};

@@ -1,27 +1,43 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
-import { Colors } from '../../constants/colors';
+import { Image, StyleSheet, Text, View } from 'react-native';
+import { colors } from '../../constants/colors';
+import { radius } from '../../constants/spacing';
+import { fontSize, fontFamily } from '../../constants/typography';
 
-export function Avatar({ uri, name = '?', size = 44, style }) {
+const SIZE_MAP = { sm: 32, md: 44, lg: 56, xl: 72 };
+
+export function Avatar({ uri, name, size = 'md', style }) {
+  const dim     = SIZE_MAP[size] || SIZE_MAP.md;
   const initials = name
-    .split(' ')
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
+    ? name.trim().split(' ').slice(0, 2).map(w => w[0].toUpperCase()).join('')
+    : '?';
 
   return (
-    <View style={[styles.container, { width: size, height: size, borderRadius: size / 2 }, style]}>
+    <View style={[styles.container, { width: dim, height: dim, borderRadius: radius.full }, style]}>
       {uri ? (
-        <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} />
+        <Image
+          source={{ uri }}
+          style={[styles.image, { width: dim, height: dim, borderRadius: radius.full }]}
+          resizeMode="cover"
+        />
       ) : (
-        <Text style={[styles.initials, { fontSize: size * 0.36 }]}>{initials}</Text>
+        <Text style={[styles.initials, { fontSize: dim * 0.35 }]}>{initials}</Text>
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { backgroundColor: Colors.surfaceElevated, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  initials: { color: Colors.primary, fontFamily: 'Syne_700Bold' },
+  container: {
+    backgroundColor: colors.surfaceElevated,
+    alignItems:     'center',
+    justifyContent: 'center',
+    overflow:       'hidden',
+  },
+  image:    { position: 'absolute', inset: 0 },
+  initials: {
+    color:      colors.textSecondary,
+    fontFamily: fontFamily.syne.bold,
+    fontWeight: '700',
+  },
 });

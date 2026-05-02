@@ -1,28 +1,46 @@
 import React, { useState } from 'react';
-import { View, TextInput, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Colors } from '../../constants/colors';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { colors } from '../../constants/colors';
+import { spacing, radius } from '../../constants/spacing';
+import { fontSize, fontFamily } from '../../constants/typography';
 
-export function Input({ label, error, secureTextEntry, style, containerStyle, ...props }) {
-  const [hidden, setHidden] = useState(secureTextEntry || false);
+export function Input({
+  label, placeholder, value, onChangeText,
+  error, secureTextEntry = false, keyboardType = 'default',
+  autoCapitalize = 'none', autoCorrect = false,
+  returnKeyType, onSubmitEditing, multiline = false,
+  numberOfLines = 1, editable = true, style, inputRef,
+}) {
   const [focused, setFocused] = useState(false);
+  const [visible, setVisible] = useState(false);
 
   return (
-    <View style={[styles.container, containerStyle]}>
+    <View style={[styles.wrapper, style]}>
       {label && <Text style={styles.label}>{label}</Text>}
-      <View style={[styles.inputWrap, focused && styles.focused, error && styles.errBorder]}>
+      <View style={[styles.inputRow, focused && styles.focused, !!error && styles.errored, !editable && styles.disabled]}>
         <TextInput
-          style={[styles.input, style]}
-          placeholderTextColor={Colors.textFaint}
-          secureTextEntry={hidden}
+          ref={inputRef}
+          style={[styles.input, multiline && { height: numberOfLines * 22, textAlignVertical: 'top' }]}
+          placeholder={placeholder}
+          placeholderTextColor={colors.textMuted}
+          value={value}
+          onChangeText={onChangeText}
+          secureTextEntry={secureTextEntry && !visible}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          autoCorrect={autoCorrect}
+          returnKeyType={returnKeyType}
+          onSubmitEditing={onSubmitEditing}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          autoCapitalize="none"
-          {...props}
+          multiline={multiline}
+          numberOfLines={multiline ? numberOfLines : undefined}
+          editable={editable}
         />
         {secureTextEntry && (
-          <TouchableOpacity onPress={() => setHidden(!hidden)} style={styles.eye}>
-            <Text style={styles.eyeText}>{hidden ? '👁' : '🙈'}</Text>
-          </TouchableOpacity>
+          <Pressable onPress={() => setVisible(v => !v)} style={styles.eyeBtn} hitSlop={8}>
+            <Text style={styles.eyeText}>{visible ? 'Hide' : 'Show'}</Text>
+          </Pressable>
         )}
       </View>
       {error && <Text style={styles.errorText}>{error}</Text>}
@@ -31,13 +49,14 @@ export function Input({ label, error, secureTextEntry, style, containerStyle, ..
 }
 
 const styles = StyleSheet.create({
-  container: { marginBottom: 16 },
-  label: { color: Colors.textMuted, fontSize: 13, fontFamily: 'DMSans_500Medium', marginBottom: 6, letterSpacing: 0.3 },
-  inputWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: 10 },
-  focused: { borderColor: Colors.primary },
-  errBorder: { borderColor: Colors.error },
-  input: { flex: 1, color: Colors.text, fontSize: 15, fontFamily: 'DMSans_400Regular', paddingHorizontal: 14, paddingVertical: 13 },
-  eye: { paddingHorizontal: 12 },
-  eyeText: { fontSize: 16 },
-  errorText: { color: Colors.error, fontSize: 12, fontFamily: 'DMSans_400Regular', marginTop: 4 },
+  wrapper:   { marginBottom: spacing[4] },
+  label:     { color: colors.textSecondary, fontSize: fontSize.xs, fontFamily: fontFamily.dmSans.medium, marginBottom: spacing[1] },
+  inputRow:  { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceElevated, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing[3] },
+  focused:   { borderColor: colors.primary },
+  errored:   { borderColor: colors.error },
+  disabled:  { opacity: 0.5 },
+  input:     { flex: 1, color: colors.textPrimary, fontSize: fontSize.base, fontFamily: fontFamily.dmSans.regular, paddingVertical: spacing[3] },
+  eyeBtn:    { paddingLeft: spacing[2] },
+  eyeText:   { color: colors.textSecondary, fontSize: fontSize.xs, fontFamily: fontFamily.dmSans.medium },
+  errorText: { color: colors.error, fontSize: fontSize.xs, marginTop: spacing[1], fontFamily: fontFamily.dmSans.regular },
 });

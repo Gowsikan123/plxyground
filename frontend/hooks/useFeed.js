@@ -1,12 +1,29 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useFeedStore } from '../store/feedStore';
 
 export function useFeed() {
-  const { posts, loading, refreshing, hasMore, error, fetchFeed, refreshFeed, loadMore } = useFeedStore();
+  const {
+    posts, total, hasMore,
+    isLoading, isRefreshing, error,
+    filters, setFilter,
+    refresh, loadMore, reset,
+  } = useFeedStore();
 
   useEffect(() => {
-    if (!posts.length) fetchFeed();
+    refresh();
+    return () => reset();
   }, []);
 
-  return { posts, loading, refreshing, hasMore, error, refreshFeed, loadMore };
+  return {
+    posts,
+    total,
+    hasMore,
+    isLoading,
+    isRefreshing,
+    error,
+    filters,
+    setFilter: useCallback(setFilter, []),
+    refresh:   useCallback(refresh, []),
+    loadMore:  useCallback(loadMore, []),
+  };
 }

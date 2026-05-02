@@ -1,24 +1,42 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Colors } from '../../constants/colors';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { colors } from '../../constants/colors';
+import { spacing, radius } from '../../constants/spacing';
 
-export function Card({ children, style, onPress }) {
+export function Card({ children, onPress, style, elevated = false }) {
+  const content = (
+    <View style={[styles.card, elevated && styles.elevated, style]}>
+      {children}
+    </View>
+  );
+
   if (onPress) {
     return (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.75} style={[styles.card, style]}>
-        {children}
-      </TouchableOpacity>
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+      >
+        {content}
+      </Pressable>
     );
   }
-  return <View style={[styles.card, style]}>{children}</View>;
+  return content;
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Colors.borderMuted,
-    padding: 16,
+    backgroundColor: colors.surface,
+    borderRadius:    radius.lg,
+    padding:         spacing[4],
+    borderWidth:     1,
+    borderColor:     colors.border,
+  },
+  elevated: {
+    backgroundColor: colors.surfaceElevated,
+    shadowColor:     '#000',
+    shadowOffset:    { width: 0, height: 2 },
+    shadowOpacity:   0.3,
+    shadowRadius:    6,
+    elevation:       4,
   },
 });

@@ -1,80 +1,50 @@
 import { create } from 'zustand';
-import contentService from '../services/contentService';
+import { contentService } from '../services/contentService';
 
-const useFeedStore = create((set, get) => ({
-  // ─ State ─────────────────────────────────────────────────────
-  posts:       [],
-  meta:        { page: 1, limit: 20, total: 0, pages: 1 },
-  isLoading:   false,
-  isRefreshing:false,
-  isFetchingMore: false,
-  error:       null,
-  filters:     { sport: null, search: null },
+export const useFeedStore = create((set, get) => ({
+  posts:      [],
+  total:      0,
+  page:       0,
+  limit:      20,
+  hasMore:    true,
+  isLoading:  false,
+  isRefreshing: false,
+  error:      null,
+  filters:    { search: '', sport: '', tags: '' },
 
-  // ─ Actions ───────────────────────────────────────────────
-
-  /** Initial load or filter change — resets to page 1. */
-  async loadFeed(filters = {}) {
-    const mergedFilters = { ...get().filters, ...filters };
-    set({ isLoading: true, error: null, filters: mergedFilters, posts: [] });
-    try {
-      const { data, meta } = await contentService.getFeed({ page: 1, ...mergedFilters });
-      set({ posts: data, meta, isLoading: false });
-    } catch (err) {
-      set({ error: err.message, isLoading: false });
-    }
+  setFilter: (key, value) => {
+    set(s => ({ filters: { ...s.filters, [key]: value } }));
+    get().refresh();
   },
 
-  /** Pull-to-refresh — reloads page 1, keeps existing posts visible during load. */
-  async refreshFeed() {
-    const { filters } = get();
-    set({ isRefreshing: true, error: null });
-    try {
-      const { data, meta } = await contentService.getFeed({ page: 1, ...filters });
-      set({ posts: data, meta, isRefreshing: false });
-    } catch (err) {
-      set({ error: err.message, isRefreshing: false });
-    }
+  refresh: async () => {
+    const { limit, filters } = get();
+    set({ isRefreshing: true, error: null, page: 0, hasMore: true });
+    const { data, error } = await contentService.getFeed({ ...filters, limit, offset: 0 });
+    if (error) { set({ isRefreshing: false, error }); return; }
+    set({
+      posts:       data.data || [],
+      total:       data.total || 0,
+      page:        1,
+      hasMore:     (data.data || []).length === limit,
+      isRefreshing: false,
+    });
   },
 
-  /** Infinite scroll — appends next page. */
-  async fetchMore() {
-    const { meta, isFetchingMore, filters } = get();
-    if (isFetchingMore) return;
-    if (meta.page >= meta.pages) return;
-    set({ isFetchingMore: true });
-    try {
-      const nextPage = meta.page + 1;
-      const { data, meta: newMeta } = await contentService.getFeed({ page: nextPage, ...filters });
-      set((s) => ({
-        posts: [...s.posts, ...data],
-        meta:  newMeta,
-        isFetchingMore: false,
-      }));
-    } catch (err) {
-      set({ error: err.message, isFetchingMore: false });
-    }
+  loadMore: async () => {
+    const { isLoading, hasMore, page, limit, filters, posts } = get();
+    if (isLoading || !hasMore) return;
+    set({ isLoading: true });
+    const { data, error } = await contentService.getFeed({ ...filters, limit, offset: page * limit });
+    if (error) { set({ isLoading: false, error }); return; }
+    const newPosts = data.data || [];
+    set({
+      posts:    [...posts, ...newPosts],
+      page:     page + 1,
+      hasMore:  newPosts.length === limit,
+      isLoading: false,
+    });
   },
 
-  /** Optimistically remove a deleted post from the list. */
-  removePost(id) {
-    set((s) => ({ posts: s.posts.filter((p) => p.id !== id) }));
-  },
-
-  /** Optimistically update a post in the list. */
-  updatePost(id, patch) {
-    set((s) => ({
-      posts: s.posts.map((p) => (p.id === id ? { ...p, ...patch } : p)),
-    }));
-  },
-
-  setFilters(filters) {
-    set({ filters: { ...get().filters, ...filters } });
-  },
-
-  clearError() {
-    set({ error: null });
-  },
+  reset: () => set({ posts: [], total: 0, page: 0, hasMore: true, isLoading: false, isRefreshing: false, error: null }),
 }));
-
-export default useFeedStore;

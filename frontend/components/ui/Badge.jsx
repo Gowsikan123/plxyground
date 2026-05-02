@@ -1,26 +1,39 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Colors } from '../../constants/colors';
+import { StyleSheet, Text, View } from 'react-native';
+import { colors } from '../../constants/colors';
+import { spacing, radius } from '../../constants/spacing';
+import { fontSize, fontFamily } from '../../constants/typography';
 
-const variantMap = {
-  primary: { bg: 'rgba(255,61,0,0.15)', text: Colors.primary },
-  success: { bg: 'rgba(34,197,94,0.15)', text: Colors.success },
-  warning: { bg: 'rgba(245,158,11,0.15)', text: Colors.warning },
-  error: { bg: 'rgba(239,68,68,0.15)', text: Colors.error },
-  info: { bg: 'rgba(59,130,246,0.15)', text: Colors.info },
-  muted: { bg: Colors.surfaceElevated, text: Colors.textMuted },
+const VARIANTS = {
+  default: { bg: colors.surfaceElevated, text: colors.textSecondary, border: colors.border },
+  primary: { bg: 'rgba(255,60,60,0.12)',  text: colors.primary,       border: 'rgba(255,60,60,0.25)' },
+  success: { bg: 'rgba(0,200,83,0.12)',   text: colors.success,       border: 'rgba(0,200,83,0.25)' },
+  warning: { bg: 'rgba(255,179,0,0.12)',  text: colors.warning,       border: 'rgba(255,179,0,0.25)' },
+  error:   { bg: 'rgba(255,60,60,0.12)',  text: colors.error,         border: 'rgba(255,60,60,0.25)' },
 };
 
-export function Badge({ label, variant = 'muted', style }) {
-  const v = variantMap[variant] || variantMap.muted;
+export function Badge({ label, variant = 'default', style }) {
+  const v = VARIANTS[variant] || VARIANTS.default;
   return (
-    <View style={[styles.base, { backgroundColor: v.bg }, style]}>
-      <Text style={[styles.text, { color: v.text }]}>{label}</Text>
+    <View style={[styles.badge, { backgroundColor: v.bg, borderColor: v.border }, style]}>
+      <Text style={[styles.label, { color: v.text }]}>{label}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  base: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3, alignSelf: 'flex-start' },
-  text: { fontSize: 11, fontFamily: 'DMSans_500Medium', letterSpacing: 0.3 },
+  badge: {
+    borderWidth:      1,
+    borderRadius:     radius.full,
+    paddingVertical:  spacing[1],
+    paddingHorizontal: spacing[2] + 2,
+    alignSelf:        'flex-start',
+  },
+  label: {
+    fontSize:    fontSize.xs,
+    fontFamily:  fontFamily.dmSans.semiBold,
+    fontWeight:  '600',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+  },
 });

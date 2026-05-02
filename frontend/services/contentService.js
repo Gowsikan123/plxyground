@@ -1,45 +1,35 @@
-import api from './api';
+import { api, safeCall } from './api';
 
 export const contentService = {
-  /**
-   * Fetch paginated public feed.
-   * @param {{ page?, limit?, sport?, search? }} params
-   */
-  async getFeed(params = {}) {
-    const res = await api.get('/api/content', { params });
-    return res.data; // { data: Post[], meta }
+  getFeed: ({ search = '', sport = '', tags = '', limit = 20, offset = 0 } = {}) => {
+    const params = {};
+    if (search) params.search = search;
+    if (sport)  params.sport  = sport;
+    if (tags)   params.tags   = tags;
+    params.limit  = limit;
+    params.offset = offset;
+    return safeCall(api.get('/api/content', { params }));
   },
 
-  /** Fetch a single post by ID. */
-  async getPost(id) {
-    const res = await api.get(`/api/content/${id}`);
-    return res.data;
-  },
+  getPost: (id) =>
+    safeCall(api.get(`/api/content/${id}`)),
 
-  /**
-   * Create a new post (creator only).
-   * @param {{ title, body, media_url?, media_type?, tags? }} data
-   */
-  async createPost(data) {
-    const res = await api.post('/api/content', data);
-    return res.data;
-  },
+  createPost: (payload) =>
+    safeCall(api.post('/api/content', payload)),
 
-  /**
-   * Update an existing post (creator, own posts only).
-   * @param {number} id
-   * @param {Partial<{ title, body, media_url, media_type, tags }>} data
-   */
-  async updatePost(id, data) {
-    const res = await api.put(`/api/content/${id}`, data);
-    return res.data;
-  },
+  updatePost: (id, payload) =>
+    safeCall(api.put(`/api/content/${id}`, payload)),
 
-  /** Soft-delete a post (creator, own posts only). */
-  async deletePost(id) {
-    const res = await api.delete(`/api/content/${id}`);
-    return res.data;
-  },
+  deletePost: (id) =>
+    safeCall(api.delete(`/api/content/${id}`)),
+
+  // Business content
+  createBusinessContent: (payload) =>
+    safeCall(api.post('/api/business-auth/content', payload)),
+
+  getMyBusinessContent: () =>
+    safeCall(api.get('/api/business-auth/content/mine')),
+
+  updateBusinessContent: (id, payload) =>
+    safeCall(api.put(`/api/business-auth/content/${id}`, payload)),
 };
-
-export default contentService;

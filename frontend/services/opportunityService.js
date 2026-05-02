@@ -1,45 +1,25 @@
-import api from './api';
+import { api, safeCall } from './api';
 
 export const opportunityService = {
-  /**
-   * Paginated public opportunities.
-   * @param {{ page?, limit?, sport?, type? }} params
-   */
-  async listOpportunities(params = {}) {
-    const res = await api.get('/api/opportunities', { params });
-    return res.data; // { data: Opportunity[], meta }
+  listOpportunities: ({ search = '', sport = '', type = '', limit = 20, offset = 0 } = {}) => {
+    const params = {};
+    if (search) params.search = search;
+    if (sport)  params.sport  = sport;
+    if (type)   params.type   = type;
+    params.limit  = limit;
+    params.offset = offset;
+    return safeCall(api.get('/api/opportunities', { params }));
   },
 
-  /** Single opportunity by ID. */
-  async getOpportunity(id) {
-    const res = await api.get(`/api/opportunities/${id}`);
-    return res.data;
-  },
+  getOpportunity: (id) =>
+    safeCall(api.get(`/api/opportunities/${id}`)),
 
-  /**
-   * Create a new opportunity (creator or business).
-   * @param {{ title, description, sport?, location?, budget?, deadline?, role_type? }} data
-   */
-  async createOpportunity(data) {
-    const res = await api.post('/api/opportunities', data);
-    return res.data;
-  },
+  createOpportunity: (payload) =>
+    safeCall(api.post('/api/opportunities', payload)),
 
-  /**
-   * Update an existing opportunity (owner only).
-   * @param {number} id
-   * @param {Partial<{ title, description, sport, location, budget, deadline, role_type }>} data
-   */
-  async updateOpportunity(id, data) {
-    const res = await api.put(`/api/opportunities/${id}`, data);
-    return res.data;
-  },
+  updateOpportunity: (id, payload) =>
+    safeCall(api.put(`/api/opportunities/${id}`, payload)),
 
-  /** Remove an opportunity (owner only). */
-  async deleteOpportunity(id) {
-    const res = await api.delete(`/api/opportunities/${id}`);
-    return res.data;
-  },
+  deleteOpportunity: (id) =>
+    safeCall(api.delete(`/api/opportunities/${id}`)),
 };
-
-export default opportunityService;

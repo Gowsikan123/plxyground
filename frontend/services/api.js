@@ -1,57 +1,49 @@
 import axios from 'axios';
-import Constants from 'expo-constants';
+import * as SecureStore from 'expo-secure-store';
 
-const BASE_URL = Constants.expoConfig?.extra?.apiUrl
-  || process.env.EXPO_PUBLIC_API_URL
-  || 'http://localhost:3001';
+const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 
-const api = axios.create({
+if (!BASE_URL) {
+  throw new Error('EXPO_PUBLIC_API_BASE_URL is not defined. Check your .env file.');
+}
+
+export const api = axios.create({
   baseURL: BASE_URL,
   timeout: 15000,
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept':       'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// ---- Request interceptor: attach Bearer token ----
-api.interceptors.request.use(
-  (config) => {
-    // Token is injected at runtime by authStore.setToken()
-    if (api._authToken) {
-      config.headers.Authorization = `Bearer ${api._authToken}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+// Attach token on every request
+api.interceptors.request.use(async (config) => {
+  try {
+    const token = await SecureStore.getItemAsync('plxyground_token');
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+  } catch { /* SecureStore unavailable — continue unauthenticated */ }
+  return config;
+});
 
-// ---- Response interceptor: normalise errors ----
+// Normalise responses to { data, error }
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const status  = error.response?.status;
-    const message = error.response?.data?.error || error.message || 'An unexpected error occurred';
-
-    // 401 — token expired or invalid; signal to auth store
-    if (status === 401) {
-      api._onUnauthorised?.();
-    }
-
-    const normalised = new Error(message);
-    normalised.status  = status;
-    normalised.data    = error.response?.data || null;
-    return Promise.reject(normalised);
+    const message =
+      error?.response?.data?.error ||
+      error?.response?.data?.message ||
+      error?.message ||
+      'An unexpected error occurred';
+    return Promise.reject(new Error(message));
   }
 );
 
 /**
- * Call once during app boot with the stored JWT and an
- * optional callback to run when a 401 is received.
+ * Wrap any axios call so it always returns { data, error }.
+ * Usage: const { data, error } = await safeCall(api.get('/foo'));
  */
-export function configureApi({ token, onUnauthorised }) {
-  api._authToken        = token || null;
-  api._onUnauthorised   = onUnauthorised || null;
+export async function safeCall(promise) {
+  try {
+    const res = await promise;
+    return { data: res.data, error: null };
+  } catch (err) {
+    return { data: null, error: err.message || 'Request failed' };
+  }
 }
-
-export default api;

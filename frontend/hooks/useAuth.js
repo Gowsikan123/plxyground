@@ -1,35 +1,39 @@
-import { useEffect } from 'react';
-import { useRouter } from 'expo-router';
+import { useEffect, useCallback } from 'react';
 import { useAuthStore } from '../store/authStore';
 
-/**
- * Redirect to login if user is not authenticated.
- * @param {'creator'|'business'|null} requiredType - if set, also enforces the user type
- */
-export function useRequireAuth(requiredType = null) {
-  const { user, token, userType, isLoading } = useAuthStore();
-  const router = useRouter();
+export function useAuth() {
+  const {
+    token, user, userType,
+    isLoading, error,
+    rehydrate,
+    creatorLogin, creatorSignup,
+    businessLogin, businessSignup,
+    refreshUser, logout, clearError,
+  } = useAuthStore();
 
   useEffect(() => {
-    if (isLoading) return;
+    rehydrate();
+  }, []);
 
-    if (!token || !user) {
-      if (requiredType === 'business') {
-        router.replace('/(auth)/business-login');
-      } else {
-        router.replace('/(auth)/login');
-      }
-      return;
-    }
+  const isAuthenticated = Boolean(token && user);
+  const isCreator  = isAuthenticated && userType === 'creator';
+  const isBusiness = isAuthenticated && userType === 'business';
 
-    if (requiredType && userType !== requiredType) {
-      if (userType === 'business') {
-        router.replace('/(business)/dashboard');
-      } else {
-        router.replace('/(creator)/feed');
-      }
-    }
-  }, [isLoading, token, user, userType, requiredType]);
-
-  return { user, token, userType, isLoading };
+  return {
+    token,
+    user,
+    userType,
+    isLoading,
+    error,
+    isAuthenticated,
+    isCreator,
+    isBusiness,
+    creatorLogin: useCallback(creatorLogin, []),
+    creatorSignup: useCallback(creatorSignup, []),
+    businessLogin: useCallback(businessLogin, []),
+    businessSignup: useCallback(businessSignup, []),
+    refreshUser: useCallback(refreshUser, []),
+    logout: useCallback(logout, []),
+    clearError: useCallback(clearError, []),
+  };
 }

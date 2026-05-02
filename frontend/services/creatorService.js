@@ -1,36 +1,21 @@
-import api from './api';
+import { api, safeCall } from './api';
 
 export const creatorService = {
-  /**
-   * Paginated public creator list.
-   * @param {{ page?, limit?, sport?, search? }} params
-   */
-  async listCreators(params = {}) {
-    const res = await api.get('/api/creators', { params });
-    return res.data; // { data: Creator[], meta }
+  listCreators: ({ search = '', sport = '', limit = 20, offset = 0 } = {}) => {
+    const params = {};
+    if (search) params.search = search;
+    if (sport)  params.sport  = sport;
+    params.limit  = limit;
+    params.offset = offset;
+    return safeCall(api.get('/api/creators', { params }));
   },
 
-  /** Get a creator profile by URL slug. */
-  async getBySlug(slug) {
-    const res = await api.get(`/api/creators/${slug}`);
-    return res.data; // { creator, content }
-  },
+  getCreatorBySlug: (slug) =>
+    safeCall(api.get(`/api/creators/slug/${slug}`)),
 
-  /** Get a creator profile by numeric ID. */
-  async getById(id) {
-    const res = await api.get(`/api/creators/id/${id}`);
-    return res.data; // { creator, content }
-  },
+  getCreatorById: (id) =>
+    safeCall(api.get(`/api/creators/id/${id}`)),
 
-  /**
-   * Update own creator profile.
-   * @param {number} id  Must match the authenticated creator.
-   * @param {Partial<{ display_name, bio, sport, location, avatar_url, website_url, instagram_handle, tiktok_handle, youtube_handle }>} data
-   */
-  async updateProfile(id, data) {
-    const res = await api.put(`/api/creators/${id}`, data);
-    return res.data;
-  },
+  updateCreator: (id, payload) =>
+    safeCall(api.put(`/api/creators/${id}`, payload)),
 };
-
-export default creatorService;
