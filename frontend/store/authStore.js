@@ -1,68 +1,78 @@
 import { create } from 'zustand';
-import { api } from '../services/api';
 import * as SecureStore from 'expo-secure-store';
-
-const TOKEN_KEY = 'plxy_token';
-const USER_KEY = 'plxy_user';
+import api from '../lib/api';
+import { ENDPOINTS } from '../constants/api';
 
 export const useAuthStore = create((set, get) => ({
   user: null,
   token: null,
-  userType: null, // 'creator' | 'business'
+  userType: null,
   isLoading: true,
+  isAuthenticated: false,
 
-  hydrate: async () => {
+  init: async () => {
     try {
-      const token = await SecureStore.getItemAsync(TOKEN_KEY);
-      const userRaw = await SecureStore.getItemAsync(USER_KEY);
-      if (token && userRaw) {
-        const user = JSON.parse(userRaw);
-        set({ token, user, userType: user.userType || 'creator', isLoading: false });
-      } else {
-        set({ isLoading: false });
+      const token = await SecureStore.getItemAsync('auth_token');
+      const userType = await SecureStore.getItemAsync('user_type');
+      if (!token || !userType) {
+        set({ isLoading: false, isAuthenticated: false });
+        return;
       }
+      const endpoint = userType === 'business' ? ENDPOINTS.BUSINESS_ME : ENDPOINTS.ME;
+      const { data, error } = await api.get(endpoint);
+      if (error || !data) {
+        await SecureStore.deleteItemAsync('auth_token');
+        await SecureStore.deleteItemAsync('user_type');
+        set({ isLoading: false, isAuthenticated: false, token: null, user: null, userType: null });
+        return;
+      }
+      set({ token, user: data, userType, isAuthenticated: true, isLoading: false });
     } catch {
-      set({ isLoading: false });
+      set({ isLoading: false, isAuthenticated: false });
     }
   },
 
-  login: async (email, password) => {
-    const data = await api.post('/auth/login', { email, password });
-    const { token, user } = data;
-    await SecureStore.setItemAsync(TOKEN_KEY, token);
-    await SecureStore.setItemAsync(USER_KEY, JSON.stringify({ ...user, userType: 'creator' }));
-    set({ token, user, userType: 'creator' });
+  loginCreator: async (email, password) => {
+    const { data, error } = await api.post(ENDPOINTS.LOGIN, { email, password });
+    if (error) return { error };
+    await SecureStore.setItemAsync('auth_token', data.token);
+    await SecureStore.setItemAsync('user_type', 'creator');
+    set({ token: data.token, user: data.user, userType: 'creator', isAuthenticated: true });
+    return { error: null };
   },
 
-  register: async (payload) => {
-    const data = await api.post('/auth/register', payload);
-    const { token, user } = data;
-    await SecureStore.setItemAsync(TOKEN_KEY, token);
-    await SecureStore.setItemAsync(USER_KEY, JSON.stringify({ ...user, userType: 'creator' }));
-    set({ token, user, userType: 'creator' });
+  signupCreator: async (payload) => {
+    const { data, error } = await api.post(ENDPOINTS.SIGNUP, payload);
+    if (error) return { error };
+    await SecureStore.setItemAsync('auth_token', data.token);
+    await SecureStore.setItemAsync('user_type', 'creator');
+    set({ token: data.token, user: data.user, userType: 'creator', isAuthenticated: true });
+    return { error: null };
   },
 
-  businessLogin: async (email, password) => {
-    const data = await api.post('/business/auth/login', { email, password });
-    const { token, business } = data;
-    await SecureStore.setItemAsync(TOKEN_KEY, token);
-    await SecureStore.setItemAsync(USER_KEY, JSON.stringify({ ...business, userType: 'business' }));
-    set({ token, user: business, userType: 'business' });
+  loginBusiness: async (email, password) => {
+    const { data, error } = await api.post(ENDPOINTS.BUSINESS_LOGIN, { email, password });
+    if (error) return { error };
+    await SecureStore.setItemAsync('auth_token', data.token);
+    await SecureStore.setItemAsync('user_type', 'business');
+    set({ token: data.token, user: data.user, userType: 'business', isAuthenticated: true });
+    return { error: null };
   },
 
-  businessRegister: async (payload) => {
-    const data = await api.post('/business/auth/register', payload);
-    const { token, business } = data;
-    await SecureStore.setItemAsync(TOKEN_KEY, token);
-    await SecureStore.setItemAsync(USER_KEY, JSON.stringify({ ...business, userType: 'business' }));
-    set({ token, user: business, userType: 'business' });
+  signupBusiness: async (payload) => {
+    const { data, error } = await api.post(ENDPOINTS.BUSINESS_SIGNUP, payload);
+    if (error) return { error };
+    await SecureStore.setItemAsync('auth_token', data.token);
+    await SecureStore.setItemAsync('user_type', 'business');
+    set({ token: data.token, user: data.user, userType: 'business', isAuthenticated: true });
+    return { error: null };
   },
+
+  updateUser: (updates) => set((s) => ({ user: { ...s.user, ...updates } })),
 
   logout: async () => {
-    try {
-      await SecureStore.deleteItemAsync(TOKEN_KEY);
-      await SecureStore.deleteItemAsync(USER_KEY);
-    } catch {}
-    set({ user: null, token: null, userType: null });
+    await SecureStore.deleteItemAsync('auth_token');
+    await SecureStore.deleteItemAsync('user_type');
+    set({ token: null, user: null, userType: null, isAuthenticated: false });
   },
 }));
