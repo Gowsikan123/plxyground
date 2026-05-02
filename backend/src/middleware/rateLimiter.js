@@ -6,7 +6,8 @@ const globalLimiter = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many requests. Please try again later.' },
+  skip: (req) => req.path === '/healthz',
+  message: { success: false, error: 'Too many requests, please try again later.' },
 });
 
 const authLimiter = rateLimit({
@@ -14,7 +15,7 @@ const authLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many authentication attempts. Please try again later.' },
+  message: { success: false, error: 'Too many login attempts, please try again later.' },
 });
 
 module.exports = { globalLimiter, authLimiter };

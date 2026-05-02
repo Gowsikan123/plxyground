@@ -3,15 +3,11 @@ const jwt = require('jsonwebtoken');
 const config = require('../config');
 
 function signToken(payload) {
-  return jwt.sign(payload, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
+  return jwt.sign(payload, config.JWT_SECRET, { expiresIn: config.JWT_EXPIRES_IN });
 }
 
 function verifyToken(token) {
-  try {
-    return jwt.verify(token, config.jwtSecret);
-  } catch {
-    return null;
-  }
+  return jwt.verify(token, config.JWT_SECRET);
 }
 
 module.exports = { signToken, verifyToken };
