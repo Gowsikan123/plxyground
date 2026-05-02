@@ -1,28 +1,25 @@
 {
   "name": "plxyground-backend",
   "version": "1.0.0",
-  "description": "PLXYGROUND API — sports creator platform",
+  "type": "commonjs",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "smoke": "jest --testPathPattern=test/ --forceExit --runInBand"
+    "seed": "node src/db/seed.js",
+    "smoke": "node scripts/smoke.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
-    "pg": "^8.11.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^5.0.1",
-    "express-rate-limit": "^7.3.1",
-    "express-validator": "^7.1.0",
+    "express-rate-limit": "^7.4.0",
+    "express-validator": "^7.2.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
+    "pg": "^8.11.5",
     "uuid": "^10.0.0"
-  },
-  "devDependencies": {
-    "jest": "^29.7.0",
-    "supertest": "^7.0.0"
   }
 }
