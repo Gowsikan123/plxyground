@@ -1,25 +1,62 @@
+# Dependencies
 node_modules/
-.env
-*.db
-*.db-shm
-*.db-wal
+.pnp
+.pnp.js
+
+# Build outputs
 dist/
+build/
 .expo/
-android/
-ios/
+web-build/
+
+# Environment variables — NEVER commit these
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.production
+
+# Logs
+logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
 
-# Local Vercel config
-.vercel/
-.frontend-vercel-env
-backend/.backend-vercel-env
-backend/.vercel-env
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
 
-# Local dev runtime artefacts
-.postgres-local/
-.run-logs/
-
-# Test output
-test-results/
+# Testing
 coverage/
+.nyc_output/
+test-results/
+playwright-report/
+
+# TypeScript
+*.tsbuildinfo
+
+# Expo
+.expo-shared/
+*.orig.*
+
+# Misc
+*.pem
+*.key
+*.cert
+.vercel
+.railway

@@ -1,0 +1,30 @@
+name: Security Audit
+
+on:
+  schedule:
+    # Every Monday at 08:00 UTC
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: npm audit
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dir: [backend, frontend, admin-panel]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install deps (${{ matrix.dir }})
+        working-directory: ${{ matrix.dir }}
+        run: npm ci
+
+      - name: Audit (${{ matrix.dir }})
+        working-directory: ${{ matrix.dir }}
+        run: npm audit --audit-level=high

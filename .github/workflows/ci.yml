@@ -3,17 +3,19 @@ name: CI
 on:
   push:
     branches: [main, develop]
-    paths:
-      - 'backend/**'
   pull_request:
     branches: [main, develop]
-    paths:
-      - 'backend/**'
 
 jobs:
-  test:
-    name: Backend Tests
+  # ─────────────────────────────────────────
+  # 1. Backend — lint + unit tests
+  # ─────────────────────────────────────────
+  backend:
+    name: Backend (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ['20', '22']
 
     services:
       postgres:
@@ -24,7 +26,7 @@ jobs:
           POSTGRES_DB: plxyground_test
         ports:
           - 5432:5432
-        options: >-
+        options: >
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
@@ -33,22 +35,27 @@ jobs:
     env:
       DATABASE_URL: postgresql://plxyground:plxyground@localhost:5432/plxyground_test
       JWT_SECRET: ci-test-secret-must-be-at-least-32-chars!!
+      ADMIN_JWT_SECRET: ci-admin-secret-must-be-at-least-32-chars
       NODE_ENV: test
+      PORT: 3001
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4.4.0
+      - name: Setup Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
         with:
-          node-version: '24'
-          cache: 'npm'
+          node-version: ${{ matrix.node }}
+          cache: npm
           cache-dependency-path: backend/package-lock.json
 
-      - name: Install dependencies
+      - name: Install deps
         working-directory: backend
         run: npm ci
+
+      - name: Lint
+        working-directory: backend
+        run: npm run lint --if-present
 
       - name: Run migrations
         working-directory: backend
@@ -56,4 +63,56 @@ jobs:
 
       - name: Run tests
         working-directory: backend
-        run: npm test
+        run: npm test -- --forceExit --detectOpenHandles
+
+  # ─────────────────────────────────────────
+  # 2. Frontend — JS type-check + lint
+  # ─────────────────────────────────────────
+  frontend:
+    name: Frontend (Expo)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint --if-present
+
+      - name: Expo doctor
+        working-directory: frontend
+        run: npx expo-doctor@latest --fix-dependencies || true
+
+  # ─────────────────────────────────────────
+  # 3. Admin panel — syntax check
+  # ─────────────────────────────────────────
+  admin:
+    name: Admin Panel
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: admin-panel/package-lock.json
+
+      - name: Install deps
+        working-directory: admin-panel
+        run: npm ci
+
+      - name: Syntax check server.js
+        working-directory: admin-panel
+        run: node --check server.js
