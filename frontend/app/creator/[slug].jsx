@@ -1,77 +1,157 @@
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, FlatList } from 'react-native';
-import { useEffect, useState } from 'react';
-import { useLocalSearchParams, router } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+  View, Text, ScrollView, Image, StyleSheet, TouchableOpacity, ActivityIndicator,
+} from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { COLORS } from '../../constants/colors';
 import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING } from '../../constants/spacing';
-import { creatorService } from '../../services/creatorService';
-import { contentService } from '../../services/contentService';
+import SafeScreen from '../../components/layout/SafeScreen';
+import ScreenHeader from '../../components/layout/ScreenHeader';
 import Avatar from '../../components/ui/Avatar';
 import Badge from '../../components/ui/Badge';
-import PostCard from '../../components/feed/PostCard';
+import ContentCard from '../../components/ContentCard';
+import creatorService from '../../services/creatorService';
 
-export default function CreatorProfileScreen() {
+export default function CreatorProfile() {
   const { slug } = useLocalSearchParams();
+  const router = useRouter();
   const [creator, setCreator] = useState(null);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    (async () => {
-      const { data, error: err } = await creatorService.getBySlug(slug);
-      if (err) { setError(err); setLoading(false); return; }
-      setCreator(data.creator);
-      const { data: cd } = await contentService.feed({ creatorId: data.creator.id, limit: 20 });
-      if (cd) setPosts(cd.content || []);
-      setLoading(false);
-    })();
+    async function load() {
+      try {
+        const { data, error: err } = await creatorService.getBySlug(slug);
+        if (err) throw new Error(err);
+        setCreator(data.creator);
+        setPosts(data.posts || []);
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
   }, [slug]);
 
-  if (loading) return <View style={styles.center}><ActivityIndicator color={COLORS.primary} size="large" /></View>;
-  if (error || !creator) return <View style={styles.center}><Text style={styles.errorText}>{error || 'Creator not found'}</Text></View>;
+  if (loading) {
+    return (
+      <SafeScreen>
+        <ScreenHeader title="Creator" />
+        <View style={styles.center}><ActivityIndicator color={COLORS.primary} /></View>
+      </SafeScreen>
+    );
+  }
+
+  if (error || !creator) {
+    return (
+      <SafeScreen>
+        <ScreenHeader title="Creator" />
+        <View style={styles.center}>
+          <Text style={styles.errorText}>{error || 'Creator not found'}</Text>
+        </View>
+      </SafeScreen>
+    );
+  }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.inner}>
-      <Pressable style={styles.back} onPress={() => router.back()}><Text style={styles.backText}>← Back</Text></Pressable>
-
-      <View style={styles.header}>
-        <Avatar uri={creator.avatar_url} name={creator.display_name || creator.username} size={72} />
-        <View style={styles.meta}>
-          <Text style={styles.displayName}>{creator.display_name || creator.username}</Text>
-          <Text style={styles.username}>@{creator.username}</Text>
-          {creator.sports_niche && <Badge label={creator.sports_niche} color={COLORS.primary} style={{ marginTop: SPACING[1] }} />}
+    <SafeScreen>
+      <ScreenHeader title={creator.display_name} />
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        <View style={styles.hero}>
+          <Avatar uri={creator.avatar_url} name={creator.display_name} size={72} />
+          <Text style={styles.name}>{creator.display_name}</Text>
+          <Text style={styles.handle}>@{creator.username}</Text>
+          {creator.bio ? <Text style={styles.bio}>{creator.bio}</Text> : null}
+          <View style={styles.badges}>
+            {creator.sport && <Badge label={creator.sport} />}
+            {creator.location && <Badge label={creator.location} variant="muted" />}
+          </View>
+          <View style={styles.stats}>
+            <View style={styles.stat}>
+              <Text style={styles.statValue}>{creator.follower_count ?? 0}</Text>
+              <Text style={styles.statLabel}>Followers</Text>
+            </View>
+            <View style={styles.stat}>
+              <Text style={styles.statValue}>{posts.length}</Text>
+              <Text style={styles.statLabel}>Posts</Text>
+            </View>
+          </View>
         </View>
-      </View>
 
-      {creator.bio ? <Text style={styles.bio}>{creator.bio}</Text> : null}
-
-      <View style={styles.statsRow}>
-        <View style={styles.stat}><Text style={styles.statVal}>{creator.post_count ?? 0}</Text><Text style={styles.statLbl}>Posts</Text></View>
-        <View style={styles.stat}><Text style={styles.statVal}>{creator.total_views ?? 0}</Text><Text style={styles.statLbl}>Views</Text></View>
-      </View>
-
-      <Text style={styles.sectionTitle}>Content</Text>
-      {posts.map((post) => <PostCard key={post.id} post={post} />)}
-    </ScrollView>
+        <Text style={styles.sectionTitle}>Posts</Text>
+        {posts.length === 0 ? (
+          <Text style={styles.empty}>No posts yet.</Text>
+        ) : (
+          posts.map((p) => (
+            <ContentCard
+              key={p.id}
+              post={p}
+              onPress={() => router.push(`/post/${p.id}`)}
+            />
+          ))
+        )}
+      </ScrollView>
+    </SafeScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  inner: { padding: SPACING[4], paddingBottom: SPACING[16] },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  back: { marginBottom: SPACING[4] },
-  backText: { ...TYPOGRAPHY.bodySm, color: COLORS.primary },
-  header: { flexDirection: 'row', gap: SPACING[4], marginBottom: SPACING[4] },
-  meta: { flex: 1, justifyContent: 'center' },
-  displayName: { ...TYPOGRAPHY.headingLg, color: COLORS.text },
-  username: { ...TYPOGRAPHY.bodySm, color: COLORS.textMuted },
-  bio: { ...TYPOGRAPHY.bodyMd, color: COLORS.text, marginBottom: SPACING[4] },
-  statsRow: { flexDirection: 'row', gap: SPACING[4], marginBottom: SPACING[6] },
-  stat: { flex: 1, backgroundColor: COLORS.surface, borderRadius: 12, padding: SPACING[4], alignItems: 'center', borderWidth: 1, borderColor: COLORS.border },
-  statVal: { ...TYPOGRAPHY.headingMd, color: COLORS.text },
-  statLbl: { ...TYPOGRAPHY.labelSm, color: COLORS.textMuted },
-  sectionTitle: { ...TYPOGRAPHY.headingMd, color: COLORS.text, marginBottom: SPACING[3] },
-  errorText: { ...TYPOGRAPHY.bodyMd, color: COLORS.error },
+  scroll: { flex: 1 },
+  content: { paddingBottom: SPACING.xl },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  errorText: { color: COLORS.error, fontFamily: TYPOGRAPHY.fonts.body, fontSize: TYPOGRAPHY.sizes.base },
+  hero: { alignItems: 'center', padding: SPACING.lg, gap: SPACING.sm },
+  name: {
+    fontFamily: TYPOGRAPHY.fonts.display,
+    fontSize: TYPOGRAPHY.sizes.xl,
+    fontWeight: '800',
+    color: COLORS.text,
+  },
+  handle: {
+    fontFamily: TYPOGRAPHY.fonts.body,
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.textMuted,
+  },
+  bio: {
+    fontFamily: TYPOGRAPHY.fonts.body,
+    fontSize: TYPOGRAPHY.sizes.base,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    maxWidth: 300,
+    lineHeight: 20,
+  },
+  badges: { flexDirection: 'row', gap: SPACING.xs, flexWrap: 'wrap', justifyContent: 'center' },
+  stats: { flexDirection: 'row', gap: SPACING.xl, marginTop: SPACING.sm },
+  stat: { alignItems: 'center' },
+  statValue: {
+    fontFamily: TYPOGRAPHY.fonts.display,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: '800',
+    color: COLORS.text,
+  },
+  statLabel: {
+    fontFamily: TYPOGRAPHY.fonts.body,
+    fontSize: TYPOGRAPHY.sizes.xs,
+    color: COLORS.textMuted,
+  },
+  sectionTitle: {
+    fontFamily: TYPOGRAPHY.fonts.display,
+    fontSize: TYPOGRAPHY.sizes.base,
+    fontWeight: '700',
+    color: COLORS.text,
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.sm,
+  },
+  empty: {
+    fontFamily: TYPOGRAPHY.fonts.body,
+    fontSize: TYPOGRAPHY.sizes.base,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    padding: SPACING.xl,
+  },
 });

@@ -1,9 +1,15 @@
 import { Tabs } from 'expo-router';
-import { Colors } from '../../constants/colors';
-import { Text } from 'react-native';
+import { COLORS } from '../../constants/colors';
+import { TYPOGRAPHY } from '../../constants/typography';
 
 function TabIcon({ label, focused }) {
-  return <Text style={{ color: focused ? Colors.primary : Colors.textFaint, fontSize: 11, fontFamily: 'DMSans_500Medium', marginTop: 2 }}>{label}</Text>;
+  const icons = {
+    Feed: focused ? '🏀' : '🏀',
+    Opportunities: focused ? '🎯' : '🎯',
+    Create: focused ? '➕' : '➕',
+    Profile: focused ? '👤' : '👤',
+  };
+  return null; // icon rendered via tabBarIcon emoji approach below
 }
 
 export default function TabsLayout() {
@@ -11,22 +17,38 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.textMuted,
         tabBarStyle: {
-          backgroundColor: Colors.surface,
-          borderTopColor: Colors.border,
+          backgroundColor: COLORS.surface,
+          borderTopColor: COLORS.border,
           borderTopWidth: 1,
-          height: 56,
-          paddingBottom: 6,
+          paddingBottom: 4,
+          height: 60,
         },
-        tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: Colors.textFaint,
-        tabBarShowLabel: false,
+        tabBarLabelStyle: {
+          fontFamily: TYPOGRAPHY.fonts.body,
+          fontSize: 11,
+          fontWeight: '600',
+        },
       }}
     >
-      <Tabs.Screen name="feed" options={{ tabBarIcon: ({ focused }) => <TabIcon label="Feed" focused={focused} /> }} />
-      <Tabs.Screen name="discover" options={{ tabBarIcon: ({ focused }) => <TabIcon label="Discover" focused={focused} /> }} />
-      <Tabs.Screen name="opportunities" options={{ tabBarIcon: ({ focused }) => <TabIcon label="Opps" focused={focused} /> }} />
-      <Tabs.Screen name="profile" options={{ tabBarIcon: ({ focused }) => <TabIcon label="Profile" focused={focused} /> }} />
+      <Tabs.Screen
+        name="feed"
+        options={{ title: 'Feed', tabBarIcon: ({ focused }) => null }}
+      />
+      <Tabs.Screen
+        name="opportunities"
+        options={{ title: 'Deals', tabBarIcon: ({ focused }) => null }}
+      />
+      <Tabs.Screen
+        name="create"
+        options={{ title: 'Post', tabBarIcon: ({ focused }) => null }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{ title: 'Profile', tabBarIcon: ({ focused }) => null }}
+      />
     </Tabs>
   );
 }
