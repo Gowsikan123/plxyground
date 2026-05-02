@@ -1,14 +1,9 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": null,
-  "buildCommand": "npm run build:web",
+  "buildCommand": "npx expo export --platform web",
   "outputDirectory": "dist",
-  "cleanUrls": true,
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "${BACKEND_URL}/api/$1",
-      "env": ["BACKEND_URL"]
-    }
+  "installCommand": "npm install --legacy-peer-deps",
+  "framework": null,
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
