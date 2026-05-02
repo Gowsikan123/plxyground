@@ -1,1245 +1,986 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>PLXYGROUND Admin</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
-<style>
-/* ── Reset & Tokens ─────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PLXYGROUND — Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:          #0d0d0f;
+      --surface:     #141416;
+      --surface-2:   #1a1a1e;
+      --surface-3:   #202026;
+      --border:      rgba(255,255,255,0.07);
+      --border-2:    rgba(255,255,255,0.12);
+      --text:        #e8e8ea;
+      --text-muted:  #8a8a92;
+      --text-faint:  #4a4a52;
+      --accent:      #6c63ff;
+      --accent-h:    #8b84ff;
+      --accent-dim:  rgba(108,99,255,0.15);
+      --green:       #22c55e;
+      --green-dim:   rgba(34,197,94,0.12);
+      --yellow:      #eab308;
+      --yellow-dim:  rgba(234,179,8,0.12);
+      --red:         #ef4444;
+      --red-dim:     rgba(239,68,68,0.12);
+      --orange:      #f97316;
+      --orange-dim:  rgba(249,115,22,0.12);
+      --radius:      8px;
+      --radius-lg:   12px;
+      --radius-sm:   5px;
+      --sidebar-w:   240px;
+      --header-h:    56px;
+      --font:        'Inter', system-ui, sans-serif;
+      --mono:        'JetBrains Mono', monospace;
+      --ease:        cubic-bezier(0.16,1,0.3,1);
+    }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.5; }
+    button { cursor: pointer; font: inherit; border: none; background: none; color: inherit; }
+    input, textarea, select { font: inherit; color: inherit; background: var(--surface-3); border: 1px solid var(--border-2); border-radius: var(--radius-sm); padding: 8px 12px; outline: none; width: 100%; }
+    input:focus, textarea:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+    a { color: inherit; text-decoration: none; }
+    img, svg { display: block; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 9999px; }
 
-:root {
-  --bg:        #0d0d0f;
-  --surface:   #131316;
-  --surface-2: #18181c;
-  --surface-3: #1f1f24;
-  --border:    #2a2a30;
-  --border-2:  #33333a;
-  --text:      #e8e8ed;
-  --text-muted:#8e8e99;
-  --text-faint:#4a4a55;
-  --accent:    #6c63ff;
-  --accent-h:  #8078ff;
-  --accent-dim:#6c63ff22;
-  --green:     #22c55e;
-  --green-dim: #22c55e22;
-  --red:       #ef4444;
-  --red-dim:   #ef444422;
-  --yellow:    #f59e0b;
-  --yellow-dim:#f59e0b22;
-  --orange:    #f97316;
-  --font-body: 'Inter', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
-  --radius:    6px;
-  --radius-lg: 10px;
-  --trans:     160ms cubic-bezier(0.16,1,0.3,1);
-  --sidebar-w: 220px;
-}
+    /* ── Layout ──────────────────────────────────────────────────── */
+    #app { display: flex; height: 100vh; overflow: hidden; }
+    #login-screen { display: flex; align-items: center; justify-content: center; height: 100vh; background: var(--bg); }
 
-body {
-  font-family: var(--font-body);
-  font-size: 14px;
-  color: var(--text);
-  background: var(--bg);
-  min-height: 100dvh;
-  line-height: 1.6;
-}
+    /* ── Sidebar ─────────────────────────────────────────────────── */
+    .sidebar {
+      width: var(--sidebar-w); min-width: var(--sidebar-w);
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      height: 100vh; overflow-y: auto;
+    }
+    .sidebar-logo {
+      display: flex; align-items: center; gap: 10px;
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 700; font-size: 15px; letter-spacing: -0.3px;
+    }
+    .logo-mark {
+      width: 28px; height: 28px; border-radius: 7px;
+      background: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 800; color: #fff; flex-shrink: 0;
+    }
+    .sidebar-nav { padding: 8px 0; flex: 1; }
+    .nav-section-label { font-size: 11px; font-weight: 600; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.8px; padding: 12px 20px 4px; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 20px;
+      border-radius: 0;
+      color: var(--text-muted);
+      font-size: 13.5px;
+      transition: all 160ms var(--ease);
+      position: relative;
+      cursor: pointer;
+    }
+    .nav-item:hover { color: var(--text); background: var(--surface-2); }
+    .nav-item.active { color: var(--text); background: var(--accent-dim); }
+    .nav-item.active::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 3px; background: var(--accent); border-radius: 0 2px 2px 0; }
+    .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+    .nav-badge { margin-left: auto; background: var(--red); color: #fff; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 9999px; min-width: 18px; text-align: center; }
+    .sidebar-footer { padding: 12px 20px; border-top: 1px solid var(--border); }
+    .admin-info { font-size: 12px; color: var(--text-muted); }
+    .admin-info strong { display: block; color: var(--text); font-size: 13px; }
 
-button { cursor: pointer; border: none; background: none; font: inherit; color: inherit; }
-a { color: inherit; text-decoration: none; }
-img { display: block; max-width: 100%; }
-input, textarea, select { font: inherit; color: inherit; }
+    /* ── Main area ───────────────────────────────────────────────── */
+    .main-wrap { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .topbar {
+      height: var(--header-h);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 24px; flex-shrink: 0;
+    }
+    .topbar-title { font-weight: 600; font-size: 15px; }
+    .topbar-actions { display: flex; align-items: center; gap: 8px; }
+    .content-area { flex: 1; overflow-y: auto; padding: 24px; }
 
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius); }
+    /* ── Buttons ─────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 14px; border-radius: var(--radius-sm);
+      font-size: 13px; font-weight: 500;
+      transition: all 160ms var(--ease); border: 1px solid transparent;
+    }
+    .btn svg { width: 14px; height: 14px; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-h); }
+    .btn-secondary { background: var(--surface-3); color: var(--text); border-color: var(--border-2); }
+    .btn-secondary:hover { border-color: var(--border-2); background: var(--surface-2); color: var(--text); }
+    .btn-danger { background: var(--red-dim); color: var(--red); border-color: rgba(239,68,68,0.2); }
+    .btn-danger:hover { background: var(--red); color: #fff; }
+    .btn-success { background: var(--green-dim); color: var(--green); border-color: rgba(34,197,94,0.2); }
+    .btn-success:hover { background: var(--green); color: #fff; }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--surface); }
-::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+    /* ── Cards ───────────────────────────────────────────────────── */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; }
+    .card-title { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
 
-/* ── Auth Screen ────────────────────────────────────────────── */
-#auth-screen {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100dvh;
-  background: radial-gradient(ellipse 80% 60% at 50% 0%, #6c63ff14 0%, transparent 70%), var(--bg);
-}
+    /* ── KPI grid ────────────────────────────────────────────────── */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 18px; }
+    .kpi-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 6px; }
+    .kpi-value { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+    .kpi-value.accent  { color: var(--accent); }
+    .kpi-value.green   { color: var(--green); }
+    .kpi-value.yellow  { color: var(--yellow); }
+    .kpi-value.red     { color: var(--red); }
+    .kpi-value.orange  { color: var(--orange); }
 
-.auth-card {
-  width: 100%;
-  max-width: 380px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 40px 36px;
-}
+    /* ── Table ───────────────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; border-radius: var(--radius-lg); border: 1px solid var(--border); background: var(--surface); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th { padding: 11px 16px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 120ms; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface-2); }
+    tbody td { padding: 11px 16px; color: var(--text); vertical-align: middle; }
+    .td-mono { font-family: var(--mono); font-size: 12px; color: var(--text-muted); }
 
-.auth-logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 32px;
-}
+    /* ── Badges ──────────────────────────────────────────────────── */
+    .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; }
+    .badge-pending  { background: var(--yellow-dim); color: var(--yellow); }
+    .badge-approved { background: var(--green-dim);  color: var(--green); }
+    .badge-rejected { background: var(--red-dim);    color: var(--red); }
+    .badge-flagged  { background: var(--orange-dim); color: var(--orange); }
+    .badge-open     { background: var(--green-dim);  color: var(--green); }
+    .badge-closed   { background: var(--surface-3);  color: var(--text-muted); }
+    .badge-suspended{ background: var(--red-dim);    color: var(--red); }
+    .badge-active   { background: var(--green-dim);  color: var(--green); }
+    .badge-admin    { background: var(--accent-dim); color: var(--accent); }
 
-.auth-logo svg { color: var(--accent); }
+    /* ── Login ───────────────────────────────────────────────────── */
+    .login-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 40px 36px;
+      width: 360px;
+    }
+    .login-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; font-weight: 700; font-size: 16px; }
+    .login-card h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+    .login-card p { color: var(--text-muted); font-size: 13px; margin-bottom: 24px; }
+    .form-group { margin-bottom: 14px; }
+    .form-label { display: block; font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 5px; }
+    .form-error { color: var(--red); font-size: 12px; margin-top: 8px; }
 
-.auth-logo span {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
+    /* ── Filters bar ─────────────────────────────────────────────── */
+    .filters { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .filters select, .filters input { width: auto; min-width: 140px; font-size: 13px; }
+    .filter-sep { flex: 1; }
 
-.auth-card h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
-.auth-card p  { font-size: 13px; color: var(--text-muted); margin-bottom: 28px; }
+    /* ── Bulk bar ────────────────────────────────────────────────── */
+    .bulk-bar {
+      display: none; align-items: center; gap: 10px;
+      background: var(--accent-dim); border: 1px solid rgba(108,99,255,0.3);
+      border-radius: var(--radius); padding: 10px 16px;
+      margin-bottom: 14px; font-size: 13px;
+    }
+    .bulk-bar.visible { display: flex; }
+    .bulk-bar strong { color: var(--accent); }
 
-.form-group { margin-bottom: 16px; }
-.form-group label { display: block; font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+    /* ── Empty state ─────────────────────────────────────────────── */
+    .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; color: var(--text-muted); gap: 8px; }
+    .empty svg { width: 40px; height: 40px; color: var(--text-faint); }
+    .empty p { font-size: 13px; }
 
-.form-input {
-  width: 100%;
-  padding: 10px 14px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-size: 14px;
-  color: var(--text);
-  transition: border-color var(--trans);
-}
-.form-input:focus { outline: none; border-color: var(--accent); }
-.form-input::placeholder { color: var(--text-faint); }
+    /* ── Toast ───────────────────────────────────────────────────── */
+    #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+    .toast {
+      background: var(--surface-2); border: 1px solid var(--border-2);
+      border-radius: var(--radius); padding: 12px 16px;
+      font-size: 13px; min-width: 240px; pointer-events: all;
+      animation: slideIn 220ms var(--ease);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .toast.success { border-left: 3px solid var(--green); }
+    .toast.error   { border-left: 3px solid var(--red); }
+    .toast.info    { border-left: 3px solid var(--accent); }
+    @keyframes slideIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: translateY(0); } }
 
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  padding: 9px 16px;
-  border-radius: var(--radius);
-  font-size: 13px;
-  font-weight: 500;
-  transition: background var(--trans), color var(--trans), border-color var(--trans), opacity var(--trans);
-  white-space: nowrap;
-}
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    /* ── Modal ───────────────────────────────────────────────────── */
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center; }
+    .modal-overlay.open { display:flex; }
+    .modal { background: var(--surface); border:1px solid var(--border-2); border-radius:var(--radius-lg); width:480px; max-width:95vw; max-height:90vh; overflow-y:auto; }
+    .modal-header { display:flex; align-items:center; justify-content:space-between; padding:18px 20px; border-bottom:1px solid var(--border); }
+    .modal-header h3 { font-size:15px; font-weight:600; }
+    .modal-body { padding:20px; }
+    .modal-footer { padding:14px 20px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px; }
+    .btn-icon { width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:var(--radius-sm); color:var(--text-muted); transition:all 120ms; }
+    .btn-icon:hover { background:var(--surface-3); color:var(--text); }
+    .btn-icon svg { width:15px; height:15px; }
 
-.btn-primary { background: var(--accent); color: #fff; }
-.btn-primary:hover:not(:disabled) { background: var(--accent-h); }
+    /* ── Sections ────────────────────────────────────────────────── */
+    .section { display: none; }
+    .section.active { display: block; }
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .section-header h2 { font-size: 18px; font-weight: 700; }
+    .section-header p { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
 
-.btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
-.btn-ghost:hover { background: var(--surface-3); color: var(--text); border-color: var(--border-2); }
+    /* ── Chart bar ───────────────────────────────────────────────── */
+    .mini-chart { display:flex; align-items:flex-end; gap:4px; height:60px; margin-top:16px; }
+    .bar-col { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; }
+    .bar { background: var(--accent-dim); border-radius:3px 3px 0 0; width:100%; transition: background 160ms; border-bottom: 2px solid var(--accent); min-height: 4px; }
+    .bar:hover { background: rgba(108,99,255,0.3); }
+    .bar-label { font-size:10px; color:var(--text-faint); }
 
-.btn-danger { background: var(--red-dim); color: var(--red); border: 1px solid transparent; }
-.btn-danger:hover { background: var(--red); color: #fff; }
+    /* ── Settings form ───────────────────────────────────────────── */
+    .settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; max-width:640px; }
+    @media (max-width:600px) { .settings-grid { grid-template-columns:1fr; } }
 
-.btn-success { background: var(--green-dim); color: var(--green); border: 1px solid transparent; }
-.btn-success:hover { background: var(--green); color: #fff; }
+    /* ── Tabs ────────────────────────────────────────────────────── */
+    .tabs { display:flex; gap:2px; background:var(--surface-2); border-radius:var(--radius-sm); padding:3px; margin-bottom:16px; width:fit-content; }
+    .tab { padding:6px 14px; border-radius:4px; font-size:13px; font-weight:500; color:var(--text-muted); cursor:pointer; transition:all 140ms; }
+    .tab.active { background:var(--surface-3); color:var(--text); }
 
-.btn-full { width: 100%; }
-.btn-sm { padding: 5px 11px; font-size: 12px; }
-
-.auth-error {
-  font-size: 12px;
-  color: var(--red);
-  background: var(--red-dim);
-  border: 1px solid #ef444433;
-  border-radius: var(--radius);
-  padding: 8px 12px;
-  margin-bottom: 14px;
-  display: none;
-}
-.auth-error.show { display: block; }
-
-/* ── App Shell ──────────────────────────────────────────────── */
-#app {
-  display: none;
-  min-height: 100dvh;
-}
-#app.active { display: flex; }
-
-/* ── Sidebar ────────────────────────────────────────────────── */
-.sidebar {
-  width: var(--sidebar-w);
-  flex-shrink: 0;
-  background: var(--surface);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  position: sticky;
-  top: 0;
-  height: 100dvh;
-  overflow-y: auto;
-}
-
-.sidebar-header {
-  padding: 20px 16px 16px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-.sidebar-header svg { color: var(--accent); flex-shrink: 0; }
-.sidebar-header .brand { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
-.sidebar-header .badge { font-size: 10px; background: var(--accent-dim); color: var(--accent); border-radius: 4px; padding: 1px 6px; font-weight: 600; }
-
-.sidebar-nav { flex: 1; padding: 12px 8px; }
-
-.nav-section { font-size: 10px; font-weight: 600; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.08em; padding: 12px 8px 6px; }
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 8px 10px;
-  border-radius: var(--radius);
-  font-size: 13px;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: background var(--trans), color var(--trans);
-  user-select: none;
-  margin-bottom: 1px;
-}
-.nav-item:hover { background: var(--surface-3); color: var(--text); }
-.nav-item.active { background: var(--accent-dim); color: var(--accent); }
-.nav-item svg { flex-shrink: 0; opacity: 0.8; }
-.nav-item.active svg { opacity: 1; }
-.nav-badge { margin-left: auto; font-size: 11px; background: var(--red); color: #fff; border-radius: 10px; padding: 1px 7px; font-weight: 600; min-width: 20px; text-align: center; }
-
-.sidebar-footer {
-  padding: 12px 8px;
-  border-top: 1px solid var(--border);
-}
-.admin-info {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 8px 10px;
-  border-radius: var(--radius);
-}
-.admin-avatar {
-  width: 30px; height: 30px;
-  background: var(--accent-dim);
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 700; color: var(--accent);
-  flex-shrink: 0;
-}
-.admin-name { font-size: 13px; font-weight: 500; }
-.admin-role { font-size: 11px; color: var(--text-muted); }
-.logout-btn { margin-left: auto; color: var(--text-faint); }
-.logout-btn:hover { color: var(--red); }
-
-/* ── Main ───────────────────────────────────────────────────── */
-.main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  overflow-y: auto;
-}
-
-.topbar {
-  height: 56px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  padding: 0 24px;
-  gap: 16px;
-  position: sticky;
-  top: 0;
-  background: var(--bg);
-  z-index: 10;
-}
-.topbar-title { font-size: 16px; font-weight: 600; }
-.topbar-sub { font-size: 12px; color: var(--text-muted); }
-.topbar-actions { margin-left: auto; display: flex; gap: 8px; }
-
-.page-content { padding: 24px; flex: 1; }
-
-/* ── Views ──────────────────────────────────────────────────── */
-.view { display: none; }
-.view.active { display: block; }
-
-/* ── KPI Grid ───────────────────────────────────────────────── */
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 14px;
-  margin-bottom: 24px;
-}
-.kpi-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 18px 20px;
-}
-.kpi-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
-.kpi-value { font-size: 28px; font-weight: 700; line-height: 1; letter-spacing: -0.03em; }
-.kpi-value.red    { color: var(--red); }
-.kpi-value.yellow { color: var(--yellow); }
-.kpi-value.green  { color: var(--green); }
-.kpi-value.accent { color: var(--accent); }
-.kpi-sub { font-size: 11px; color: var(--text-faint); margin-top: 6px; }
-
-/* ── Section Header ─────────────────────────────────────────── */
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.section-title { font-size: 15px; font-weight: 600; }
-.section-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-
-/* ── Table ──────────────────────────────────────────────────── */
-.table-wrap {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-}
-
-table { width: 100%; border-collapse: collapse; }
-thead tr { border-bottom: 1px solid var(--border); }
-th {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 10px 14px;
-  text-align: left;
-}
-td { padding: 11px 14px; font-size: 13px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-tr:last-child td { border-bottom: none; }
-tr:hover td { background: var(--surface-2); }
-
-.check-col { width: 40px; }
-.table-checkbox { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
-
-/* ── Badges ─────────────────────────────────────────────────── */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 600;
-}
-.badge-pending  { background: var(--yellow-dim); color: var(--yellow); }
-.badge-approved { background: var(--green-dim);  color: var(--green);  }
-.badge-rejected { background: var(--red-dim);    color: var(--red);    }
-.badge-flagged  { background: #f9731622;           color: var(--orange); }
-.badge-open     { background: var(--green-dim);  color: var(--green);  }
-.badge-closed   { background: var(--red-dim);    color: var(--red);    }
-.badge-suspended{ background: var(--red-dim);    color: var(--red);    }
-.badge-active   { background: var(--green-dim);  color: var(--green);  }
-.badge-verified { background: var(--accent-dim); color: var(--accent); }
-
-/* ── Filter Bar ─────────────────────────────────────────────── */
-.filter-bar {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
-.filter-input {
-  padding: 7px 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-size: 13px;
-  color: var(--text);
-  min-width: 180px;
-  transition: border-color var(--trans);
-}
-.filter-input:focus { outline: none; border-color: var(--accent); }
-.filter-input::placeholder { color: var(--text-faint); }
-
-/* ── Bulk Bar ───────────────────────────────────────────────── */
-.bulk-bar {
-  display: none;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  background: var(--accent-dim);
-  border: 1px solid var(--accent)44;
-  border-radius: var(--radius);
-  margin-bottom: 12px;
-  font-size: 13px;
-  color: var(--accent);
-}
-.bulk-bar.show { display: flex; }
-.bulk-bar strong { font-weight: 700; }
-.bulk-actions { margin-left: auto; display: flex; gap: 8px; }
-
-/* ── Empty State ────────────────────────────────────────────── */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 64px 24px;
-  color: var(--text-faint);
-  gap: 10px;
-  text-align: center;
-}
-.empty-state svg { opacity: 0.4; }
-.empty-state p { font-size: 13px; color: var(--text-muted); }
-
-/* ── Toast ──────────────────────────────────────────────────── */
-#toast-container {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  z-index: 9999;
-}
-.toast {
-  padding: 11px 16px;
-  border-radius: var(--radius);
-  font-size: 13px;
-  font-weight: 500;
-  border: 1px solid;
-  animation: slideIn 200ms cubic-bezier(0.16,1,0.3,1) forwards;
-  max-width: 320px;
-}
-.toast.success { background: var(--green-dim);  color: var(--green);  border-color: var(--green)44; }
-.toast.error   { background: var(--red-dim);    color: var(--red);    border-color: var(--red)44; }
-.toast.info    { background: var(--accent-dim); color: var(--accent); border-color: var(--accent)44; }
-@keyframes slideIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: none; } }
-
-/* ── Modal ──────────────────────────────────────────────────── */
-.modal-overlay {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.7);
-  z-index: 1000;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-.modal-overlay.show { display: flex; }
-.modal {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  width: 100%;
-  max-width: 460px;
-  padding: 28px;
-}
-.modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
-.modal p  { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
-.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
-
-/* ── Audit log ──────────────────────────────────────────────── */
-.log-action { font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
-.log-meta   { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* ── Settings ───────────────────────────────────────────────── */
-.settings-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 24px;
-  max-width: 460px;
-  margin-bottom: 16px;
-}
-.settings-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 16px; }
-
-/* ── Sport Breakdown ────────────────────────────────────────── */
-.sport-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 0;
-  font-size: 13px;
-}
-.sport-bar-wrap { flex: 1; background: var(--surface-3); border-radius: 3px; height: 6px; overflow: hidden; }
-.sport-bar { height: 100%; background: var(--accent); border-radius: 3px; transition: width 600ms cubic-bezier(0.16,1,0.3,1); }
-.sport-name { width: 90px; color: var(--text-muted); }
-.sport-count { width: 30px; text-align: right; font-variant-numeric: tabular-nums; }
-
-/* ── Responsive ─────────────────────────────────────────────── */
-@media (max-width: 768px) {
-  :root { --sidebar-w: 0px; }
-  .sidebar { display: none; }
-  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-}
-</style>
+    /* ── Audit JSON ──────────────────────────────────────────────── */
+    .json-pre { font-family:var(--mono); font-size:11px; background:var(--surface-3); border-radius:var(--radius-sm); padding:8px 10px; color:var(--text-muted); overflow-x:auto; max-width:200px; white-space:pre; }
+  </style>
 </head>
 <body>
 
-<!-- ══ AUTH SCREEN ══════════════════════════════════════════════ -->
-<div id="auth-screen">
-  <div class="auth-card">
-    <div class="auth-logo">
-      <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-        <rect width="28" height="28" rx="7" fill="currentColor" fill-opacity=".12"/>
-        <path d="M7 14 C7 10 10 7 14 7 C18 7 21 10 21 14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-        <circle cx="14" cy="18" r="3.5" fill="currentColor"/>
-        <circle cx="9" cy="16" r="1.8" fill="currentColor" fill-opacity=".6"/>
-        <circle cx="19" cy="16" r="1.8" fill="currentColor" fill-opacity=".6"/>
-      </svg>
-      <span>PLXYGROUND</span>
+<!-- ── Login Screen ────────────────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-mark">PX</div>
+      PLXYGROUND
     </div>
-    <h1>Admin Portal</h1>
-    <p>Sign in with your administrator credentials</p>
-    <div id="auth-error" class="auth-error"></div>
+    <h2>Admin Login</h2>
+    <p>Sign in to the admin panel</p>
     <form id="login-form">
       <div class="form-group">
-        <label for="login-email">Email</label>
-        <input id="login-email" class="form-input" type="email" placeholder="admin@plxyground.com" autocomplete="email" required />
+        <label class="form-label">Email</label>
+        <input type="email" id="login-email" placeholder="admin@plxyground.com" required />
       </div>
       <div class="form-group">
-        <label for="login-password">Password</label>
-        <input id="login-password" class="form-input" type="password" placeholder="••••••••" autocomplete="current-password" required />
+        <label class="form-label">Password</label>
+        <input type="password" id="login-password" placeholder="••••••••" required />
       </div>
-      <button type="submit" class="btn btn-primary btn-full" id="login-btn">Sign in</button>
+      <div class="form-error" id="login-error" style="display:none"></div>
+      <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;justify-content:center" id="login-btn">Sign in</button>
     </form>
   </div>
 </div>
 
-<!-- ══ APP SHELL ════════════════════════════════════════════════ -->
-<div id="app">
-
+<!-- ── App Shell ────────────────────────────────────────────────── -->
+<div id="app" style="display:none">
   <!-- Sidebar -->
   <aside class="sidebar">
-    <div class="sidebar-header">
-      <svg width="22" height="22" viewBox="0 0 28 28" fill="none">
-        <rect width="28" height="28" rx="7" fill="currentColor" fill-opacity=".12"/>
-        <path d="M7 14 C7 10 10 7 14 7 C18 7 21 10 21 14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-        <circle cx="14" cy="18" r="3.5" fill="currentColor"/>
-        <circle cx="9" cy="16" r="1.8" fill="currentColor" fill-opacity=".6"/>
-        <circle cx="19" cy="16" r="1.8" fill="currentColor" fill-opacity=".6"/>
-      </svg>
-      <span class="brand">PLXYGROUND</span>
-      <span class="badge">ADMIN</span>
+    <div class="sidebar-logo">
+      <div class="logo-mark">PX</div>
+      PLXYGROUND
     </div>
-
     <nav class="sidebar-nav">
-      <div class="nav-section">Overview</div>
-      <div class="nav-item active" data-view="dashboard">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <div class="nav-section-label">Overview</div>
+      <div class="nav-item active" data-section="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
         Dashboard
       </div>
 
-      <div class="nav-section">Moderation</div>
-      <div class="nav-item" data-view="queue">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-        Queue
+      <div class="nav-section-label">Moderation</div>
+      <div class="nav-item" data-section="queue">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12h6M9 8h6M9 16h4"/><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/></svg>
+        Mod Queue
         <span class="nav-badge" id="queue-badge" style="display:none">0</span>
       </div>
-      <div class="nav-item" data-view="content">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+      <div class="nav-item" data-section="content">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
         Content
       </div>
 
-      <div class="nav-section">Users</div>
-      <div class="nav-item" data-view="creators">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-        Creators
-      </div>
-      <div class="nav-item" data-view="businesses">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-        Businesses
+      <div class="nav-section-label">Users</div>
+      <div class="nav-item" data-section="users">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Users
       </div>
 
-      <div class="nav-section">System</div>
-      <div class="nav-item" data-view="audit">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      <div class="nav-section-label">System</div>
+      <div class="nav-item" data-section="audit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
         Audit Log
       </div>
-      <div class="nav-item" data-view="settings">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg>
+      <div class="nav-item" data-section="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M4.93 19.07l1.41-1.41M19.07 19.07l-1.41-1.41M1 12h2M21 12h2M12 1v2M12 21v2"/></svg>
         Settings
       </div>
     </nav>
-
     <div class="sidebar-footer">
       <div class="admin-info">
-        <div class="admin-avatar" id="admin-avatar-initials">A</div>
-        <div>
-          <div class="admin-name" id="admin-username">Admin</div>
-          <div class="admin-role" id="admin-role">superadmin</div>
-        </div>
-        <button class="btn logout-btn" id="logout-btn" title="Sign out">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        </button>
+        <strong id="sidebar-admin-name">Admin</strong>
+        <span id="sidebar-admin-role">admin</span>
       </div>
+      <button class="btn btn-secondary btn-sm" style="margin-top:10px;width:100%;justify-content:center" onclick="logout()">Sign out</button>
     </div>
   </aside>
 
   <!-- Main -->
-  <main class="main">
-    <header class="topbar">
-      <div>
-        <div class="topbar-title" id="topbar-title">Dashboard</div>
-        <div class="topbar-sub" id="topbar-sub">Overview of platform activity</div>
-      </div>
+  <div class="main-wrap">
+    <div class="topbar">
+      <span class="topbar-title" id="topbar-title">Dashboard</span>
       <div class="topbar-actions">
-        <button class="btn btn-ghost btn-sm" id="refresh-btn">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-          Refresh
-        </button>
+        <span style="font-size:12px;color:var(--text-muted)" id="topbar-env">API: connecting...</span>
       </div>
-    </header>
+    </div>
+    <div class="content-area">
 
-    <div class="page-content">
-
-      <!-- ── DASHBOARD ── -->
-      <div class="view active" id="view-dashboard">
-        <div class="kpi-grid" id="kpi-grid">
-          <div class="kpi-card"><div class="kpi-label">Creators</div><div class="kpi-value accent" id="kpi-creators">—</div></div>
-          <div class="kpi-card"><div class="kpi-label">Businesses</div><div class="kpi-value accent" id="kpi-businesses">—</div></div>
-          <div class="kpi-card"><div class="kpi-label">Total Content</div><div class="kpi-value" id="kpi-content">—</div></div>
-          <div class="kpi-card"><div class="kpi-label">Opportunities</div><div class="kpi-value" id="kpi-opps">—</div></div>
-          <div class="kpi-card"><div class="kpi-label">Pending Queue</div><div class="kpi-value yellow" id="kpi-pending">—</div><div class="kpi-sub">Awaiting review</div></div>
-          <div class="kpi-card"><div class="kpi-label">Flagged</div><div class="kpi-value red" id="kpi-flagged">—</div><div class="kpi-sub">Needs attention</div></div>
-          <div class="kpi-card"><div class="kpi-label">Applications</div><div class="kpi-value green" id="kpi-applications">—</div></div>
+      <!-- ── Dashboard ── -->
+      <section id="section-dashboard" class="section active">
+        <div class="section-header">
+          <div><h2>Dashboard</h2><p>Platform overview</p></div>
+          <button class="btn btn-secondary btn-sm" onclick="loadDashboard()">&#8635; Refresh</button>
         </div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-          <div class="table-wrap" style="padding:20px;">
-            <div class="section-title" style="margin-bottom:14px;">Content Last 7 Days</div>
-            <div id="trend-list"><div class="empty-state" style="padding:20px;"><p>Loading…</p></div></div>
+        <div class="kpi-grid" id="kpi-grid"><!-- JS --></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="card">
+            <div class="card-title">Content (last 7 days)</div>
+            <div class="mini-chart" id="mini-chart"></div>
           </div>
-          <div class="table-wrap" style="padding:20px;">
-            <div class="section-title" style="margin-bottom:14px;">Sport Breakdown</div>
-            <div id="sport-breakdown"><div class="empty-state" style="padding:20px;"><p>Loading…</p></div></div>
+          <div class="card">
+            <div class="card-title">Top Sports</div>
+            <div id="sport-breakdown" style="margin-top:12px"></div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- ── QUEUE ── -->
-      <div class="view" id="view-queue">
-        <div class="bulk-bar" id="queue-bulk-bar">
-          <strong id="queue-selected-count">0</strong> selected
-          <div class="bulk-actions">
-            <button class="btn btn-success btn-sm" id="bulk-approve-btn">Approve all</button>
-            <button class="btn btn-danger btn-sm" id="bulk-reject-btn">Reject all</button>
-            <button class="btn btn-ghost btn-sm" id="bulk-deselect-btn">Deselect</button>
-          </div>
+      <!-- ── Mod Queue ── -->
+      <section id="section-queue" class="section">
+        <div class="section-header">
+          <div><h2>Moderation Queue</h2><p>Pending and flagged content awaiting review</p></div>
+          <button class="btn btn-secondary btn-sm" onclick="loadQueue()">&#8635; Refresh</button>
+        </div>
+        <div class="bulk-bar" id="bulk-bar">
+          <strong id="bulk-count">0</strong> selected
+          <button class="btn btn-success btn-sm" onclick="bulkAction('approved')">Approve all</button>
+          <button class="btn btn-danger btn-sm" onclick="bulkAction('rejected')">Reject all</button>
+          <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="clearSelection()">Clear</button>
         </div>
         <div class="table-wrap">
           <table>
             <thead><tr>
-              <th class="check-col"><input type="checkbox" class="table-checkbox" id="queue-select-all" /></th>
-              <th>Title</th><th>Creator</th><th>Sport</th><th>Status</th><th>Submitted</th><th>Actions</th>
+              <th><input type="checkbox" id="select-all" onchange="toggleSelectAll(this)" /></th>
+              <th>Content</th><th>Creator</th><th>Sport</th><th>Status</th><th>Posted</th><th>Actions</th>
             </tr></thead>
-            <tbody id="queue-tbody"><tr><td colspan="7"><div class="empty-state"><p>Loading queue…</p></div></td></tr></tbody>
+            <tbody id="queue-tbody"><tr><td colspan="7"><div class="empty"><p>Loading...</p></div></td></tr></tbody>
           </table>
         </div>
-      </div>
+      </section>
 
-      <!-- ── CONTENT ── -->
-      <div class="view" id="view-content">
-        <div class="filter-bar">
-          <input class="filter-input" id="content-search" placeholder="Search content…" />
-          <select class="filter-input" id="content-status-filter" style="min-width:130px;background:var(--surface);">
+      <!-- ── Content ── -->
+      <section id="section-content" class="section">
+        <div class="section-header">
+          <div><h2>Content</h2><p>All content across the platform</p></div>
+          <button class="btn btn-secondary btn-sm" onclick="loadContent()">&#8635; Refresh</button>
+        </div>
+        <div class="filters">
+          <select id="content-status-filter" onchange="loadContent()">
             <option value="">All statuses</option>
             <option value="approved">Approved</option>
             <option value="pending">Pending</option>
             <option value="rejected">Rejected</option>
             <option value="flagged">Flagged</option>
           </select>
+          <select id="content-sport-filter" onchange="loadContent()">
+            <option value="">All sports</option>
+            <option value="basketball">Basketball</option>
+            <option value="football">Football</option>
+            <option value="tennis">Tennis</option>
+            <option value="athletics">Athletics</option>
+            <option value="swimming">Swimming</option>
+          </select>
+          <div class="filter-sep"></div>
+          <span id="content-count" style="font-size:12px;color:var(--text-muted)"></span>
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Title</th><th>Creator</th><th>Sport</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
-            <tbody id="content-tbody"><tr><td colspan="6"><div class="empty-state"><p>Loading…</p></div></td></tr></tbody>
+            <thead><tr><th>Title</th><th>Creator</th><th>Sport</th><th>Type</th><th>Status</th><th>Posted</th><th>Actions</th></tr></thead>
+            <tbody id="content-tbody"><tr><td colspan="7"><div class="empty"><p>Loading...</p></div></td></tr></tbody>
           </table>
         </div>
-      </div>
+      </section>
 
-      <!-- ── CREATORS ── -->
-      <div class="view" id="view-creators">
-        <div class="filter-bar">
-          <input class="filter-input" id="creator-search" placeholder="Search creators…" />
+      <!-- ── Users ── -->
+      <section id="section-users" class="section">
+        <div class="section-header">
+          <div><h2>Users</h2><p>Creators and business accounts</p></div>
+          <button class="btn btn-secondary btn-sm" onclick="loadUsers()">&#8635; Refresh</button>
+        </div>
+        <div class="tabs" id="user-tabs">
+          <div class="tab active" data-type="creator" onclick="switchUserTab(this)">Creators</div>
+          <div class="tab" data-type="business" onclick="switchUserTab(this)">Businesses</div>
         </div>
         <div class="table-wrap">
-          <table>
-            <thead><tr><th>Username</th><th>Display Name</th><th>Sport</th><th>Followers</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody id="creators-tbody"><tr><td colspan="6"><div class="empty-state"><p>Loading…</p></div></td></tr></tbody>
+          <table id="users-table">
+            <thead id="users-thead"></thead>
+            <tbody id="users-tbody"><tr><td colspan="7"><div class="empty"><p>Loading...</p></div></td></tr></tbody>
           </table>
         </div>
-      </div>
+      </section>
 
-      <!-- ── BUSINESSES ── -->
-      <div class="view" id="view-businesses">
-        <div class="filter-bar">
-          <input class="filter-input" id="business-search" placeholder="Search businesses…" />
+      <!-- ── Audit Log ── -->
+      <section id="section-audit" class="section">
+        <div class="section-header">
+          <div><h2>Audit Log</h2><p>Full action history</p></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-secondary btn-sm" onclick="exportAudit()">&#8595; Export JSON</button>
+            <button class="btn btn-secondary btn-sm" onclick="loadAudit()">&#8635; Refresh</button>
+          </div>
         </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Name</th><th>Email</th><th>Industry</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody id="businesses-tbody"><tr><td colspan="5"><div class="empty-state"><p>Loading…</p></div></td></tr></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- ── AUDIT LOG ── -->
-      <div class="view" id="view-audit">
-        <div class="filter-bar">
-          <select class="filter-input" id="audit-type-filter" style="min-width:140px;background:var(--surface);">
-            <option value="">All actor types</option>
+        <div class="filters">
+          <select id="audit-actor-filter" onchange="loadAudit()">
+            <option value="">All actors</option>
             <option value="user">User</option>
             <option value="business">Business</option>
             <option value="admin">Admin</option>
             <option value="system">System</option>
           </select>
-          <input class="filter-input" id="audit-action-filter" placeholder="Filter by action…" />
-          <button class="btn btn-ghost btn-sm" id="audit-export-btn">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Export JSON
-          </button>
+          <input type="text" id="audit-action-filter" placeholder="Filter by action…" style="max-width:200px" oninput="debounceAudit()" />
+          <div class="filter-sep"></div>
+          <span id="audit-count" style="font-size:12px;color:var(--text-muted)"></span>
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Target</th><th>IP</th><th>Meta</th></tr></thead>
-            <tbody id="audit-tbody"><tr><td colspan="6"><div class="empty-state"><p>Loading…</p></div></td></tr></tbody>
+            <thead><tr><th>#</th><th>Actor</th><th>Type</th><th>Action</th><th>Target</th><th>IP</th><th>Meta</th><th>Time</th></tr></thead>
+            <tbody id="audit-tbody"><tr><td colspan="8"><div class="empty"><p>Loading...</p></div></td></tr></tbody>
           </table>
         </div>
-        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;">
-          <button class="btn btn-ghost btn-sm" id="audit-prev-btn">← Prev</button>
-          <span style="font-size:12px;color:var(--text-muted);align-self:center;" id="audit-page-label">Page 1</span>
-          <button class="btn btn-ghost btn-sm" id="audit-next-btn">Next →</button>
-        </div>
-      </div>
+      </section>
 
-      <!-- ── SETTINGS ── -->
-      <div class="view" id="view-settings">
-        <div class="settings-card">
-          <h3>Change Password</h3>
-          <div id="settings-error" class="auth-error"></div>
-          <div id="settings-success" class="auth-error" style="color:var(--green);background:var(--green-dim);border-color:#22c55e33;"></div>
-          <form id="settings-form">
+      <!-- ── Settings ── -->
+      <section id="section-settings" class="section">
+        <div class="section-header"><div><h2>Settings</h2><p>Admin account settings</p></div></div>
+        <div class="card" style="max-width:480px">
+          <div class="card-title">Change Password</div>
+          <form id="password-form" style="margin-top:16px">
             <div class="form-group">
-              <label>Current Password</label>
-              <input class="form-input" type="password" id="settings-current" placeholder="Current password" required />
+              <label class="form-label">Current password</label>
+              <input type="password" id="pw-current" required />
             </div>
             <div class="form-group">
-              <label>New Password</label>
-              <input class="form-input" type="password" id="settings-new" placeholder="Min 8 characters" required minlength="8" />
+              <label class="form-label">New password</label>
+              <input type="password" id="pw-new" required minlength="8" />
             </div>
             <div class="form-group">
-              <label>Confirm New Password</label>
-              <input class="form-input" type="password" id="settings-confirm" placeholder="Repeat new password" required />
+              <label class="form-label">Confirm new password</label>
+              <input type="password" id="pw-confirm" required />
             </div>
-            <button type="submit" class="btn btn-primary">Update Password</button>
+            <div class="form-error" id="pw-error" style="display:none"></div>
+            <button type="submit" class="btn btn-primary" id="pw-btn">Update password</button>
           </form>
         </div>
-        <div class="settings-card">
-          <h3>Session Info</h3>
-          <p style="font-size:13px;color:var(--text-muted);margin:0;">Logged in as <strong id="settings-username"></strong> &middot; Role: <span id="settings-role"></span></p>
+        <div class="card" style="max-width:480px;margin-top:16px">
+          <div class="card-title">API Connection</div>
+          <div style="margin-top:12px;font-size:13px;color:var(--text-muted)">
+            Base URL: <code style="font-family:var(--mono);color:var(--accent)" id="api-base-display"></code>
+          </div>
+          <div style="margin-top:8px">
+            <label class="form-label" style="margin-bottom:5px;display:block">Override API base URL</label>
+            <div style="display:flex;gap:8px">
+              <input type="text" id="api-url-input" placeholder="http://localhost:3001" style="flex:1" />
+              <button class="btn btn-secondary btn-sm" onclick="setApiBase()">Save</button>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
-    </div><!-- /page-content -->
-  </main>
-</div>
-
-<!-- ── MODAL ── -->
-<div class="modal-overlay" id="modal-overlay">
-  <div class="modal">
-    <h2 id="modal-title">Confirm</h2>
-    <p id="modal-body">Are you sure?</p>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" id="modal-cancel">Cancel</button>
-      <button class="btn btn-danger" id="modal-confirm">Confirm</button>
     </div>
   </div>
 </div>
 
-<!-- ── TOAST ── -->
+<!-- Toast container -->
 <div id="toast-container"></div>
 
+<!-- Moderate modal -->
+<div class="modal-overlay" id="moderate-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">Moderate Content</h3>
+      <button class="btn-icon" onclick="closeModal('moderate-modal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Action</label>
+        <select id="modal-status">
+          <option value="approved">Approve</option>
+          <option value="rejected">Reject</option>
+          <option value="flagged">Flag</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Moderation note (optional)</label>
+        <textarea id="modal-note" rows="3" placeholder="Reason for this decision…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('moderate-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitModerate()">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <script>
-(function () {
-  'use strict';
+// ── Config ──────────────────────────────────────────────────────────────
+let API_BASE = localStorage.getItem('px_api_base') || 'http://localhost:3001';
+let TOKEN = localStorage.getItem('px_admin_token') || null;
+let currentAdmin = null;
+let currentSection = 'dashboard';
+let moderateTargetId = null;
+let selectedIds = new Set();
+let currentUserTab = 'creator';
+let auditDebounce = null;
+let auditLogs = [];
 
-  /* ── Config ─────────────────────────────────────────────── */
-  const API = (localStorage.getItem('plxy_api') || 'http://localhost:3001') + '/api';
-  let token = null;
-  let adminData = null;
-  let auditPage = 1;
-  let allAuditLogs = [];
-  let allCreators = [];
-  let allBusinesses = [];
-  let allContent = [];
-  let queueSelected = new Set();
+// ── Boot ─────────────────────────────────────────────────────────────────
+document.getElementById('api-base-display').textContent = API_BASE;
+document.getElementById('api-url-input').value = API_BASE;
 
-  /* ── Helpers ────────────────────────────────────────────── */
-  function toast(msg, type = 'info') {
-    const el = document.createElement('div');
-    el.className = `toast ${type}`;
-    el.textContent = msg;
-    document.getElementById('toast-container').appendChild(el);
-    setTimeout(() => el.remove(), 3500);
-  }
+if (TOKEN) {
+  verifySession();
+} 
 
-  function showModal(title, body, onConfirm, confirmClass = 'btn-danger') {
-    document.getElementById('modal-title').textContent = title;
-    document.getElementById('modal-body').textContent = body;
-    const btn = document.getElementById('modal-confirm');
-    btn.className = `btn ${confirmClass}`;
-    document.getElementById('modal-overlay').classList.add('show');
-    btn.onclick = () => { closeModal(); onConfirm(); };
-  }
-  function closeModal() { document.getElementById('modal-overlay').classList.remove('show'); }
-  document.getElementById('modal-cancel').onclick = closeModal;
-  document.getElementById('modal-overlay').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeModal(); });
-
-  function fmt(dateStr) {
-    if (!dateStr) return '—';
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) + ' ' +
-           d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
-  }
-
-  function badge(status) {
-    const map = {
-      pending:  'badge-pending',
-      approved: 'badge-approved',
-      rejected: 'badge-rejected',
-      flagged:  'badge-flagged',
-      open:     'badge-open',
-      closed:   'badge-closed',
-      suspended:'badge-suspended',
-      active:   'badge-active',
-      verified: 'badge-verified',
-    };
-    return `<span class="badge ${map[status] || 'badge-pending'}">${status}</span>`;
-  }
-
-  async function api(path, opts = {}) {
-    const res = await fetch(API + path, {
-      ...opts,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(opts.headers || {}),
-      },
-      body: opts.body ? JSON.stringify(opts.body) : undefined,
-    });
-    const data = await res.json().catch(() => ({}));
+// ── API helper ────────────────────────────────────────────────────────────
+async function api(method, path, body) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json', ...(TOKEN ? { Authorization: 'Bearer ' + TOKEN } : {}) },
+  };
+  if (body) opts.body = JSON.stringify(body);
+  try {
+    const res = await fetch(API_BASE + path, opts);
+    const data = await res.json();
     return { ok: res.ok, status: res.status, data };
+  } catch (e) {
+    return { ok: false, status: 0, data: { error: 'Network error — is the API running?' } };
   }
+}
 
-  /* ── Auth ───────────────────────────────────────────────── */
-  document.getElementById('login-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const btn = document.getElementById('login-btn');
-    const errEl = document.getElementById('auth-error');
-    errEl.classList.remove('show');
-    btn.disabled = true;
-    btn.textContent = 'Signing in…';
-
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-password').value;
-
-    const { ok, data } = await api('/admin/auth/login', { method: 'POST', body: { email, password } });
-    if (!ok) {
-      errEl.textContent = data.error || 'Login failed';
-      errEl.classList.add('show');
-      btn.disabled = false;
-      btn.textContent = 'Sign in';
-      return;
-    }
-
-    token = data.token;
-    adminData = data.admin;
+// ── Session ───────────────────────────────────────────────────────────────
+async function verifySession() {
+  const r = await api('GET', '/api/admin/auth/me');
+  if (r.ok) {
+    currentAdmin = r.data.admin;
     showApp();
-  });
+  } else {
+    TOKEN = null;
+    localStorage.removeItem('px_admin_token');
+  }
+}
 
-  function showApp() {
-    document.getElementById('auth-screen').style.display = 'none';
-    document.getElementById('app').classList.add('active');
-    const initials = (adminData.username || 'A').slice(0, 2).toUpperCase();
-    document.getElementById('admin-avatar-initials').textContent = initials;
-    document.getElementById('admin-username').textContent = adminData.username;
-    document.getElementById('admin-role').textContent = adminData.role;
-    document.getElementById('settings-username').textContent = adminData.username;
-    document.getElementById('settings-role').textContent = adminData.role;
-    loadDashboard();
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('sidebar-admin-name').textContent = currentAdmin.username;
+  document.getElementById('sidebar-admin-role').textContent = currentAdmin.role;
+  document.getElementById('topbar-env').textContent = 'API: ' + API_BASE;
+  navigate('dashboard');
+}
+
+function logout() {
+  TOKEN = null;
+  currentAdmin = null;
+  localStorage.removeItem('px_admin_token');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  toast('Signed out', 'info');
+}
+
+// ── Login ─────────────────────────────────────────────────────────────────
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email    = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  const btn      = document.getElementById('login-btn');
+  const errEl    = document.getElementById('login-error');
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  errEl.style.display = 'none';
+
+  const r = await api('POST', '/api/admin/auth/login', { email, password });
+  btn.disabled = false; btn.textContent = 'Sign in';
+
+  if (r.ok) {
+    TOKEN = r.data.token;
+    currentAdmin = r.data.admin;
+    localStorage.setItem('px_admin_token', TOKEN);
+    showApp();
+  } else {
+    errEl.textContent = r.data.error || 'Login failed';
+    errEl.style.display = 'block';
+  }
+});
+
+// ── Navigation ────────────────────────────────────────────────────────────
+document.querySelectorAll('.nav-item').forEach(el => {
+  el.addEventListener('click', () => navigate(el.dataset.section));
+});
+
+function navigate(section) {
+  currentSection = section;
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.section === section));
+  document.querySelectorAll('.section').forEach(el => el.classList.toggle('active', el.id === 'section-' + section));
+  const titles = { dashboard:'Dashboard', queue:'Moderation Queue', content:'Content', users:'Users', audit:'Audit Log', settings:'Settings' };
+  document.getElementById('topbar-title').textContent = titles[section] || section;
+  const loaders = { dashboard: loadDashboard, queue: loadQueue, content: loadContent, users: loadUsers, audit: loadAudit };
+  if (loaders[section]) loaders[section]();
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  const r = await api('GET', '/api/admin/analytics');
+  if (!r.ok) { toast('Failed to load analytics', 'error'); return; }
+  const { kpis, content_last_7_days, sport_breakdown } = r.data;
+
+  const kpiDefs = [
+    { key: 'total_creators',    label: 'Creators',     cls: 'accent' },
+    { key: 'total_businesses',  label: 'Businesses',   cls: 'green' },
+    { key: 'total_content',     label: 'Total Content',cls: 'accent' },
+    { key: 'total_opps',        label: 'Opportunities',cls: 'green' },
+    { key: 'pending_queue',     label: 'Pending',      cls: 'yellow' },
+    { key: 'flagged_queue',     label: 'Flagged',      cls: 'orange' },
+    { key: 'total_applications',label: 'Applications', cls: 'accent' },
+  ];
+  document.getElementById('kpi-grid').innerHTML = kpiDefs.map(k =>
+    `<div class="kpi-card"><div class="kpi-label">${k.label}</div><div class="kpi-value ${k.cls}">${(kpis[k.key]||0).toLocaleString()}</div></div>`
+  ).join('');
+
+  // Update queue badge
+  const queueCount = (kpis.pending_queue || 0) + (kpis.flagged_queue || 0);
+  const badge = document.getElementById('queue-badge');
+  badge.textContent = queueCount;
+  badge.style.display = queueCount > 0 ? 'inline-block' : 'none';
+
+  // Mini chart
+  if (content_last_7_days && content_last_7_days.length) {
+    const max = Math.max(...content_last_7_days.map(d => parseInt(d.posts, 10)), 1);
+    document.getElementById('mini-chart').innerHTML = content_last_7_days.map(d => {
+      const h = Math.max(4, Math.round((parseInt(d.posts,10) / max) * 56));
+      const day = new Date(d.day).toLocaleDateString('en-GB', { weekday:'short' });
+      return `<div class="bar-col"><div class="bar" style="height:${h}px" title="${d.posts} posts"></div><div class="bar-label">${day}</div></div>`;
+    }).join('');
+  } else {
+    document.getElementById('mini-chart').innerHTML = '<div style="color:var(--text-faint);font-size:12px">No data yet</div>';
   }
 
-  document.getElementById('logout-btn').addEventListener('click', () => {
-    showModal('Sign out', 'Are you sure you want to sign out?', () => {
-      token = null; adminData = null;
-      document.getElementById('app').classList.remove('active');
-      document.getElementById('auth-screen').style.display = 'flex';
-      document.getElementById('login-form').reset();
-    }, 'btn-danger');
-  });
+  // Sport breakdown
+  if (sport_breakdown && sport_breakdown.length) {
+    document.getElementById('sport-breakdown').innerHTML = sport_breakdown.map(s =>
+      `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px">
+        <span style="text-transform:capitalize">${s.sport}</span>
+        <span style="font-variant-numeric:tabular-nums;color:var(--text-muted)">${s.count}</span>
+      </div>`
+    ).join('');
+  } else {
+    document.getElementById('sport-breakdown').innerHTML = '<div style="color:var(--text-faint);font-size:12px;padding-top:8px">No data yet</div>';
+  }
+}
 
-  /* ── Navigation ─────────────────────────────────────────── */
-  const viewMeta = {
-    dashboard:  { title: 'Dashboard',   sub: 'Overview of platform activity' },
-    queue:      { title: 'Mod Queue',    sub: 'Pending and flagged content' },
-    content:    { title: 'Content',      sub: 'All platform content' },
-    creators:   { title: 'Creators',     sub: 'Registered creator accounts' },
-    businesses: { title: 'Businesses',   sub: 'Registered business accounts' },
-    audit:      { title: 'Audit Log',    sub: 'Full platform activity trail' },
-    settings:   { title: 'Settings',     sub: 'Admin account settings' },
-  };
+// ── Mod Queue ─────────────────────────────────────────────────────────────
+async function loadQueue() {
+  const r = await api('GET', '/api/admin/queue');
+  if (!r.ok) { toast('Failed to load queue', 'error'); return; }
+  const { queue } = r.data;
+  const tbody = document.getElementById('queue-tbody');
+  selectedIds.clear();
+  updateBulkBar();
 
-  document.querySelectorAll('.nav-item').forEach((item) => {
-    item.addEventListener('click', () => {
-      const view = item.dataset.view;
-      document.querySelectorAll('.nav-item').forEach((i) => i.classList.remove('active'));
-      item.classList.add('active');
-      document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
-      document.getElementById(`view-${view}`).classList.add('active');
-      const meta = viewMeta[view] || {};
-      document.getElementById('topbar-title').textContent = meta.title || view;
-      document.getElementById('topbar-sub').textContent = meta.sub || '';
-      if (view === 'dashboard')  loadDashboard();
-      if (view === 'queue')      loadQueue();
-      if (view === 'content')    loadContent();
-      if (view === 'creators')   loadCreators();
-      if (view === 'businesses') loadBusinesses();
-      if (view === 'audit')      loadAudit();
-    });
-  });
-
-  document.getElementById('refresh-btn').addEventListener('click', () => {
-    const activeView = document.querySelector('.nav-item.active')?.dataset.view;
-    if (activeView === 'dashboard')  loadDashboard();
-    if (activeView === 'queue')      loadQueue();
-    if (activeView === 'content')    loadContent();
-    if (activeView === 'creators')   loadCreators();
-    if (activeView === 'businesses') loadBusinesses();
-    if (activeView === 'audit')      loadAudit();
-    toast('Refreshed', 'info');
-  });
-
-  /* ── Dashboard ──────────────────────────────────────────── */
-  async function loadDashboard() {
-    const { ok, data } = await api('/admin/analytics');
-    if (!ok) { toast('Failed to load analytics', 'error'); return; }
-    const k = data.kpis;
-    document.getElementById('kpi-creators').textContent     = k.total_creators.toLocaleString();
-    document.getElementById('kpi-businesses').textContent   = k.total_businesses.toLocaleString();
-    document.getElementById('kpi-content').textContent      = k.total_content.toLocaleString();
-    document.getElementById('kpi-opps').textContent         = k.total_opps.toLocaleString();
-    document.getElementById('kpi-pending').textContent      = k.pending_queue.toLocaleString();
-    document.getElementById('kpi-flagged').textContent      = k.flagged_queue.toLocaleString();
-    document.getElementById('kpi-applications').textContent = k.total_applications.toLocaleString();
-
-    const queueTotal = k.pending_queue + k.flagged_queue;
-    const badge = document.getElementById('queue-badge');
-    badge.textContent = queueTotal;
-    badge.style.display = queueTotal > 0 ? 'inline-block' : 'none';
-
-    // Trend
-    const trendEl = document.getElementById('trend-list');
-    if (!data.content_last_7_days.length) {
-      trendEl.innerHTML = '<div class="empty-state" style="padding:16px;"><p>No data yet</p></div>';
-    } else {
-      trendEl.innerHTML = data.content_last_7_days.map((r) =>
-        `<div class="sport-row"><span class="sport-name" style="width:80px;font-size:12px;">${r.day}</span>
-         <div class="sport-bar-wrap"><div class="sport-bar" style="width:${Math.min(100, r.posts * 10)}%"></div></div>
-         <span class="sport-count">${r.posts}</span></div>`
-      ).join('');
-    }
-
-    // Sport breakdown
-    const sportEl = document.getElementById('sport-breakdown');
-    if (!data.sport_breakdown.length) {
-      sportEl.innerHTML = '<div class="empty-state" style="padding:16px;"><p>No data yet</p></div>';
-    } else {
-      const max = Math.max(...data.sport_breakdown.map((r) => parseInt(r.count, 10)));
-      sportEl.innerHTML = data.sport_breakdown.map((r) =>
-        `<div class="sport-row"><span class="sport-name">${r.sport}</span>
-         <div class="sport-bar-wrap"><div class="sport-bar" style="width:${(parseInt(r.count,10)/max*100).toFixed(1)}%"></div></div>
-         <span class="sport-count">${r.count}</span></div>`
-      ).join('');
-    }
+  if (!queue || !queue.length) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg><p>Queue is clear — nothing to review</p></div></td></tr>`;
+    return;
   }
 
-  /* ── Queue ──────────────────────────────────────────────── */
-  async function loadQueue() {
-    queueSelected.clear();
-    updateBulkBar();
-    const { ok, data } = await api('/admin/queue');
-    if (!ok) { toast('Failed to load queue', 'error'); return; }
-    renderQueue(data.queue);
+  tbody.innerHTML = queue.map(item => `
+    <tr>
+      <td><input type="checkbox" class="row-check" data-id="${item.id}" onchange="toggleRow(this)" /></td>
+      <td style="max-width:240px">
+        <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.title)}</div>
+        ${item.tags && item.tags.length ? `<div style="margin-top:3px">${item.tags.slice(0,3).map(t=>`<span class="badge badge-admin" style="margin-right:3px">${esc(t)}</span>`).join('')}</div>` : ''}
+      </td>
+      <td>
+        <div style="font-weight:500">${esc(item.display_name)}</div>
+        <div style="font-size:11px;color:var(--text-muted)">@${esc(item.username)}</div>
+      </td>
+      <td style="text-transform:capitalize">${esc(item.sport||'—')}</td>
+      <td><span class="badge badge-${item.status}">${item.status}</span></td>
+      <td class="td-mono">${fmtDate(item.created_at)}</td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-success btn-sm" onclick="quickModerate(${item.id},'approved')">Approve</button>
+          <button class="btn btn-danger btn-sm" onclick="quickModerate(${item.id},'rejected')">Reject</button>
+          <button class="btn btn-secondary btn-sm" onclick="openModerate(${item.id})">More</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+async function quickModerate(id, status) {
+  const r = await api('PATCH', `/api/admin/queue/${id}`, { status });
+  if (r.ok) { toast(`Content ${status}`, 'success'); loadQueue(); if (currentSection === 'dashboard') loadDashboard(); }
+  else toast(r.data.error || 'Action failed', 'error');
+}
+
+function openModerate(id) {
+  moderateTargetId = id;
+  document.getElementById('modal-note').value = '';
+  document.getElementById('modal-status').value = 'approved';
+  document.getElementById('moderate-modal').classList.add('open');
+}
+
+async function submitModerate() {
+  if (!moderateTargetId) return;
+  const status = document.getElementById('modal-status').value;
+  const moderation_note = document.getElementById('modal-note').value;
+  const r = await api('PATCH', `/api/admin/queue/${moderateTargetId}`, { status, moderation_note });
+  if (r.ok) { toast(`Content ${status}`, 'success'); closeModal('moderate-modal'); loadQueue(); }
+  else toast(r.data.error || 'Action failed', 'error');
+}
+
+async function bulkAction(status) {
+  if (!selectedIds.size) return;
+  const r = await api('POST', '/api/admin/queue/bulk', { ids: [...selectedIds], status });
+  if (r.ok) { toast(`${r.data.updated} items ${status}`, 'success'); loadQueue(); }
+  else toast(r.data.error || 'Bulk action failed', 'error');
+}
+
+function toggleRow(cb) {
+  const id = parseInt(cb.dataset.id, 10);
+  cb.checked ? selectedIds.add(id) : selectedIds.delete(id);
+  updateBulkBar();
+}
+
+function toggleSelectAll(cb) {
+  document.querySelectorAll('.row-check').forEach(el => { el.checked = cb.checked; toggleRow(el); });
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  document.querySelectorAll('.row-check').forEach(el => el.checked = false);
+  const sa = document.getElementById('select-all');
+  if (sa) sa.checked = false;
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('bulk-bar');
+  const count = document.getElementById('bulk-count');
+  count.textContent = selectedIds.size;
+  bar.classList.toggle('visible', selectedIds.size > 0);
+}
+
+// ── Content ───────────────────────────────────────────────────────────────
+async function loadContent() {
+  const status = document.getElementById('content-status-filter').value;
+  const sport  = document.getElementById('content-sport-filter').value;
+  let url = '/api/content?limit=50';
+  if (sport) url += '&sport=' + encodeURIComponent(sport);
+  const r = await api('GET', url);
+  if (!r.ok) { toast('Failed to load content', 'error'); return; }
+  let items = r.data.content || [];
+  if (status) items = items.filter(i => i.status === status);
+  document.getElementById('content-count').textContent = items.length + ' items';
+  const tbody = document.getElementById('content-tbody');
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><p>No content found</p></div></td></tr>`;
+    return;
   }
+  tbody.innerHTML = items.map(item => `
+    <tr>
+      <td style="max-width:200px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.title)}</td>
+      <td>${esc(item.display_name||'—')}</td>
+      <td style="text-transform:capitalize">${esc(item.sport||'—')}</td>
+      <td>${esc(item.media_type||'text')}</td>
+      <td><span class="badge badge-${item.status||'pending'}">${item.status||'pending'}</span></td>
+      <td class="td-mono">${fmtDate(item.created_at)}</td>
+      <td>
+        <button class="btn btn-secondary btn-sm" onclick="openModerateFromContent(${item.id})">Moderate</button>
+      </td>
+    </tr>`).join('');
+}
 
-  function renderQueue(items) {
-    const tbody = document.getElementById('queue-tbody');
-    if (!items.length) {
-      tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg><p>Queue is clear — nothing to review</p></div></td></tr>';
-      return;
-    }
-    tbody.innerHTML = items.map((item) => `
-      <tr data-id="${item.id}">
-        <td><input type="checkbox" class="table-checkbox queue-check" data-id="${item.id}" /></td>
-        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${item.title}">${item.title}</td>
-        <td>${item.display_name || item.username}</td>
-        <td>${item.sport || '—'}</td>
-        <td>${badge(item.status)}</td>
-        <td style="color:var(--text-muted);font-size:12px;">${fmt(item.created_at)}</td>
-        <td>
-          <div style="display:flex;gap:6px;">
-            <button class="btn btn-success btn-sm queue-action" data-id="${item.id}" data-action="approved">Approve</button>
-            <button class="btn btn-danger btn-sm queue-action" data-id="${item.id}" data-action="rejected">Reject</button>
-            <button class="btn btn-ghost btn-sm queue-action" data-id="${item.id}" data-action="flagged" style="color:var(--orange);">Flag</button>
-          </div>
-        </td>
-      </tr>`).join('');
+function openModerateFromContent(id) {
+  moderateTargetId = id;
+  document.getElementById('modal-note').value = '';
+  document.getElementById('modal-status').value = 'approved';
+  document.getElementById('modal-title').textContent = 'Moderate Content #' + id;
+  document.getElementById('moderate-modal').classList.add('open');
+}
 
-    tbody.querySelectorAll('.queue-check').forEach((cb) => {
-      cb.addEventListener('change', () => {
-        cb.checked ? queueSelected.add(Number(cb.dataset.id)) : queueSelected.delete(Number(cb.dataset.id));
-        updateBulkBar();
-      });
-    });
+// ── Users ─────────────────────────────────────────────────────────────────
+function switchUserTab(el) {
+  document.querySelectorAll('#user-tabs .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  currentUserTab = el.dataset.type;
+  loadUsers();
+}
 
-    tbody.querySelectorAll('.queue-action').forEach((btn) => {
-      btn.addEventListener('click', () => moderateItem(Number(btn.dataset.id), btn.dataset.action));
-    });
+async function loadUsers() {
+  const r = await api('GET', '/api/admin/users?type=' + currentUserTab);
+  if (!r.ok) { toast('Failed to load users', 'error'); return; }
+  const users = r.data.users || [];
+  const thead = document.getElementById('users-thead');
+  const tbody = document.getElementById('users-tbody');
+
+  if (currentUserTab === 'creator') {
+    thead.innerHTML = '<tr><th>Name</th><th>Username</th><th>Email</th><th>Sport</th><th>Status</th><th>Followers</th><th>Joined</th><th>Actions</th></tr>';
+    tbody.innerHTML = !users.length
+      ? `<tr><td colspan="8"><div class="empty"><p>No creators found</p></div></td></tr>`
+      : users.map(u => `
+        <tr>
+          <td style="font-weight:500">${esc(u.display_name||u.username)}</td>
+          <td class="td-mono">@${esc(u.username)}</td>
+          <td style="font-size:12px;color:var(--text-muted)">${esc(u.email)}</td>
+          <td style="text-transform:capitalize">${esc(u.sport||'—')}</td>
+          <td>${u.is_suspended ? '<span class="badge badge-suspended">Suspended</span>' : '<span class="badge badge-active">Active</span>'}</td>
+          <td class="td-mono">${(u.follower_count||0).toLocaleString()}</td>
+          <td class="td-mono">${fmtDate(u.created_at)}</td>
+          <td>
+            <div style="display:flex;gap:4px">
+              ${!u.is_verified ? `<button class="btn btn-secondary btn-sm" onclick="userAction('creator',${u.id},'verify')">Verify</button>` : ''}
+              ${u.is_suspended
+                ? `<button class="btn btn-success btn-sm" onclick="userAction('creator',${u.id},'reactivate')">Reactivate</button>`
+                : `<button class="btn btn-danger btn-sm" onclick="userAction('creator',${u.id},'suspend')">Suspend</button>`}
+            </div>
+          </td>
+        </tr>`).join('');
+  } else {
+    thead.innerHTML = '<tr><th>Name</th><th>Email</th><th>Industry</th><th>Status</th><th>Joined</th><th>Actions</th></tr>';
+    tbody.innerHTML = !users.length
+      ? `<tr><td colspan="6"><div class="empty"><p>No businesses found</p></div></td></tr>`
+      : users.map(u => `
+        <tr>
+          <td style="font-weight:500">${esc(u.name)}</td>
+          <td style="font-size:12px;color:var(--text-muted)">${esc(u.email)}</td>
+          <td style="text-transform:capitalize">${esc(u.industry||'—')}</td>
+          <td>${u.is_suspended ? '<span class="badge badge-suspended">Suspended</span>' : '<span class="badge badge-active">Active</span>'}</td>
+          <td class="td-mono">${fmtDate(u.created_at)}</td>
+          <td>
+            <div style="display:flex;gap:4px">
+              ${!u.is_verified ? `<button class="btn btn-secondary btn-sm" onclick="userAction('business',${u.id},'verify')">Verify</button>` : ''}
+              ${u.is_suspended
+                ? `<button class="btn btn-success btn-sm" onclick="userAction('business',${u.id},'reactivate')">Reactivate</button>`
+                : `<button class="btn btn-danger btn-sm" onclick="userAction('business',${u.id},'suspend')">Suspend</button>`}
+            </div>
+          </td>
+        </tr>`).join('');
   }
+}
 
-  function updateBulkBar() {
-    const bar = document.getElementById('queue-bulk-bar');
-    document.getElementById('queue-selected-count').textContent = queueSelected.size;
-    bar.classList.toggle('show', queueSelected.size > 0);
+async function userAction(type, id, action) {
+  const r = await api('PATCH', `/api/admin/users/${type}/${id}`, { action });
+  if (r.ok) { toast(`User ${action}d`, 'success'); loadUsers(); }
+  else toast(r.data.error || 'Action failed', 'error');
+}
+
+// ── Audit Log ─────────────────────────────────────────────────────────────
+async function loadAudit() {
+  const actor  = document.getElementById('audit-actor-filter').value;
+  const action = document.getElementById('audit-action-filter').value;
+  let url = '/api/admin/audit?limit=100';
+  if (actor)  url += '&actor_type=' + encodeURIComponent(actor);
+  if (action) url += '&action=' + encodeURIComponent(action);
+  const r = await api('GET', url);
+  if (!r.ok) { toast('Failed to load audit log', 'error'); return; }
+  auditLogs = r.data.logs || [];
+  document.getElementById('audit-count').textContent = auditLogs.length + ' entries';
+  const tbody = document.getElementById('audit-tbody');
+  if (!auditLogs.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><p>No audit entries found</p></div></td></tr>`;
+    return;
   }
+  tbody.innerHTML = auditLogs.map(l => `
+    <tr>
+      <td class="td-mono" style="font-size:11px">${l.id}</td>
+      <td class="td-mono">${l.actor_id || '—'}</td>
+      <td><span class="badge badge-${l.actor_type === 'admin' ? 'admin' : l.actor_type === 'user' ? 'active' : 'pending'}">${l.actor_type||'—'}</span></td>
+      <td style="font-family:var(--mono);font-size:12px;color:var(--accent)">${esc(l.action)}</td>
+      <td class="td-mono">${l.target_type ? esc(l.target_type) + ' #' + l.target_id : '—'}</td>
+      <td class="td-mono" style="font-size:11px">${l.ip || '—'}</td>
+      <td><pre class="json-pre">${esc(JSON.stringify(l.meta || {}, null, 1))}</pre></td>
+      <td class="td-mono">${fmtDate(l.created_at)}</td>
+    </tr>`).join('');
+}
 
-  document.getElementById('queue-select-all').addEventListener('change', (e) => {
-    document.querySelectorAll('.queue-check').forEach((cb) => {
-      cb.checked = e.target.checked;
-      e.target.checked ? queueSelected.add(Number(cb.dataset.id)) : queueSelected.delete(Number(cb.dataset.id));
-    });
-    updateBulkBar();
-  });
+function debounceAudit() {
+  clearTimeout(auditDebounce);
+  auditDebounce = setTimeout(loadAudit, 400);
+}
 
-  document.getElementById('bulk-approve-btn').addEventListener('click', () => bulkModerate('approved'));
-  document.getElementById('bulk-reject-btn').addEventListener('click', () => bulkModerate('rejected'));
-  document.getElementById('bulk-deselect-btn').addEventListener('click', () => {
-    queueSelected.clear();
-    document.querySelectorAll('.queue-check').forEach((cb) => (cb.checked = false));
-    document.getElementById('queue-select-all').checked = false;
-    updateBulkBar();
-  });
+function exportAudit() {
+  const blob = new Blob([JSON.stringify(auditLogs, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `audit-log-${Date.now()}.json`;
+  a.click(); URL.revokeObjectURL(url);
+  toast('Audit log exported', 'success');
+}
 
-  async function moderateItem(id, status) {
-    const { ok, data } = await api(`/admin/queue/${id}`, { method: 'PATCH', body: { status } });
-    if (!ok) { toast(data.error || 'Moderation failed', 'error'); return; }
-    toast(`Content ${status}`, 'success');
-    loadQueue();
-  }
+// ── Settings ──────────────────────────────────────────────────────────────
+document.getElementById('password-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const current  = document.getElementById('pw-current').value;
+  const newPw    = document.getElementById('pw-new').value;
+  const confirm  = document.getElementById('pw-confirm').value;
+  const errEl    = document.getElementById('pw-error');
+  const btn      = document.getElementById('pw-btn');
+  errEl.style.display = 'none';
+  if (newPw !== confirm) { errEl.textContent = 'Passwords do not match'; errEl.style.display = 'block'; return; }
+  btn.disabled = true; btn.textContent = 'Updating…';
+  const r = await api('PATCH', '/api/admin/settings/password', { current_password: current, new_password: newPw });
+  btn.disabled = false; btn.textContent = 'Update password';
+  if (r.ok) { toast('Password updated', 'success'); e.target.reset(); }
+  else { errEl.textContent = r.data.error || 'Update failed'; errEl.style.display = 'block'; }
+});
 
-  async function bulkModerate(status) {
-    const ids = Array.from(queueSelected);
-    showModal(`Bulk ${status}`, `${status} ${ids.length} item(s)?`, async () => {
-      const { ok, data } = await api('/admin/queue/bulk', { method: 'POST', body: { ids, status } });
-      if (!ok) { toast(data.error || 'Bulk action failed', 'error'); return; }
-      toast(`${data.updated} items ${status}`, 'success');
-      loadQueue();
-    }, status === 'approved' ? 'btn-success' : 'btn-danger');
-  }
+function setApiBase() {
+  const val = document.getElementById('api-url-input').value.trim();
+  if (!val) return;
+  API_BASE = val;
+  localStorage.setItem('px_api_base', val);
+  document.getElementById('api-base-display').textContent = val;
+  document.getElementById('topbar-env').textContent = 'API: ' + val;
+  toast('API base URL updated', 'success');
+}
 
-  /* ── Content ────────────────────────────────────────────── */
-  async function loadContent() {
-    const { ok, data } = await api('/content?limit=50');
-    if (!ok) { toast('Failed to load content', 'error'); return; }
-    allContent = data.content || [];
-    renderContent(allContent);
-  }
+// ── Modal ─────────────────────────────────────────────────────────────────
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  moderateTargetId = null;
+}
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) closeModal(m.id); });
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => closeModal(m.id)); });
 
-  function renderContent(items) {
-    const tbody = document.getElementById('content-tbody');
-    if (!items.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>No content found</p></div></td></tr>'; return; }
-    tbody.innerHTML = items.map((c) => `
-      <tr>
-        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.title}</td>
-        <td>${c.display_name || '—'}</td>
-        <td>${c.sport || '—'}</td>
-        <td>${badge(c.status)}</td>
-        <td style="color:var(--text-muted);font-size:12px;">${fmt(c.created_at)}</td>
-        <td><div style="display:flex;gap:6px;">
-          <button class="btn btn-success btn-sm" onclick="moderateFromContent(${c.id},'approved')">✓</button>
-          <button class="btn btn-danger btn-sm" onclick="moderateFromContent(${c.id},'rejected')">✗</button>
-        </div></td>
-      </tr>`).join('');
-  }
+// ── Toast ─────────────────────────────────────────────────────────────────
+function toast(msg, type = 'info') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
 
-  window.moderateFromContent = async (id, status) => {
-    const { ok, data } = await api(`/admin/queue/${id}`, { method: 'PATCH', body: { status } });
-    if (!ok) { toast(data.error || 'Failed', 'error'); return; }
-    toast(`Content ${status}`, 'success'); loadContent();
-  };
-
-  document.getElementById('content-search').addEventListener('input', (e) => {
-    const q = e.target.value.toLowerCase();
-    const status = document.getElementById('content-status-filter').value;
-    renderContent(allContent.filter((c) => (!q || c.title.toLowerCase().includes(q)) && (!status || c.status === status)));
-  });
-  document.getElementById('content-status-filter').addEventListener('change', (e) => {
-    const q = document.getElementById('content-search').value.toLowerCase();
-    const status = e.target.value;
-    renderContent(allContent.filter((c) => (!q || c.title.toLowerCase().includes(q)) && (!status || c.status === status)));
-  });
-
-  /* ── Creators ───────────────────────────────────────────── */
-  async function loadCreators() {
-    const { ok, data } = await api('/admin/users?type=creator&limit=100');
-    if (!ok) { toast('Failed to load creators', 'error'); return; }
-    allCreators = data.users || [];
-    renderCreators(allCreators);
-  }
-
-  function renderCreators(items) {
-    const tbody = document.getElementById('creators-tbody');
-    if (!items.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>No creators found</p></div></td></tr>'; return; }
-    tbody.innerHTML = items.map((u) => `
-      <tr>
-        <td style="font-family:var(--font-mono);font-size:12px;">@${u.username}</td>
-        <td>${u.display_name || '—'}</td>
-        <td>${u.sport || '—'}</td>
-        <td style="font-variant-numeric:tabular-nums;">${(u.follower_count || 0).toLocaleString()}</td>
-        <td>${u.is_suspended ? badge('suspended') : (u.is_verified ? badge('verified') : badge('active'))}</td>
-        <td><div style="display:flex;gap:6px;">
-          ${u.is_suspended
-            ? `<button class="btn btn-success btn-sm" onclick="userAction('creator',${u.id},'reactivate','Reactivate @${u.username}?')">Reactivate</button>`
-            : `<button class="btn btn-danger btn-sm" onclick="userAction('creator',${u.id},'suspend','Suspend @${u.username}?')">Suspend</button>`}
-          ${!u.is_verified ? `<button class="btn btn-ghost btn-sm" onclick="userAction('creator',${u.id},'verify','Verify @${u.username}?')">Verify</button>` : ''}
-        </div></td>
-      </tr>`).join('');
-  }
-
-  document.getElementById('creator-search').addEventListener('input', (e) => {
-    const q = e.target.value.toLowerCase();
-    renderCreators(allCreators.filter((u) => !q || u.username.toLowerCase().includes(q) || (u.display_name || '').toLowerCase().includes(q)));
-  });
-
-  /* ── Businesses ─────────────────────────────────────────── */
-  async function loadBusinesses() {
-    const { ok, data } = await api('/admin/users?type=business&limit=100');
-    if (!ok) { toast('Failed to load businesses', 'error'); return; }
-    allBusinesses = data.users || [];
-    renderBusinesses(allBusinesses);
-  }
-
-  function renderBusinesses(items) {
-    const tbody = document.getElementById('businesses-tbody');
-    if (!items.length) { tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><p>No businesses found</p></div></td></tr>'; return; }
-    tbody.innerHTML = items.map((b) => `
-      <tr>
-        <td>${b.name}</td>
-        <td style="color:var(--text-muted);font-size:12px;">${b.email}</td>
-        <td>${b.industry || '—'}</td>
-        <td>${b.is_suspended ? badge('suspended') : (b.is_verified ? badge('verified') : badge('active'))}</td>
-        <td><div style="display:flex;gap:6px;">
-          ${b.is_suspended
-            ? `<button class="btn btn-success btn-sm" onclick="userAction('business',${b.id},'reactivate','Reactivate ${b.name}?')">Reactivate</button>`
-            : `<button class="btn btn-danger btn-sm" onclick="userAction('business',${b.id},'suspend','Suspend ${b.name}?')">Suspend</button>`}
-          ${!b.is_verified ? `<button class="btn btn-ghost btn-sm" onclick="userAction('business',${b.id},'verify','Verify ${b.name}?')">Verify</button>` : ''}
-        </div></td>
-      </tr>`).join('');
-  }
-
-  document.getElementById('business-search').addEventListener('input', (e) => {
-    const q = e.target.value.toLowerCase();
-    renderBusinesses(allBusinesses.filter((b) => !q || b.name.toLowerCase().includes(q) || b.email.toLowerCase().includes(q)));
-  });
-
-  window.userAction = async (type, id, action, confirmMsg) => {
-    showModal(action.charAt(0).toUpperCase() + action.slice(1), confirmMsg, async () => {
-      const { ok, data } = await api(`/admin/users/${type}/${id}`, { method: 'PATCH', body: { action } });
-      if (!ok) { toast(data.error || 'Action failed', 'error'); return; }
-      toast(`User ${action}d`, 'success');
-      type === 'business' ? loadBusinesses() : loadCreators();
-    }, action === 'suspend' ? 'btn-danger' : 'btn-success');
-  };
-
-  /* ── Audit Log ──────────────────────────────────────────── */
-  async function loadAudit() {
-    const type   = document.getElementById('audit-type-filter').value;
-    const action = document.getElementById('audit-action-filter').value;
-    const params = new URLSearchParams({ page: auditPage, limit: 50 });
-    if (type)   params.set('actor_type', type);
-    if (action) params.set('action', action);
-    const { ok, data } = await api(`/admin/audit?${params}`);
-    if (!ok) { toast('Failed to load audit log', 'error'); return; }
-    allAuditLogs = data.logs || [];
-    renderAudit(allAuditLogs);
-    document.getElementById('audit-page-label').textContent = `Page ${auditPage}`;
-  }
-
-  function renderAudit(logs) {
-    const tbody = document.getElementById('audit-tbody');
-    if (!logs.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>No log entries</p></div></td></tr>'; return; }
-    tbody.innerHTML = logs.map((l) => `
-      <tr>
-        <td style="color:var(--text-muted);font-size:12px;white-space:nowrap;">${fmt(l.created_at)}</td>
-        <td><span class="badge ${l.actor_type === 'admin' ? 'badge-verified' : 'badge-pending'}">${l.actor_type}</span>${l.actor_id ? ` <span style="font-size:11px;color:var(--text-faint);">#${l.actor_id}</span>` : ''}</td>
-        <td><span class="log-action">${l.action}</span></td>
-        <td style="font-size:12px;color:var(--text-muted);">${l.target_type ? `${l.target_type} #${l.target_id}` : '—'}</td>
-        <td style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);">${l.ip || '—'}</td>
-        <td><span class="log-meta" title="${JSON.stringify(l.meta)}">${l.meta && Object.keys(l.meta).length ? JSON.stringify(l.meta) : '—'}</span></td>
-      </tr>`).join('');
-  }
-
-  document.getElementById('audit-type-filter').addEventListener('change', () => { auditPage = 1; loadAudit(); });
-  document.getElementById('audit-action-filter').addEventListener('input', () => { auditPage = 1; loadAudit(); });
-  document.getElementById('audit-prev-btn').addEventListener('click', () => { if (auditPage > 1) { auditPage--; loadAudit(); } });
-  document.getElementById('audit-next-btn').addEventListener('click', () => { auditPage++; loadAudit(); });
-
-  document.getElementById('audit-export-btn').addEventListener('click', () => {
-    const blob = new Blob([JSON.stringify(allAuditLogs, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `plxyground-audit-${Date.now()}.json`;
-    a.click();
-    toast('Audit log exported', 'success');
-  });
-
-  /* ── Settings ───────────────────────────────────────────── */
-  document.getElementById('settings-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const errEl = document.getElementById('settings-error');
-    const sucEl = document.getElementById('settings-success');
-    errEl.classList.remove('show'); sucEl.classList.remove('show');
-
-    const current = document.getElementById('settings-current').value;
-    const newPw   = document.getElementById('settings-new').value;
-    const confirm = document.getElementById('settings-confirm').value;
-
-    if (newPw !== confirm) {
-      errEl.textContent = 'New passwords do not match';
-      errEl.classList.add('show');
-      return;
-    }
-
-    const { ok, data } = await api('/admin/settings/password', {
-      method: 'PATCH',
-      body: { current_password: current, new_password: newPw },
-    });
-
-    if (!ok) {
-      errEl.textContent = data.error || 'Failed to update password';
-      errEl.classList.add('show');
-    } else {
-      sucEl.textContent = 'Password updated successfully';
-      sucEl.classList.add('show');
-      document.getElementById('settings-form').reset();
-      toast('Password updated', 'success');
-    }
-  });
-
-})();
+// ── Helpers ───────────────────────────────────────────────────────────────
+function esc(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
 </script>
 </body>
 </html>

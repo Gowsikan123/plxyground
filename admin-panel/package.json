@@ -5,12 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "node server.js"
   },
-  "dependencies": {
-    "serve-handler": "^6.1.5"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.0"
-  }
+  "dependencies": {}
 }
