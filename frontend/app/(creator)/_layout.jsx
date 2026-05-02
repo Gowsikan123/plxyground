@@ -1,31 +1,36 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { COLORS } from '../../constants/colors';
+import { TYPOGRAPHY } from '../../constants/typography';
 
-export default function CreatorLayout() {
+const TAB_ICON = {
+  feed: { focused: 'home', unfocused: 'home-outline' },
+  create: { focused: 'add-circle', unfocused: 'add-circle-outline' },
+  opportunities: { focused: 'briefcase', unfocused: 'briefcase-outline' },
+  profile: { focused: 'person', unfocused: 'person-outline' },
+  settings: { focused: 'settings', unfocused: 'settings-outline' },
+};
+
+export default function CreatorTabsLayout() {
   return (
     <Tabs
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarStyle: { backgroundColor: '#0a0a0a', borderTopColor: '#1a1a1a' },
-        tabBarActiveTintColor: '#7c3aed',
-        tabBarInactiveTintColor: '#555',
-        tabBarIcon: ({ color, size }) => {
-          const icons = {
-            feed: 'home-outline',
-            create: 'add-circle-outline',
-            opportunities: 'briefcase-outline',
-            profile: 'person-outline',
-            settings: 'settings-outline',
-          };
-          return <Ionicons name={icons[route.name] || 'ellipse-outline'} size={size} color={color} />;
+        tabBarStyle: {
+          backgroundColor: COLORS.surface,
+          borderTopColor: COLORS.border,
+          borderTopWidth: 1,
+          paddingBottom: 6,
+          height: 62,
+        },
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.textMuted,
+        tabBarLabelStyle: { ...TYPOGRAPHY.labelSm, marginTop: 2 },
+        tabBarIcon: ({ focused, color, size }) => {
+          const icons = TAB_ICON[route.name] || { focused: 'ellipse', unfocused: 'ellipse-outline' };
+          return <Ionicons name={focused ? icons.focused : icons.unfocused} size={size} color={color} />;
         },
       })}
-    >
-      <Tabs.Screen name="feed" options={{ title: 'Feed' }} />
-      <Tabs.Screen name="create" options={{ title: 'Create' }} />
-      <Tabs.Screen name="opportunities" options={{ title: 'Deals' }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
-      <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
-    </Tabs>
+    />
   );
 }

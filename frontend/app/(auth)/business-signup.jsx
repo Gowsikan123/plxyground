@@ -1,58 +1,51 @@
-import React, { useState } from 'react';
-import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Alert, ScrollView,
-} from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { useState } from 'react';
 import { router } from 'expo-router';
-import { useAuthStore } from '../../store/authStore';
+import { COLORS } from '../../constants/colors';
+import { TYPOGRAPHY } from '../../constants/typography';
+import { SPACING } from '../../constants/spacing';
+import Input from '../../components/ui/Input';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function BusinessSignupScreen() {
-  const [companyName, setCompanyName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const businessRegister = useAuthStore((s) => s.businessRegister);
+  const { registerBusiness, loading } = useAuth();
+  const [form, setForm] = useState({ businessName: '', contactName: '', email: '', password: '', confirmPassword: '', website: '', description: '' });
+  const [error, setError] = useState('');
 
-  async function handleSignup() {
-    if (!companyName || !email || !password) return Alert.alert('Error', 'Please fill in all fields');
-    if (password.length < 8) return Alert.alert('Error', 'Password must be at least 8 characters');
-    setLoading(true);
-    try {
-      await businessRegister({ company_name: companyName.trim(), email: email.toLowerCase().trim(), password });
-      router.replace('/(business)/dashboard');
-    } catch (err) {
-      Alert.alert('Registration failed', err.message || 'Something went wrong');
-    } finally {
-      setLoading(false);
-    }
-  }
+  const set = (key) => (val) => setForm((f) => ({ ...f, [key]: val }));
+
+  const handleSignup = async () => {
+    setError('');
+    const { businessName, contactName, email, password, confirmPassword } = form;
+    if (!businessName || !contactName || !email || !password) { setError('Please fill in all required fields'); return; }
+    if (password !== confirmPassword) { setError('Passwords do not match'); return; }
+    if (password.length < 8) { setError('Password must be at least 8 characters'); return; }
+    const { error: err } = await registerBusiness({ business_name: businessName.trim(), contact_name: contactName.trim(), email: email.trim().toLowerCase(), password, website: form.website, description: form.description });
+    if (err) setError(err);
+  };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.logo}>PLXYGROUND</Text>
-        <Text style={styles.subtitle}>Register your business</Text>
-
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
+        <Pressable style={styles.back} onPress={() => router.back()}><Text style={styles.backText}>← Back</Text></Pressable>
+        <Text style={styles.heading}>Register Business</Text>
+        <Text style={styles.sub}>Start finding sports creators to partner with</Text>
         <View style={styles.form}>
-          <Text style={styles.label}>Company Name</Text>
-          <TextInput style={styles.input} value={companyName} onChangeText={setCompanyName}
-            placeholder="Your Company Ltd" placeholderTextColor="#888" />
-
-          <Text style={styles.label}>Business Email</Text>
-          <TextInput style={styles.input} value={email} onChangeText={setEmail}
-            keyboardType="email-address" autoCapitalize="none" placeholder="business@company.com" placeholderTextColor="#888" />
-
-          <Text style={styles.label}>Password</Text>
-          <TextInput style={styles.input} value={password} onChangeText={setPassword}
-            secureTextEntry placeholder="Min. 8 characters" placeholderTextColor="#888" />
-
-          <TouchableOpacity style={[styles.btn, loading && styles.btnDisabled]} onPress={handleSignup} disabled={loading}>
+          <Input label="Business Name *" value={form.businessName} onChangeText={set('businessName')} />
+          <Input label="Contact Name *" value={form.contactName} onChangeText={set('contactName')} />
+          <Input label="Business Email *" value={form.email} onChangeText={set('email')} keyboardType="email-address" autoCapitalize="none" />
+          <Input label="Website" value={form.website} onChangeText={set('website')} keyboardType="url" autoCapitalize="none" />
+          <Input label="Description" value={form.description} onChangeText={set('description')} multiline numberOfLines={3} />
+          <Input label="Password *" value={form.password} onChangeText={set('password')} secureTextEntry />
+          <Input label="Confirm Password *" value={form.confirmPassword} onChangeText={set('confirmPassword')} secureTextEntry />
+          {!!error && <Text style={styles.errorText}>{error}</Text>}
+          <Pressable style={({ pressed }) => [styles.btnBusiness, pressed && { opacity: 0.8 }]} onPress={handleSignup} disabled={loading}>
             {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Create Business Account</Text>}
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => router.push('/(auth)/business-login')}>
-            <Text style={styles.link}>Already registered? Sign in</Text>
-          </TouchableOpacity>
+          </Pressable>
+          <View style={styles.switchRow}>
+            <Text style={styles.switchHint}>Already registered? </Text>
+            <Pressable onPress={() => router.push('/(auth)/business-login')}><Text style={styles.switchLink}>Sign in</Text></Pressable>
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -60,14 +53,17 @@ export default function BusinessSignupScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, backgroundColor: '#0a0a0a', justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40 },
-  logo: { color: '#fff', fontSize: 28, fontWeight: '800', textAlign: 'center', letterSpacing: 2, marginBottom: 4 },
-  subtitle: { color: '#888', fontSize: 14, textAlign: 'center', marginBottom: 40 },
-  form: { gap: 12 },
-  label: { color: '#ccc', fontSize: 14, fontWeight: '600', marginBottom: -4 },
-  input: { backgroundColor: '#1a1a1a', color: '#fff', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, borderWidth: 1, borderColor: '#2a2a2a' },
-  btn: { backgroundColor: '#7c3aed', borderRadius: 10, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
-  btnDisabled: { opacity: 0.6 },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  link: { color: '#7c3aed', textAlign: 'center', fontSize: 14, marginTop: 8 },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  inner: { flexGrow: 1, padding: SPACING[6], paddingTop: SPACING[12] },
+  back: { marginBottom: SPACING[8] },
+  backText: { ...TYPOGRAPHY.bodySm, color: COLORS.primary },
+  heading: { ...TYPOGRAPHY.displaySm, color: COLORS.text, marginBottom: SPACING[1] },
+  sub: { ...TYPOGRAPHY.bodyMd, color: COLORS.textMuted, marginBottom: SPACING[8] },
+  form: { gap: SPACING[4] },
+  errorText: { ...TYPOGRAPHY.bodySm, color: COLORS.error },
+  btnBusiness: { backgroundColor: '#2d6a2d', borderRadius: 14, paddingVertical: SPACING[4], alignItems: 'center', marginTop: SPACING[2] },
+  btnText: { ...TYPOGRAPHY.labelLg, color: '#fff' },
+  switchRow: { flexDirection: 'row', justifyContent: 'center' },
+  switchHint: { ...TYPOGRAPHY.bodySm, color: COLORS.textMuted },
+  switchLink: { ...TYPOGRAPHY.bodySm, color: '#5ca85c', fontWeight: '600' },
 });

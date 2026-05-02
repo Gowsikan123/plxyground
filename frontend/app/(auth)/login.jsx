@@ -1,96 +1,75 @@
-import React, { useState } from 'react';
-import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { useState } from 'react';
 import { router } from 'expo-router';
-import { useAuthStore } from '../../store/authStore';
+import { COLORS } from '../../constants/colors';
+import { TYPOGRAPHY } from '../../constants/typography';
+import { SPACING } from '../../constants/spacing';
+import Input from '../../components/ui/Input';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function LoginScreen() {
+  const { login, loading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const login = useAuthStore((s) => s.login);
+  const [error, setError] = useState('');
 
-  async function handleLogin() {
-    if (!email || !password) {
-      return Alert.alert('Error', 'Please fill in all fields');
-    }
-    setLoading(true);
-    try {
-      await login(email.toLowerCase().trim(), password);
-      router.replace('/(creator)/feed');
-    } catch (err) {
-      Alert.alert('Login failed', err.message || 'Invalid email or password');
-    } finally {
-      setLoading(false);
-    }
-  }
+  const handleLogin = async () => {
+    setError('');
+    if (!email.trim() || !password) { setError('Please fill in all fields'); return; }
+    const { error: err } = await login(email.trim().toLowerCase(), password);
+    if (err) setError(err);
+  };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <Text style={styles.logo}>PLXYGROUND</Text>
-      <Text style={styles.subtitle}>Creator Platform</Text>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
+        <Pressable style={styles.back} onPress={() => router.back()}>
+          <Text style={styles.backText}>← Back</Text>
+        </Pressable>
 
-      <View style={styles.form}>
-        <Text style={styles.label}>Email</Text>
-        <TextInput
-          style={styles.input}
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          placeholder="you@example.com"
-          placeholderTextColor="#888"
-        />
+        <Text style={styles.heading}>Welcome back</Text>
+        <Text style={styles.sub}>Sign in to your creator account</Text>
 
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          placeholder="Your password"
-          placeholderTextColor="#888"
-        />
+        <View style={styles.form}>
+          <Input label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+          <Input label="Password" value={password} onChangeText={setPassword} secureTextEntry />
+          {!!error && <Text style={styles.errorText}>{error}</Text>}
 
-        <TouchableOpacity
-          style={[styles.btn, loading && styles.btnDisabled]}
-          onPress={handleLogin}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.btnText}>Sign In</Text>
-          )}
-        </TouchableOpacity>
+          <Pressable
+            style={({ pressed }) => [styles.btnPrimary, pressed && { opacity: 0.8 }]}
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Sign In</Text>}
+          </Pressable>
 
-        <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
-          <Text style={styles.link}>Don’t have an account? Sign up</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.push('/(auth)/business-login')}>
-          <Text style={styles.link}>Business login →</Text>
-        </TouchableOpacity>
-      </View>
+          <View style={styles.switchRow}>
+            <Text style={styles.switchHint}>No account? </Text>
+            <Pressable onPress={() => router.push('/(auth)/signup')}>
+              <Text style={styles.switchLink}>Create one</Text>
+            </Pressable>
+          </View>
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0a', justifyContent: 'center', paddingHorizontal: 24 },
-  logo: { color: '#fff', fontSize: 28, fontWeight: '800', textAlign: 'center', letterSpacing: 2, marginBottom: 4 },
-  subtitle: { color: '#888', fontSize: 14, textAlign: 'center', marginBottom: 40 },
-  form: { gap: 12 },
-  label: { color: '#ccc', fontSize: 14, fontWeight: '600', marginBottom: -4 },
-  input: { backgroundColor: '#1a1a1a', color: '#fff', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, borderWidth: 1, borderColor: '#2a2a2a' },
-  btn: { backgroundColor: '#7c3aed', borderRadius: 10, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
-  btnDisabled: { opacity: 0.6 },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  link: { color: '#7c3aed', textAlign: 'center', fontSize: 14, marginTop: 8 },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  inner: { flexGrow: 1, padding: SPACING[6], paddingTop: SPACING[12] },
+  back: { marginBottom: SPACING[8] },
+  backText: { ...TYPOGRAPHY.bodySm, color: COLORS.primary },
+  heading: { ...TYPOGRAPHY.displaySm, color: COLORS.text, marginBottom: SPACING[1] },
+  sub: { ...TYPOGRAPHY.bodyMd, color: COLORS.textMuted, marginBottom: SPACING[8] },
+  form: { gap: SPACING[4] },
+  errorText: { ...TYPOGRAPHY.bodySm, color: COLORS.error },
+  btnPrimary: {
+    backgroundColor: COLORS.primary, borderRadius: 14,
+    paddingVertical: SPACING[4], alignItems: 'center', marginTop: SPACING[2],
+  },
+  btnText: { ...TYPOGRAPHY.labelLg, color: '#fff' },
+  switchRow: { flexDirection: 'row', justifyContent: 'center' },
+  switchHint: { ...TYPOGRAPHY.bodySm, color: COLORS.textMuted },
+  switchLink: { ...TYPOGRAPHY.bodySm, color: COLORS.primary, fontWeight: '600' },
 });

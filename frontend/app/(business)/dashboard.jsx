@@ -1,79 +1,75 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
-import { useAuthStore } from '../../store/authStore';
-import { api } from '../../services/api';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { router } from 'expo-router';
+import { useAuth } from '../../hooks/useAuth';
+import { COLORS } from '../../constants/colors';
+import { TYPOGRAPHY } from '../../constants/typography';
+import { SPACING } from '../../constants/spacing';
+import Header from '../../components/layout/Header';
 
-export default function BusinessDashboardScreen() {
-  const { user, token } = useAuthStore();
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
+const KPI = ({ label, value, sub }) => (
+  <View style={styles.kpiCard}>
+    <Text style={styles.kpiValue}>{value}</Text>
+    <Text style={styles.kpiLabel}>{label}</Text>
+    {sub ? <Text style={styles.kpiSub}>{sub}</Text> : null}
+  </View>
+);
 
-  useEffect(() => {
-    async function loadStats() {
-      try {
-        const data = await api.get('/business/content', token);
-        setStats({ totalPosts: data.total || 0, posts: data.data || [] });
-      } catch {
-        setStats({ totalPosts: 0, posts: [] });
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadStats();
-  }, []);
+export default function BusinessDashboard() {
+  const { user } = useAuth();
 
-  if (loading) {
-    return <View style={styles.center}><ActivityIndicator color="#7c3aed" size="large" /></View>;
-  }
+  const kpis = [
+    { label: 'Active Opportunities', value: '0', sub: 'Live now' },
+    { label: 'Applications', value: '0', sub: 'Received' },
+    { label: 'Active Deals', value: '0', sub: 'In progress' },
+    { label: 'Total Reach', value: '0', sub: 'Creator views' },
+  ];
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.greeting}>Welcome back,</Text>
-      <Text style={styles.company}>{user?.company_name || 'Your Business'}</Text>
+    <View style={styles.container}>
+      <Header title={user?.business_name ?? 'Dashboard'} />
+      <ScrollView contentContainerStyle={styles.inner}>
+        <Text style={styles.greeting}>Good to see you back</Text>
+        <Text style={styles.sub}>Manage your creator partnerships</Text>
 
-      <View style={styles.kpiRow}>
-        <View style={styles.kpi}>
-          <Text style={styles.kpiValue}>{stats?.totalPosts ?? 0}</Text>
-          <Text style={styles.kpiLabel}>Total Posts</Text>
+        <View style={styles.kpiGrid}>
+          {kpis.map((k) => <KPI key={k.label} {...k} />)}
         </View>
-        <View style={styles.kpi}>
-          <Text style={styles.kpiValue}>🟢</Text>
-          <Text style={styles.kpiLabel}>Account Active</Text>
-        </View>
-      </View>
 
-      <Text style={styles.sectionTitle}>Recent Campaigns</Text>
-      {stats?.posts?.slice(0, 5).map((post) => (
-        <View key={post.id} style={styles.card}>
-          <Text style={styles.cardTitle}>{post.title}</Text>
-          <Text style={styles.cardStatus}>{post.status}</Text>
+        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <View style={styles.actionsGrid}>
+          <Pressable style={styles.actionCard} onPress={() => router.push('/(business)/opportunities')}>
+            <Text style={styles.actionIcon}>📋</Text>
+            <Text style={styles.actionLabel}>Post Opportunity</Text>
+          </Pressable>
+          <Pressable style={styles.actionCard} onPress={() => router.push('/(business)/discover')}>
+            <Text style={styles.actionIcon}>🔍</Text>
+            <Text style={styles.actionLabel}>Find Creators</Text>
+          </Pressable>
         </View>
-      ))}
-
-      {!stats?.posts?.length && (
-        <View style={styles.empty}>
-          <Text style={styles.emptyText}>No campaigns yet.</Text>
-          <Text style={styles.emptySubtext}>Create your first post from the Content tab.</Text>
-        </View>
-      )}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0a', paddingHorizontal: 20, paddingTop: 32 },
-  center: { flex: 1, backgroundColor: '#0a0a0a', justifyContent: 'center', alignItems: 'center' },
-  greeting: { color: '#888', fontSize: 14 },
-  company: { color: '#fff', fontSize: 24, fontWeight: '800', marginBottom: 24 },
-  kpiRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
-  kpi: { flex: 1, backgroundColor: '#111', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#1e1e1e', alignItems: 'center' },
-  kpiValue: { color: '#7c3aed', fontSize: 28, fontWeight: '800', marginBottom: 4 },
-  kpiLabel: { color: '#888', fontSize: 13 },
-  sectionTitle: { color: '#fff', fontSize: 16, fontWeight: '700', marginBottom: 12 },
-  card: { backgroundColor: '#111', borderRadius: 10, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: '#1e1e1e' },
-  cardTitle: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  cardStatus: { color: '#888', fontSize: 12, marginTop: 4 },
-  empty: { paddingTop: 32, alignItems: 'center' },
-  emptyText: { color: '#fff', fontSize: 16 },
-  emptySubtext: { color: '#666', fontSize: 13, marginTop: 4 },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  inner: { padding: SPACING[4], paddingBottom: SPACING[12] },
+  greeting: { ...TYPOGRAPHY.headingLg, color: COLORS.text, marginTop: SPACING[2] },
+  sub: { ...TYPOGRAPHY.bodyMd, color: COLORS.textMuted, marginBottom: SPACING[6] },
+  kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING[3], marginBottom: SPACING[6] },
+  kpiCard: {
+    flex: 1, minWidth: '45%', backgroundColor: COLORS.surface, borderRadius: 14,
+    padding: SPACING[4], borderWidth: 1, borderColor: COLORS.border,
+  },
+  kpiValue: { ...TYPOGRAPHY.displaySm, color: COLORS.text },
+  kpiLabel: { ...TYPOGRAPHY.labelMd, color: COLORS.textMuted, marginTop: SPACING[1] },
+  kpiSub: { ...TYPOGRAPHY.labelSm, color: COLORS.textFaint, marginTop: 2 },
+  sectionTitle: { ...TYPOGRAPHY.headingMd, color: COLORS.text, marginBottom: SPACING[3] },
+  actionsGrid: { flexDirection: 'row', gap: SPACING[3] },
+  actionCard: {
+    flex: 1, backgroundColor: COLORS.surface, borderRadius: 14, padding: SPACING[5],
+    alignItems: 'center', borderWidth: 1, borderColor: COLORS.border,
+  },
+  actionIcon: { fontSize: 32, marginBottom: SPACING[2] },
+  actionLabel: { ...TYPOGRAPHY.labelMd, color: COLORS.text, textAlign: 'center' },
 });

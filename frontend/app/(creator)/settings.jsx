@@ -1,47 +1,81 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
-import { useAuthStore } from '../../store/authStore';
-import { api } from '../../services/api';
+import { View, Text, StyleSheet, ScrollView, Pressable, Switch, ActivityIndicator } from 'react-native';
+import { useState } from 'react';
+import { useAuth } from '../../hooks/useAuth';
+import { COLORS } from '../../constants/colors';
+import { TYPOGRAPHY } from '../../constants/typography';
+import { SPACING } from '../../constants/spacing';
+import Input from '../../components/ui/Input';
+
+const Section = ({ title, children }) => (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>{title}</Text>
+    <View style={styles.sectionBody}>{children}</View>
+  </View>
+);
+
+const Row = ({ label, value, onPress, destructive }) => (
+  <Pressable style={styles.row} onPress={onPress}>
+    <Text style={[styles.rowLabel, destructive && styles.rowLabelDestructive]}>{label}</Text>
+    {value && <Text style={styles.rowValue}>{value}</Text>}
+  </Pressable>
+);
 
 export default function SettingsScreen() {
-  const { user, token } = useAuthStore();
+  const { user, logout, updateProfile, loading } = useAuth();
+  const [displayName, setDisplayName] = useState(user?.display_name || '');
   const [bio, setBio] = useState(user?.bio || '');
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [notifs, setNotifs] = useState(true);
 
-  async function handleSave() {
-    setLoading(true);
-    try {
-      await api.put('/auth/me', { bio }, token);
-      Alert.alert('Saved', 'Profile updated successfully.');
-    } catch (err) {
-      Alert.alert('Error', err.message || 'Failed to save settings');
-    } finally {
-      setLoading(false);
-    }
-  }
+  const handleSave = async () => {
+    setSaving(true);
+    await updateProfile({ display_name: displayName, bio });
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.inner}>
       <Text style={styles.heading}>Settings</Text>
 
-      <Text style={styles.label}>Bio</Text>
-      <TextInput style={[styles.input, styles.textarea]} value={bio} onChangeText={setBio}
-        placeholder="Tell the world about you..." placeholderTextColor="#555" multiline numberOfLines={4} textAlignVertical="top" />
+      <Section title="Profile">
+        <Input label="Display Name" value={displayName} onChangeText={setDisplayName} />
+        <Input label="Bio" value={bio} onChangeText={setBio} multiline numberOfLines={3} />
+        <Pressable style={[styles.saveBtn, saving && { opacity: 0.7 }]} onPress={handleSave} disabled={saving}>
+          {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>{saved ? '✓ Saved' : 'Save Changes'}</Text>}
+        </Pressable>
+      </Section>
 
-      <TouchableOpacity style={[styles.btn, loading && styles.btnDisabled]} onPress={handleSave} disabled={loading}>
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Save Changes</Text>}
-      </TouchableOpacity>
+      <Section title="Notifications">
+        <View style={styles.toggleRow}>
+          <Text style={styles.rowLabel}>Push notifications</Text>
+          <Switch value={notifs} onValueChange={setNotifs} trackColor={{ true: COLORS.primary }} />
+        </View>
+      </Section>
+
+      <Section title="Account">
+        <Row label="Privacy Policy" onPress={() => {}} />
+        <Row label="Terms of Service" onPress={() => {}} />
+        <Row label="Sign Out" onPress={logout} destructive />
+      </Section>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0a', paddingHorizontal: 20, paddingTop: 24 },
-  heading: { color: '#fff', fontSize: 22, fontWeight: '800', marginBottom: 24 },
-  label: { color: '#aaa', fontSize: 13, fontWeight: '600', marginBottom: 6, marginTop: 16 },
-  input: { backgroundColor: '#111', color: '#fff', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, borderWidth: 1, borderColor: '#1e1e1e' },
-  textarea: { minHeight: 100, paddingTop: 12 },
-  btn: { backgroundColor: '#7c3aed', borderRadius: 10, paddingVertical: 16, alignItems: 'center', marginTop: 24 },
-  btnDisabled: { opacity: 0.6 },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  inner: { padding: SPACING[6], paddingTop: SPACING[14], paddingBottom: SPACING[20] },
+  heading: { ...TYPOGRAPHY.displaySm, color: COLORS.text, marginBottom: SPACING[8] },
+  section: { marginBottom: SPACING[8] },
+  sectionTitle: { ...TYPOGRAPHY.labelMd, color: COLORS.textMuted, letterSpacing: 1, marginBottom: SPACING[3] },
+  sectionBody: { gap: SPACING[3] },
+  row: { paddingVertical: SPACING[4], borderBottomWidth: 1, borderBottomColor: COLORS.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  rowLabel: { ...TYPOGRAPHY.bodyMd, color: COLORS.text },
+  rowLabelDestructive: { color: COLORS.error },
+  rowValue: { ...TYPOGRAPHY.bodySm, color: COLORS.textMuted },
+  toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SPACING[2] },
+  saveBtn: { backgroundColor: COLORS.primary, borderRadius: 12, paddingVertical: SPACING[3], alignItems: 'center', marginTop: SPACING[2] },
+  saveBtnText: { ...TYPOGRAPHY.labelMd, color: '#fff' },
 });

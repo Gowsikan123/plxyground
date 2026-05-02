@@ -1,81 +1,106 @@
-import React, { useState } from 'react';
-import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
-} from 'react-native';
-import { useAuthStore } from '../../store/authStore';
-import { api } from '../../services/api';
-import { useFeedStore } from '../../store/feedStore';
+import { View, Text, StyleSheet, Pressable, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { useState } from 'react';
+import { router } from 'expo-router';
+import { COLORS } from '../../constants/colors';
+import { TYPOGRAPHY } from '../../constants/typography';
+import { SPACING } from '../../constants/spacing';
+import Input from '../../components/ui/Input';
+import { contentService } from '../../services/contentService';
+import { useAuth } from '../../hooks/useAuth';
 
-const CATEGORIES = ['Lifestyle', 'Tech', 'Fashion', 'Food', 'Travel', 'Sports', 'Music', 'Art', 'Gaming', 'Other'];
+const CONTENT_TYPES = ['video', 'image', 'article', 'highlight'];
+const SPORT_TAGS = ['basketball', 'football', 'cricket', 'tennis', 'mma', 'fitness', 'athletics', 'swimming', 'rugby', 'boxing'];
 
 export default function CreateScreen() {
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
-  const [category, setCategory] = useState('Other');
+  const { token } = useAuth();
+  const [form, setForm] = useState({ title: '', description: '', content_type: 'video', media_url: '', sport_tags: [] });
   const [loading, setLoading] = useState(false);
-  const token = useAuthStore((s) => s.token);
-  const refreshFeed = useFeedStore((s) => s.refreshFeed);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
 
-  async function handleSubmit() {
-    if (!title.trim() || !body.trim()) return Alert.alert('Error', 'Title and body are required');
+  const set = (key) => (val) => setForm((f) => ({ ...f, [key]: val }));
+
+  const toggleTag = (tag) => {
+    setForm((f) => ({
+      ...f,
+      sport_tags: f.sport_tags.includes(tag) ? f.sport_tags.filter((t) => t !== tag) : [...f.sport_tags, tag],
+    }));
+  };
+
+  const handleSubmit = async () => {
+    setError('');
+    if (!form.title.trim() || !form.description.trim()) { setError('Title and description are required'); return; }
     setLoading(true);
-    try {
-      await api.post('/content', { title: title.trim(), body: body.trim(), category }, token);
-      Alert.alert('Posted!', 'Your post has been submitted for review.');
-      setTitle('');
-      setBody('');
-      setCategory('Other');
-      await refreshFeed();
-    } catch (err) {
-      Alert.alert('Error', err.message || 'Failed to post');
-    } finally {
-      setLoading(false);
-    }
-  }
+    const { error: err } = await contentService.create({ ...form, sport_tags: form.sport_tags.join(',') }, token);
+    setLoading(false);
+    if (err) { setError(err); return; }
+    setSuccess(true);
+    setTimeout(() => { setSuccess(false); router.push('/(creator)/feed'); }, 1500);
+  };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
         <Text style={styles.heading}>New Post</Text>
+        <Text style={styles.sub}>Share your sports content with the community</Text>
 
-        <Text style={styles.label}>Title</Text>
-        <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="What’s this about?" placeholderTextColor="#555" />
+        <View style={styles.form}>
+          <Input label="Title *" value={form.title} onChangeText={set('title')} placeholder="What's this about?" />
+          <Input label="Description *" value={form.description} onChangeText={set('description')} multiline numberOfLines={4} placeholder="Tell your story..." />
+          <Input label="Media URL" value={form.media_url} onChangeText={set('media_url')} keyboardType="url" autoCapitalize="none" placeholder="https://..." />
 
-        <Text style={styles.label}>Body</Text>
-        <TextInput style={[styles.input, styles.textarea]} value={body} onChangeText={setBody}
-          placeholder="Write your content here..." placeholderTextColor="#555" multiline numberOfLines={8} textAlignVertical="top" />
+          <Text style={styles.sectionLabel}>Content Type</Text>
+          <View style={styles.chipRow}>
+            {CONTENT_TYPES.map((type) => (
+              <Pressable
+                key={type}
+                style={[styles.chip, form.content_type === type && styles.chipActive]}
+                onPress={() => set('content_type')(type)}
+              >
+                <Text style={[styles.chipText, form.content_type === type && styles.chipTextActive]}>{type}</Text>
+              </Pressable>
+            ))}
+          </View>
 
-        <Text style={styles.label}>Category</Text>
-        <View style={styles.categories}>
-          {CATEGORIES.map((cat) => (
-            <TouchableOpacity key={cat} style={[styles.catBtn, category === cat && styles.catBtnActive]}
-              onPress={() => setCategory(cat)}>
-              <Text style={[styles.catText, category === cat && styles.catTextActive]}>{cat}</Text>
-            </TouchableOpacity>
-          ))}
+          <Text style={styles.sectionLabel}>Sport Tags</Text>
+          <View style={styles.chipRow}>
+            {SPORT_TAGS.map((tag) => (
+              <Pressable
+                key={tag}
+                style={[styles.chip, form.sport_tags.includes(tag) && styles.chipActive]}
+                onPress={() => toggleTag(tag)}
+              >
+                <Text style={[styles.chipText, form.sport_tags.includes(tag) && styles.chipTextActive]}>#{tag}</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {!!error && <Text style={styles.errorText}>{error}</Text>}
+          {success && <Text style={styles.successText}>✓ Post published!</Text>}
+
+          <Pressable style={({ pressed }) => [styles.btnSubmit, pressed && { opacity: 0.8 }]} onPress={handleSubmit} disabled={loading}>
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Publish Post</Text>}
+          </Pressable>
         </View>
-
-        <TouchableOpacity style={[styles.btn, loading && styles.btnDisabled]} onPress={handleSubmit} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Submit Post</Text>}
-        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0a', paddingHorizontal: 20, paddingTop: 24 },
-  heading: { color: '#fff', fontSize: 22, fontWeight: '800', marginBottom: 24 },
-  label: { color: '#aaa', fontSize: 13, fontWeight: '600', marginBottom: 6, marginTop: 16 },
-  input: { backgroundColor: '#111', color: '#fff', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, borderWidth: 1, borderColor: '#1e1e1e' },
-  textarea: { minHeight: 140, paddingTop: 12 },
-  categories: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  catBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: '#2a2a2a', backgroundColor: '#111' },
-  catBtnActive: { borderColor: '#7c3aed', backgroundColor: '#2d1b6b' },
-  catText: { color: '#888', fontSize: 13 },
-  catTextActive: { color: '#c4b5fd' },
-  btn: { backgroundColor: '#7c3aed', borderRadius: 10, paddingVertical: 16, alignItems: 'center', marginTop: 24 },
-  btnDisabled: { opacity: 0.6 },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  inner: { flexGrow: 1, padding: SPACING[6], paddingTop: SPACING[14] },
+  heading: { ...TYPOGRAPHY.displaySm, color: COLORS.text, marginBottom: SPACING[1] },
+  sub: { ...TYPOGRAPHY.bodyMd, color: COLORS.textMuted, marginBottom: SPACING[6] },
+  form: { gap: SPACING[4] },
+  sectionLabel: { ...TYPOGRAPHY.labelMd, color: COLORS.textMuted, marginTop: SPACING[2] },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING[2] },
+  chip: { paddingHorizontal: SPACING[3], paddingVertical: SPACING[2], borderRadius: SPACING[5], borderWidth: 1, borderColor: COLORS.border },
+  chipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  chipText: { ...TYPOGRAPHY.labelSm, color: COLORS.textMuted },
+  chipTextActive: { color: '#fff' },
+  errorText: { ...TYPOGRAPHY.bodySm, color: COLORS.error },
+  successText: { ...TYPOGRAPHY.bodySm, color: COLORS.success },
+  btnSubmit: { backgroundColor: COLORS.primary, borderRadius: 14, paddingVertical: SPACING[4], alignItems: 'center', marginTop: SPACING[4] },
+  btnText: { ...TYPOGRAPHY.labelLg, color: '#fff' },
 });

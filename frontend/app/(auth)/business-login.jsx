@@ -1,80 +1,68 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Input } from '../../components/ui/Input';
-import { Button } from '../../components/ui/Button';
-import { Colors } from '../../constants/colors';
+import { View, Text, StyleSheet, Pressable, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { useState } from 'react';
+import { router } from 'expo-router';
+import { COLORS } from '../../constants/colors';
+import { TYPOGRAPHY } from '../../constants/typography';
+import { SPACING } from '../../constants/spacing';
+import Input from '../../components/ui/Input';
+import { useAuth } from '../../hooks/useAuth';
 
-export default function BusinessLogin() {
-  const router = useRouter();
-  const [mode, setMode] = useState('login');
-  const [form, setForm] = useState({ email: '', password: '', company_name: '', industry: '' });
-  const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
+export default function BusinessLoginScreen() {
+  const { loginBusiness, loading } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
 
-  function set(field, val) {
-    setForm((p) => ({ ...p, [field]: val }));
-    setErrors((p) => ({ ...p, [field]: '' }));
-  }
-
-  async function submit() {
-    setLoading(true);
-    const { loginBusiness, signupBusiness } = require('../../store/authStore').useAuthStore.getState();
-    let result;
-    if (mode === 'login') {
-      result = await loginBusiness(form.email, form.password);
-    } else {
-      result = await signupBusiness(form);
-    }
-    setLoading(false);
-    if (result.error) {
-      setErrors({ general: result.error });
-    } else {
-      router.replace('/(tabs)/feed');
-    }
-  }
+  const handleLogin = async () => {
+    setError('');
+    if (!email.trim() || !password) { setError('Please fill in all fields'); return; }
+    const { error: err } = await loginBusiness(email.trim().toLowerCase(), password);
+    if (err) setError(err);
+  };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <TouchableOpacity onPress={() => router.back()} style={styles.back}>
-          <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.heading}>Business {mode === 'login' ? 'Login' : 'Signup'}</Text>
-        <View style={styles.toggle}>
-          <TouchableOpacity onPress={() => setMode('login')} style={[styles.tab, mode === 'login' && styles.activeTab]}>
-            <Text style={[styles.tabText, mode === 'login' && styles.activeTabText]}>Login</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setMode('signup')} style={[styles.tab, mode === 'signup' && styles.activeTab]}>
-            <Text style={[styles.tabText, mode === 'signup' && styles.activeTabText]}>Sign Up</Text>
-          </TouchableOpacity>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
+        <Pressable style={styles.back} onPress={() => router.back()}><Text style={styles.backText}>← Back</Text></Pressable>
+        <View style={styles.badge}><Text style={styles.badgeText}>BUSINESS</Text></View>
+        <Text style={styles.heading}>Business Sign In</Text>
+        <Text style={styles.sub}>Manage partnerships and opportunities</Text>
+        <View style={styles.form}>
+          <Input label="Business Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+          <Input label="Password" value={password} onChangeText={setPassword} secureTextEntry />
+          {!!error && <Text style={styles.errorText}>{error}</Text>}
+          <Pressable style={({ pressed }) => [styles.btnBusiness, pressed && { opacity: 0.8 }]} onPress={handleLogin} disabled={loading}>
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Sign In as Business</Text>}
+          </Pressable>
+          <View style={styles.switchRow}>
+            <Text style={styles.switchHint}>No business account? </Text>
+            <Pressable onPress={() => router.push('/(auth)/business-signup')}><Text style={styles.switchLink}>Register</Text></Pressable>
+          </View>
+          <Pressable style={styles.altLink} onPress={() => router.push('/(auth)/creator-login')}>
+            <Text style={styles.altLinkText}>Sign in as a Creator instead →</Text>
+          </Pressable>
         </View>
-        {errors.general && <Text style={styles.errorBanner}>{errors.general}</Text>}
-        <Input label="Email" value={form.email} onChangeText={(v) => set('email', v)} keyboardType="email-address" placeholder="business@company.com" />
-        <Input label="Password" value={form.password} onChangeText={(v) => set('password', v)} secureTextEntry placeholder="••••••••" />
-        {mode === 'signup' && (
-          <>
-            <Input label="Company Name" value={form.company_name} onChangeText={(v) => set('company_name', v)} placeholder="Your Company" />
-            <Input label="Industry (optional)" value={form.industry} onChangeText={(v) => set('industry', v)} placeholder="e.g. Sports Tech" />
-          </>
-        )}
-        <Button title={mode === 'login' ? 'Login' : 'Create Business Account'} onPress={submit} loading={loading} style={styles.cta} />
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: 24, paddingTop: 60 },
-  back: { marginBottom: 24 },
-  backText: { color: Colors.textMuted, fontFamily: 'DMSans_400Regular', fontSize: 15 },
-  heading: { color: Colors.text, fontSize: 28, fontFamily: 'Syne_700Bold', marginBottom: 24 },
-  toggle: { flexDirection: 'row', backgroundColor: Colors.surface, borderRadius: 10, padding: 4, marginBottom: 24 },
-  tab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
-  activeTab: { backgroundColor: Colors.info },
-  tabText: { color: Colors.textMuted, fontFamily: 'DMSans_500Medium', fontSize: 14 },
-  activeTabText: { color: '#fff' },
-  errorBanner: { color: Colors.error, backgroundColor: 'rgba(239,68,68,0.1)', padding: 12, borderRadius: 8, fontSize: 13, fontFamily: 'DMSans_400Regular', marginBottom: 16 },
-  cta: { marginTop: 8 },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  inner: { flexGrow: 1, padding: SPACING[6], paddingTop: SPACING[12] },
+  back: { marginBottom: SPACING[6] },
+  backText: { ...TYPOGRAPHY.bodySm, color: COLORS.primary },
+  badge: { alignSelf: 'flex-start', backgroundColor: '#1a2a1a', borderRadius: 6, paddingHorizontal: SPACING[3], paddingVertical: SPACING[1], marginBottom: SPACING[3] },
+  badgeText: { ...TYPOGRAPHY.labelSm, color: '#5ca85c', letterSpacing: 1.5 },
+  heading: { ...TYPOGRAPHY.displaySm, color: COLORS.text, marginBottom: SPACING[1] },
+  sub: { ...TYPOGRAPHY.bodyMd, color: COLORS.textMuted, marginBottom: SPACING[8] },
+  form: { gap: SPACING[4] },
+  errorText: { ...TYPOGRAPHY.bodySm, color: COLORS.error },
+  btnBusiness: { backgroundColor: '#2d6a2d', borderRadius: 14, paddingVertical: SPACING[4], alignItems: 'center', marginTop: SPACING[2] },
+  btnText: { ...TYPOGRAPHY.labelLg, color: '#fff' },
+  switchRow: { flexDirection: 'row', justifyContent: 'center' },
+  switchHint: { ...TYPOGRAPHY.bodySm, color: COLORS.textMuted },
+  switchLink: { ...TYPOGRAPHY.bodySm, color: '#5ca85c', fontWeight: '600' },
+  altLink: { alignItems: 'center', marginTop: SPACING[2] },
+  altLinkText: { ...TYPOGRAPHY.bodySm, color: COLORS.textMuted },
 });
