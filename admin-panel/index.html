@@ -1,236 +1,209 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-section="dashboard">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PLXYGROUND Admin</title>
   <style>
-    :root {
-      --bg:           #0d0d0f;
-      --surface:      #141416;
-      --surface-2:    #1a1a1d;
-      --surface-3:    #212126;
-      --border:       rgba(255,255,255,0.07);
-      --border-hover: rgba(255,255,255,0.14);
-      --text:         #e8e8ea;
-      --text-muted:   #7a7a85;
-      --text-faint:   #44444d;
-      --accent:       #f97316;
-      --accent-hover: #fb923c;
-      --accent-dim:   rgba(249,115,22,0.12);
-      --green:        #22c55e;
-      --green-dim:    rgba(34,197,94,0.12);
-      --red:          #ef4444;
-      --red-dim:      rgba(239,68,68,0.12);
-      --yellow:       #eab308;
-      --yellow-dim:   rgba(234,179,8,0.12);
-      --blue:         #3b82f6;
-      --blue-dim:     rgba(59,130,246,0.12);
-      --radius:       8px;
-      --radius-lg:    12px;
-      --sidebar-w:    220px;
-      --header-h:     56px;
-      --transition:   160ms cubic-bezier(0.16,1,0.3,1);
-      --shadow:       0 4px 24px rgba(0,0,0,0.4);
-    }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { -webkit-font-smoothing: antialiased; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 14px;
+
+    :root {
+      --bg:           #0A0A0A;
+      --sidebar:      #111111;
+      --surface:      #1A1A1A;
+      --surface-2:    #222222;
+      --border:       #2A2A2A;
+      --primary:      #FF3C3C;
+      --primary-dark: #CC1F1F;
+      --success:      #00C853;
+      --warning:      #FFB300;
+      --error:        #FF3C3C;
+      --text:         #FFFFFF;
+      --text-muted:   #8A8A8A;
+      --text-faint:   #555555;
+      --radius:       6px;
+      --radius-lg:    10px;
+      --transition:   140ms ease;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
       background: var(--bg);
       color: var(--text);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }
-    a { color: inherit; text-decoration: none; }
-    button { cursor: pointer; font: inherit; border: none; background: none; color: inherit; }
-    input, textarea, select {
-      font: inherit;
-      color: var(--text);
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 8px 12px;
-      outline: none;
-      transition: border-color var(--transition);
-    }
-    input:focus, textarea:focus, select:focus { border-color: var(--accent); }
-    select option { background: var(--surface-2); }
 
-    /* ── Layout ── */
-    #app { display: flex; flex: 1; }
-    #sidebar {
-      width: var(--sidebar-w);
-      background: var(--surface);
+    /* ── LAYOUT ── */
+    .app { display: flex; height: 100vh; overflow: hidden; }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: 220px;
+      flex-shrink: 0;
+      background: var(--sidebar);
       border-right: 1px solid var(--border);
       display: flex;
       flex-direction: column;
-      position: fixed;
-      top: 0; left: 0;
-      height: 100vh;
-      z-index: 100;
+      overflow-y: auto;
     }
     .sidebar-logo {
-      height: var(--header-h);
-      display: flex;
-      align-items: center;
-      padding: 0 20px;
+      padding: 20px 16px 16px;
       border-bottom: 1px solid var(--border);
-      gap: 10px;
-      font-weight: 700;
-      font-size: 15px;
-      letter-spacing: 0.04em;
     }
     .logo-mark {
-      width: 28px; height: 28px;
-      background: var(--accent);
-      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo-icon {
+      width: 32px; height: 32px;
+      background: var(--primary);
+      border-radius: 8px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 12px; font-weight: 800; color: #fff;
-      flex-shrink: 0;
+      font-weight: 800; font-size: 13px; color: #fff; letter-spacing: -0.5px;
     }
-    .sidebar-nav { flex: 1; padding: 12px 10px; overflow-y: auto; }
-    .nav-section-label {
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      color: var(--text-faint);
-      text-transform: uppercase;
-      padding: 8px 10px 4px;
-    }
+    .logo-text { font-weight: 700; font-size: 15px; letter-spacing: 1px; }
+    .logo-sub  { font-size: 10px; color: var(--text-muted); letter-spacing: 2px; margin-top: 1px; }
+
+    .nav { flex: 1; padding: 12px 0; }
     .nav-item {
       display: flex; align-items: center; gap: 10px;
-      padding: 9px 10px;
-      border-radius: var(--radius);
-      font-size: 13px;
-      color: var(--text-muted);
+      padding: 9px 16px;
       cursor: pointer;
-      transition: background var(--transition), color var(--transition);
+      border-radius: 0;
+      color: var(--text-muted);
+      font-size: 13px; font-weight: 500;
+      transition: color var(--transition), background var(--transition);
+      border-left: 3px solid transparent;
       user-select: none;
     }
-    .nav-item:hover { background: var(--surface-2); color: var(--text); }
-    .nav-item.active { background: var(--accent-dim); color: var(--accent); font-weight: 600; }
-    .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
-    .nav-badge {
-      margin-left: auto;
-      background: var(--red);
-      color: #fff;
-      font-size: 10px;
-      font-weight: 700;
-      padding: 1px 6px;
-      border-radius: 99px;
-      min-width: 18px;
-      text-align: center;
+    .nav-item:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+    .nav-item.active {
+      color: var(--primary);
+      background: rgba(255,60,60,0.08);
+      border-left-color: var(--primary);
     }
+    .nav-icon { width: 16px; height: 16px; flex-shrink: 0; }
+
     .sidebar-footer {
-      padding: 12px;
+      padding: 12px 16px;
       border-top: 1px solid var(--border);
     }
-    .admin-chip {
-      display: flex; align-items: center; gap: 10px;
-      padding: 8px 10px;
+    .btn-logout {
+      width: 100%;
+      padding: 8px 12px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
       border-radius: var(--radius);
-      background: var(--surface-2);
+      cursor: pointer;
+      font-size: 13px;
+      transition: all var(--transition);
+      display: flex; align-items: center; gap: 8px; justify-content: center;
     }
-    .admin-avatar {
-      width: 28px; height: 28px;
-      background: var(--accent);
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
-    }
-    .admin-info { flex: 1; min-width: 0; }
-    .admin-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .admin-role { font-size: 10px; color: var(--text-faint); }
-    .btn-logout { color: var(--text-faint); padding: 4px; border-radius: 4px; }
-    .btn-logout:hover { color: var(--red); }
+    .btn-logout:hover { border-color: var(--primary); color: var(--primary); }
 
-    /* ── Main area ── */
-    #main {
-      margin-left: var(--sidebar-w);
+    /* ── MAIN ── */
+    .main {
       flex: 1;
+      overflow-y: auto;
       display: flex;
       flex-direction: column;
-      min-height: 100vh;
     }
-    #header {
-      height: var(--header-h);
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      padding: 0 24px;
-      gap: 16px;
-      position: sticky; top: 0;
-      z-index: 50;
-    }
-    .page-title { font-size: 15px; font-weight: 600; flex: 1; }
-    .header-actions { display: flex; align-items: center; gap: 8px; }
-    #content { padding: 24px; flex: 1; }
-
-    /* ── Login screen ── */
-    #login-screen {
-      display: none;
-      position: fixed;
-      inset: 0;
+    .topbar {
+      position: sticky; top: 0; z-index: 10;
       background: var(--bg);
-      z-index: 999;
-      align-items: center;
-      justify-content: center;
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex; align-items: center; justify-content: space-between;
     }
-    #login-screen.visible { display: flex; }
+    .topbar-title { font-size: 16px; font-weight: 600; }
+    .topbar-admin { font-size: 12px; color: var(--text-muted); }
+
+    .page { padding: 24px; display: none; }
+    .page.active { display: block; }
+
+    /* ── LOGIN OVERLAY ── */
+    .login-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(8px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+    }
+    .login-overlay.hidden { display: none; }
     .login-card {
-      width: 360px;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
-      padding: 32px;
+      padding: 36px 32px;
+      width: 100%; max-width: 380px;
     }
-    .login-logo {
-      display: flex; align-items: center; gap: 10px;
-      margin-bottom: 28px;
-      font-size: 16px; font-weight: 700;
-    }
-    .login-card h2 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
-    .login-card p { color: var(--text-muted); font-size: 13px; margin-bottom: 24px; }
-    .form-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
-    .form-field label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
-    .form-field input { width: 100%; }
+    .login-logo { text-align: center; margin-bottom: 24px; }
+    .login-logo .logo-icon { width: 48px; height: 48px; font-size: 18px; margin: 0 auto 10px; }
+    .login-logo h2 { font-size: 18px; font-weight: 700; }
+    .login-logo p  { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
     .login-error {
-      font-size: 12px; color: var(--red);
-      background: var(--red-dim);
+      background: rgba(255,60,60,0.1);
+      border: 1px solid rgba(255,60,60,0.3);
+      color: var(--primary);
       border-radius: var(--radius);
-      padding: 8px 12px;
-      margin-bottom: 12px;
+      padding: 10px 12px;
+      font-size: 13px;
+      margin-bottom: 16px;
       display: none;
     }
-    .login-error.visible { display: block; }
+    .login-error.show { display: block; }
 
-    /* ── Buttons ── */
+    /* ── FORM ELEMENTS ── */
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; font-weight: 500; letter-spacing: 0.3px; }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: var(--radius);
+      padding: 9px 12px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color var(--transition);
+    }
+    .field input:focus, .field select:focus, .field textarea:focus {
+      border-color: var(--primary);
+    }
+    .field textarea { resize: vertical; min-height: 80px; }
+    .field select option { background: #1A1A1A; }
+
+    /* ── BUTTONS ── */
     .btn {
       display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-      padding: 8px 16px;
+      padding: 9px 16px;
       border-radius: var(--radius);
-      font-size: 13px;
-      font-weight: 600;
-      transition: background var(--transition), opacity var(--transition);
+      font-size: 13px; font-weight: 600;
+      cursor: pointer; border: none;
+      transition: all var(--transition);
       white-space: nowrap;
     }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+    .btn:disabled { opacity: 0.5; pointer-events: none; }
+    .btn-primary   { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-secondary:hover { border-color: #555; }
+    .btn-success   { background: var(--success); color: #000; }
+    .btn-success:hover { background: #00a844; }
+    .btn-warning   { background: var(--warning); color: #000; }
+    .btn-warning:hover { background: #e09f00; }
+    .btn-danger    { background: rgba(255,60,60,0.15); color: var(--primary); border: 1px solid rgba(255,60,60,0.3); }
+    .btn-danger:hover  { background: rgba(255,60,60,0.25); }
     .btn-sm { padding: 5px 10px; font-size: 12px; }
-    .btn-ghost { background: var(--surface-2); color: var(--text-muted); }
-    .btn-ghost:hover { background: var(--surface-3); color: var(--text); }
-    .btn-danger { background: var(--red-dim); color: var(--red); }
-    .btn-danger:hover { background: var(--red); color: #fff; }
-    .btn-success { background: var(--green-dim); color: var(--green); }
-    .btn-success:hover { background: var(--green); color: #fff; }
     .btn-full { width: 100%; }
 
-    /* ── Cards & grids ── */
+    /* ── KPI CARDS ── */
     .kpi-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -243,1011 +216,1183 @@
       border-radius: var(--radius-lg);
       padding: 20px;
     }
-    .kpi-label { font-size: 11px; font-weight: 600; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
-    .kpi-value { font-size: 28px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
-    .kpi-sub { font-size: 12px; color: var(--text-muted); }
-    .kpi-card.accent .kpi-value { color: var(--accent); }
-    .kpi-card.green .kpi-value { color: var(--green); }
-    .kpi-card.blue .kpi-value { color: var(--blue); }
-    .kpi-card.yellow .kpi-value { color: var(--yellow); }
-    .kpi-card.red .kpi-value { color: var(--red); }
+    .kpi-label { font-size: 11px; color: var(--text-muted); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px; }
+    .kpi-value { font-size: 28px; font-weight: 700; line-height: 1; }
+    .kpi-value.pending { color: var(--warning); }
+    .kpi-value.green   { color: var(--success); }
 
-    /* ── Table ── */
+    /* ── SECTION HEADINGS ── */
+    .section-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .section-head h2 { font-size: 15px; font-weight: 600; }
+
+    /* ── CHART ── */
+    .chart-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      margin-bottom: 28px;
+    }
+    .chart-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      height: 80px;
+      margin-top: 12px;
+    }
+    .chart-bar-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      height: 100%;
+      justify-content: flex-end;
+    }
+    .chart-bar {
+      width: 100%;
+      background: var(--primary);
+      border-radius: 3px 3px 0 0;
+      min-height: 2px;
+      transition: height 0.4s ease;
+    }
+    .chart-label { font-size: 10px; color: var(--text-muted); }
+
+    /* ── TABLE ── */
     .table-wrap {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
       overflow: hidden;
+      margin-bottom: 24px;
     }
-    .table-header {
-      padding: 16px 20px;
+    .table-toolbar {
+      padding: 12px 16px;
       border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
     }
-    .table-title { font-weight: 600; font-size: 14px; flex: 1; min-width: 120px; }
+    .table-toolbar input, .table-toolbar select {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: var(--radius);
+      padding: 7px 10px;
+      font-size: 12px;
+      font-family: inherit;
+      outline: none;
+    }
+    .table-toolbar input:focus, .table-toolbar select:focus { border-color: var(--primary); }
+    .table-toolbar input { min-width: 200px; }
+
     table { width: 100%; border-collapse: collapse; }
     thead th {
+      padding: 10px 14px;
       text-align: left;
-      padding: 10px 16px;
       font-size: 11px;
-      font-weight: 600;
-      color: var(--text-faint);
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      background: var(--surface);
       border-bottom: 1px solid var(--border);
       white-space: nowrap;
     }
-    tbody tr { border-bottom: 1px solid var(--border); transition: background var(--transition); }
-    tbody tr:last-child { border-bottom: none; }
-    tbody tr:hover { background: var(--surface-2); }
-    tbody td { padding: 12px 16px; font-size: 13px; vertical-align: middle; }
-    .table-footer {
-      padding: 12px 20px;
-      border-top: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 12px;
-      color: var(--text-muted);
-      gap: 12px;
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background var(--transition);
     }
-    .pagination { display: flex; gap: 6px; align-items: center; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(255,255,255,0.025); }
+    tbody td {
+      padding: 10px 14px;
+      font-size: 13px;
+      color: var(--text);
+      vertical-align: middle;
+    }
+    tbody td.muted { color: var(--text-muted); }
 
-    /* ── Badges ── */
+    .actions-cell { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    /* ── BADGES ── */
     .badge {
       display: inline-flex; align-items: center;
       padding: 2px 8px;
-      border-radius: 99px;
-      font-size: 11px;
-      font-weight: 600;
+      border-radius: 20px;
+      font-size: 11px; font-weight: 600;
       white-space: nowrap;
     }
-    .badge-green { background: var(--green-dim); color: var(--green); }
-    .badge-red { background: var(--red-dim); color: var(--red); }
-    .badge-yellow { background: var(--yellow-dim); color: var(--yellow); }
-    .badge-blue { background: var(--blue-dim); color: var(--blue); }
-    .badge-gray { background: var(--surface-3); color: var(--text-muted); }
-    .badge-orange { background: var(--accent-dim); color: var(--accent); }
+    .badge-pending  { background: rgba(255,179,0,0.15);  color: var(--warning); }
+    .badge-approved, .badge-published { background: rgba(0,200,83,0.15); color: var(--success); }
+    .badge-rejected, .badge-deleted  { background: rgba(255,60,60,0.15); color: var(--primary); }
+    .badge-active   { background: rgba(0,200,83,0.15);  color: var(--success); }
+    .badge-suspended{ background: rgba(255,60,60,0.15); color: var(--primary); }
+    .badge-admin    { background: rgba(255,60,60,0.15); color: var(--primary); }
+    .badge-creator  { background: rgba(100,100,255,0.15); color: #8888ff; }
+    .badge-business { background: rgba(255,179,0,0.15); color: var(--warning); }
 
-    /* ── Toast ── */
-    #toast-container {
+    /* ── BULK BAR ── */
+    .bulk-bar {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      background: rgba(255,60,60,0.08);
+      border-bottom: 1px solid rgba(255,60,60,0.2);
+      flex-wrap: wrap;
+    }
+    .bulk-bar.show { display: flex; }
+    .bulk-count { font-size: 13px; color: var(--text-muted); }
+    .bulk-note input {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: var(--radius);
+      padding: 6px 10px;
+      font-size: 12px;
+      font-family: inherit;
+      outline: none;
+      width: 220px;
+    }
+    .bulk-note input:focus { border-color: var(--primary); }
+
+    /* ── PAGINATION ── */
+    .pagination {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      justify-content: flex-end;
+    }
+    .page-info { font-size: 12px; color: var(--text-muted); margin-right: auto; }
+
+    /* ── ALERTS ── */
+    .alerts-list { display: flex; flex-direction: column; gap: 8px; }
+    .alert-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      display: flex; align-items: flex-start; gap: 10px;
+    }
+    .alert-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--primary);
+      margin-top: 4px; flex-shrink: 0;
+    }
+    .alert-action { font-size: 13px; font-weight: 500; }
+    .alert-meta   { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+    /* ── CONFIRM MODAL ── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 500;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      width: 100%; max-width: 360px;
+    }
+    .modal-card h3 { font-size: 16px; font-weight: 600; margin-bottom: 10px; }
+    .modal-card p  { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+    /* ── TOAST ── */
+    .toast-container {
       position: fixed;
       bottom: 24px; right: 24px;
-      display: flex; flex-direction: column; gap: 8px;
       z-index: 9999;
+      display: flex; flex-direction: column; gap: 10px;
     }
     .toast {
-      background: var(--surface-3);
-      border: 1px solid var(--border-hover);
+      background: var(--surface);
+      border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 12px 16px;
       font-size: 13px;
-      box-shadow: var(--shadow);
-      display: flex; align-items: center; gap: 10px;
       min-width: 260px;
-      animation: slideIn 0.2s ease;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      animation: toast-in 0.2s ease;
+      display: flex; align-items: center; gap: 10px;
     }
-    .toast.success { border-left: 3px solid var(--green); }
-    .toast.error   { border-left: 3px solid var(--red); }
-    .toast.info    { border-left: 3px solid var(--blue); }
-    @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    .toast.success { border-left: 3px solid var(--success); }
+    .toast.error   { border-left: 3px solid var(--primary); }
+    .toast.warning { border-left: 3px solid var(--warning); }
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
 
-    /* ── Modal ── */
-    .modal-overlay {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.6);
-      z-index: 500;
-      display: flex; align-items: center; justify-content: center;
-      display: none;
-    }
-    .modal-overlay.visible { display: flex; }
-    .modal {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 24px;
-      width: 480px;
-      max-width: 95vw;
-      box-shadow: var(--shadow);
-    }
-    .modal-title { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
-    .modal-body { color: var(--text-muted); font-size: 13px; margin-bottom: 20px; line-height: 1.6; }
-    .modal-footer { display: flex; gap: 8px; justify-content: flex-end; }
-
-    /* ── Misc ── */
+    /* ── EMPTY STATE ── */
     .empty-state {
+      padding: 48px;
       text-align: center;
-      padding: 60px 24px;
-      color: var(--text-faint);
-    }
-    .empty-state svg { width: 40px; height: 40px; margin: 0 auto 12px; opacity: 0.4; }
-    .empty-state p { font-size: 13px; margin-top: 4px; }
-    .loading-row td { text-align: center; padding: 40px; color: var(--text-faint); }
-    .checkbox-col { width: 40px; }
-    input[type="checkbox"] {
-      width: 14px; height: 14px; padding: 0;
-      accent-color: var(--accent);
-      cursor: pointer;
-    }
-    .search-input { width: 200px; }
-    .filter-select { width: 140px; }
-    .content-preview {
-      max-width: 300px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
       color: var(--text-muted);
     }
-    .section { display: none; }
-    .section.active { display: block; }
-    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-    @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
-    .stat-table-wrap {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      overflow: hidden;
-    }
-    .stat-table-title { font-size: 13px; font-weight: 600; padding: 14px 18px; border-bottom: 1px solid var(--border); }
-    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .form-section-title { font-size: 13px; font-weight: 600; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
-    .settings-card {
+    .empty-state svg { margin: 0 auto 12px; opacity: 0.3; }
+    .empty-state p { font-size: 14px; }
+
+    /* ── SETTINGS ── */
+    .settings-section {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
       padding: 24px;
       max-width: 480px;
+      margin-bottom: 24px;
     }
+    .settings-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 18px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* ── SKELETON ── */
+    .skeleton {
+      background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s ease-in-out infinite;
+      border-radius: var(--radius);
+    }
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    .skel-kpi { height: 80px; border-radius: var(--radius-lg); }
+    .skel-row { height: 44px; margin-bottom: 1px; }
   </style>
 </head>
 <body>
 
-<!-- Login Screen -->
-<div id="login-screen" class="visible">
+<!-- LOGIN OVERLAY -->
+<div class="login-overlay" id="loginOverlay">
   <div class="login-card">
     <div class="login-logo">
-      <div class="logo-mark">PX</div>
-      PLXYGROUND
+      <div class="logo-icon">PX</div>
+      <h2>PLXYGROUND</h2>
+      <p>Admin Panel</p>
     </div>
-    <h2>Admin Sign In</h2>
-    <p>Restricted access — authorised personnel only</p>
-    <div id="login-error" class="login-error"></div>
-    <div class="form-field">
+    <div class="login-error" id="loginError"></div>
+    <div class="field">
       <label>Email</label>
-      <input type="email" id="login-email" placeholder="admin@plxyground.com" autocomplete="email" />
+      <input type="email" id="loginEmail" placeholder="admin@plxyground.local" autocomplete="email" />
     </div>
-    <div class="form-field">
+    <div class="field">
       <label>Password</label>
-      <input type="password" id="login-password" placeholder="Password" autocomplete="current-password" />
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" />
     </div>
-    <button class="btn btn-primary btn-full" id="btn-login">Sign In</button>
+    <button class="btn btn-primary btn-full" id="loginBtn" onclick="doLogin()">Log In</button>
   </div>
 </div>
 
-<!-- App Shell -->
-<div id="app" style="display:none">
-  <aside id="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-mark">PX</div>
-      PLXYGROUND
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay hidden" id="confirmModal">
+  <div class="modal-card">
+    <h3 id="confirmTitle">Are you sure?</h3>
+    <p id="confirmBody">This action cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeConfirm()">Cancel</button>
+      <button class="btn btn-danger" id="confirmOkBtn">Confirm</button>
     </div>
-    <nav class="sidebar-nav">
-      <div class="nav-section-label">Overview</div>
-      <div class="nav-item active" data-section="dashboard">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- APP -->
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">
+        <div class="logo-icon">PX</div>
+        <div>
+          <div class="logo-text">PLXYGROUND</div>
+          <div class="logo-sub">ADMIN</div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-item active" data-section="dashboard" onclick="navigate('dashboard')">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
         Dashboard
       </div>
-      <div class="nav-section-label">Moderation</div>
-      <div class="nav-item" data-section="queue">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><path d="M21 12c0 4.97-4.03 9-9 9S3 16.97 3 12 7.03 3 12 3s9 4.03 9 9z"/></svg>
-        Queue
-        <span class="nav-badge" id="queue-badge" style="display:none">0</span>
+      <div class="nav-item" data-section="queue" onclick="navigate('queue')">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
+          <rect x="9" y="3" width="6" height="4" rx="1"/>
+          <path d="m9 12 2 2 4-4"/>
+        </svg>
+        Mod Queue
+        <span id="queueBadge" style="margin-left:auto;background:var(--primary);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;display:none"></span>
       </div>
-      <div class="nav-item" data-section="content">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+      <div class="nav-item" data-section="content" onclick="navigate('content')">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+          <polyline points="10 9 9 9 8 9"/>
+        </svg>
         Content
       </div>
-      <div class="nav-section-label">Users</div>
-      <div class="nav-item" data-section="creators">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        Creators
+      <div class="nav-item" data-section="users" onclick="navigate('users')">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        Users
       </div>
-      <div class="nav-item" data-section="businesses">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
-        Businesses
-      </div>
-      <div class="nav-section-label">System</div>
-      <div class="nav-item" data-section="analytics">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
-        Analytics
-      </div>
-      <div class="nav-item" data-section="audit">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+      <div class="nav-item" data-section="audit" onclick="navigate('audit')">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
         Audit Log
       </div>
-      <div class="nav-item" data-section="settings">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <div class="nav-item" data-section="settings" onclick="navigate('settings')">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
         Settings
       </div>
     </nav>
+
     <div class="sidebar-footer">
-      <div class="admin-chip">
-        <div class="admin-avatar" id="admin-avatar">A</div>
-        <div class="admin-info">
-          <div class="admin-name" id="admin-name">Admin</div>
-          <div class="admin-role" id="admin-role">super_admin</div>
-        </div>
-        <button class="btn-logout" id="btn-logout" title="Sign out">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        </button>
-      </div>
+      <div style="font-size:11px;color:var(--text-faint);margin-bottom:8px" id="sidebarAdminEmail"></div>
+      <button class="btn-logout" onclick="doLogout()">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        Log Out
+      </button>
     </div>
   </aside>
 
-  <div id="main">
-    <header id="header">
-      <div class="page-title" id="page-title">Dashboard</div>
-      <div class="header-actions" id="header-actions"></div>
-    </header>
-    <div id="content">
+  <!-- MAIN -->
+  <main class="main">
+    <div class="topbar">
+      <span class="topbar-title" id="topbarTitle">Dashboard</span>
+      <span class="topbar-admin" id="topbarAdmin"></span>
+    </div>
 
-      <!-- DASHBOARD -->
-      <section class="section active" id="section-dashboard">
-        <div class="kpi-grid" id="kpi-grid">
-          <div class="kpi-card accent"><div class="kpi-label">Total Creators</div><div class="kpi-value" id="kpi-creators">—</div></div>
-          <div class="kpi-card blue"><div class="kpi-label">Total Businesses</div><div class="kpi-value" id="kpi-businesses">—</div></div>
-          <div class="kpi-card green"><div class="kpi-label">Approved Content</div><div class="kpi-value" id="kpi-content">—</div></div>
-          <div class="kpi-card yellow"><div class="kpi-label">Active Opportunities</div><div class="kpi-value" id="kpi-opps">—</div></div>
-          <div class="kpi-card red"><div class="kpi-label">Pending Queue</div><div class="kpi-value" id="kpi-queue">—</div><div class="kpi-sub">needs review</div></div>
-        </div>
-        <div class="two-col">
-          <div class="stat-table-wrap">
-            <div class="stat-table-title">Content by Type</div>
-            <table><thead><tr><th>Type</th><th>Count</th></tr></thead><tbody id="tbl-by-type"></tbody></table>
-          </div>
-          <div class="stat-table-wrap">
-            <div class="stat-table-title">Top Creators</div>
-            <table><thead><tr><th>Creator</th><th>Sport</th><th>Posts</th></tr></thead><tbody id="tbl-top-creators"></tbody></table>
-          </div>
-        </div>
-      </section>
+    <!-- DASHBOARD -->
+    <section class="page active" id="page-dashboard">
+      <div class="kpi-grid" id="kpiGrid">
+        <div class="kpi-card skeleton skel-kpi"></div>
+        <div class="kpi-card skeleton skel-kpi"></div>
+        <div class="kpi-card skeleton skel-kpi"></div>
+        <div class="kpi-card skeleton skel-kpi"></div>
+        <div class="kpi-card skeleton skel-kpi"></div>
+      </div>
 
-      <!-- QUEUE -->
-      <section class="section" id="section-queue">
-        <div class="table-wrap">
-          <div class="table-header">
-            <div class="table-title">Pending Content <span id="queue-count" style="color:var(--text-faint);font-weight:400"></span></div>
-            <button class="btn btn-sm btn-success" id="btn-bulk-approve" disabled>Approve Selected</button>
-            <button class="btn btn-sm btn-danger" id="btn-bulk-reject" disabled>Reject Selected</button>
-          </div>
+      <div class="chart-wrap">
+        <div class="section-head"><h2>Creator Signups (30 days)</h2></div>
+        <div class="chart-bars" id="signupChart"></div>
+      </div>
+
+      <div class="section-head"><h2>Recent Activity</h2></div>
+      <div class="alerts-list" id="alertsList"></div>
+    </section>
+
+    <!-- MOD QUEUE -->
+    <section class="page" id="page-queue">
+      <div class="table-wrap">
+        <div class="table-toolbar">
+          <select id="queueTypeFilter" onchange="loadQueue()">
+            <option value="">All Types</option>
+            <option value="creator_content">Creator Content</option>
+            <option value="business_content">Business Content</option>
+          </select>
+          <span style="margin-left:auto;font-size:12px;color:var(--text-muted)" id="queueTotal"></span>
+        </div>
+        <div class="bulk-bar" id="bulkBar">
+          <span class="bulk-count" id="bulkCount">0 selected</span>
+          <div class="bulk-note"><input type="text" id="bulkNote" placeholder="Rejection note (optional)" /></div>
+          <button class="btn btn-success btn-sm" onclick="bulkAction('approve')">Approve</button>
+          <button class="btn btn-danger btn-sm" onclick="bulkAction('reject')">Reject</button>
+          <button class="btn btn-secondary btn-sm" onclick="clearSelection()">Clear</button>
+        </div>
+        <div id="queueTableWrap">
           <table>
             <thead><tr>
-              <th class="checkbox-col"><input type="checkbox" id="queue-check-all" /></th>
-              <th>Title</th><th>Creator</th><th>Sport</th><th>Type</th><th>Submitted</th><th>Actions</th>
+              <th><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)" /></th>
+              <th>ID</th><th>Type</th><th>Title</th><th>Creator</th><th>Submitted</th><th>Actions</th>
             </tr></thead>
-            <tbody id="tbl-queue"></tbody>
+            <tbody id="queueTbody"></tbody>
           </table>
-          <div class="table-footer">
-            <span id="queue-info"></span>
-            <div class="pagination">
-              <button class="btn btn-sm btn-ghost" id="queue-prev">Prev</button>
-              <span id="queue-page">1</span>
-              <button class="btn btn-sm btn-ghost" id="queue-next">Next</button>
-            </div>
-          </div>
         </div>
-      </section>
+        <div class="pagination">
+          <span class="page-info" id="queuePageInfo"></span>
+          <button class="btn btn-secondary btn-sm" id="queuePrev" onclick="queuePage(-1)">Prev</button>
+          <button class="btn btn-secondary btn-sm" id="queueNext" onclick="queuePage(1)">Next</button>
+        </div>
+      </div>
+    </section>
 
-      <!-- CONTENT -->
-      <section class="section" id="section-content">
-        <div class="table-wrap">
-          <div class="table-header">
-            <div class="table-title">All Content</div>
-            <input class="search-input" id="content-search" placeholder="Search title…" />
-            <select class="filter-select" id="content-status-filter">
-              <option value="">All statuses</option>
-              <option value="approved">Approved</option>
-              <option value="pending">Pending</option>
-              <option value="rejected">Rejected</option>
-            </select>
-          </div>
-          <table>
-            <thead><tr><th>Title</th><th>Creator</th><th>Sport</th><th>Type</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
-            <tbody id="tbl-content"></tbody>
-          </table>
-          <div class="table-footer">
-            <span id="content-info"></span>
-            <div class="pagination">
-              <button class="btn btn-sm btn-ghost" id="content-prev">Prev</button>
-              <span id="content-page">1</span>
-              <button class="btn btn-sm btn-ghost" id="content-next">Next</button>
-            </div>
-          </div>
+    <!-- CONTENT -->
+    <section class="page" id="page-content">
+      <div class="table-wrap">
+        <div class="table-toolbar">
+          <input type="text" id="contentSearch" placeholder="Search title..." oninput="debounce(loadContent, 400)()" />
+          <select id="contentStatusFilter" onchange="loadContent()">
+            <option value="">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <span style="margin-left:auto;font-size:12px;color:var(--text-muted)" id="contentTotal"></span>
         </div>
-      </section>
+        <table>
+          <thead><tr>
+            <th>ID</th><th>Title</th><th>Creator</th><th>Type</th><th>Status</th><th>Date</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="contentTbody"></tbody>
+        </table>
+        <div class="pagination">
+          <span class="page-info" id="contentPageInfo"></span>
+          <button class="btn btn-secondary btn-sm" id="contentPrev" onclick="contentPage(-1)">Prev</button>
+          <button class="btn btn-secondary btn-sm" id="contentNext" onclick="contentPage(1)">Next</button>
+        </div>
+      </div>
+    </section>
 
-      <!-- CREATORS -->
-      <section class="section" id="section-creators">
-        <div class="table-wrap">
-          <div class="table-header">
-            <div class="table-title">Creators</div>
-            <input class="search-input" id="creators-search" placeholder="Search…" />
-            <button class="btn btn-sm btn-ghost" id="btn-refresh-creators">Refresh</button>
-          </div>
-          <table>
-            <thead><tr><th>Username</th><th>Display Name</th><th>Sport</th><th>Followers</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
-            <tbody id="tbl-creators"></tbody>
-          </table>
-          <div class="table-footer">
-            <span id="creators-info"></span>
-            <div class="pagination">
-              <button class="btn btn-sm btn-ghost" id="creators-prev">Prev</button>
-              <span id="creators-page">1</span>
-              <button class="btn btn-sm btn-ghost" id="creators-next">Next</button>
-            </div>
-          </div>
+    <!-- USERS -->
+    <section class="page" id="page-users">
+      <div class="table-wrap">
+        <div class="table-toolbar">
+          <input type="text" id="usersSearch" placeholder="Search name or email..." oninput="debounce(loadUsers, 400)()" />
+          <select id="usersTypeFilter" onchange="loadUsers()">
+            <option value="creators">Creators</option>
+            <option value="businesses">Businesses</option>
+          </select>
+          <span style="margin-left:auto;font-size:12px;color:var(--text-muted)" id="usersTotal"></span>
         </div>
-      </section>
+        <table>
+          <thead><tr id="usersThead"></tr></thead>
+          <tbody id="usersTbody"></tbody>
+        </table>
+        <div class="pagination">
+          <span class="page-info" id="usersPageInfo"></span>
+          <button class="btn btn-secondary btn-sm" id="usersPrev" onclick="usersPage(-1)">Prev</button>
+          <button class="btn btn-secondary btn-sm" id="usersNext" onclick="usersPage(1)">Next</button>
+        </div>
+      </div>
+    </section>
 
-      <!-- BUSINESSES -->
-      <section class="section" id="section-businesses">
-        <div class="table-wrap">
-          <div class="table-header">
-            <div class="table-title">Businesses</div>
-            <input class="search-input" id="businesses-search" placeholder="Search…" />
-            <button class="btn btn-sm btn-ghost" id="btn-refresh-businesses">Refresh</button>
-          </div>
-          <table>
-            <thead><tr><th>Business Name</th><th>Email</th><th>Industry</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
-            <tbody id="tbl-businesses"></tbody>
-          </table>
-          <div class="table-footer">
-            <span id="businesses-info"></span>
-            <div class="pagination">
-              <button class="btn btn-sm btn-ghost" id="businesses-prev">Prev</button>
-              <span id="businesses-page">1</span>
-              <button class="btn btn-sm btn-ghost" id="businesses-next">Next</button>
-            </div>
-          </div>
+    <!-- AUDIT -->
+    <section class="page" id="page-audit">
+      <div class="table-wrap">
+        <div class="table-toolbar">
+          <select id="auditActorFilter" onchange="loadAudit()">
+            <option value="">All Actors</option>
+            <option value="admin">Admin</option>
+            <option value="creator">Creator</option>
+            <option value="business">Business</option>
+          </select>
+          <input type="text" id="auditActionFilter" placeholder="Filter by action..." oninput="debounce(loadAudit, 400)()" />
+          <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="exportAudit()">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Export JSON
+          </button>
         </div>
-      </section>
+        <table>
+          <thead><tr>
+            <th>ID</th><th>Actor</th><th>Action</th><th>Metadata</th><th>Date</th>
+          </tr></thead>
+          <tbody id="auditTbody"></tbody>
+        </table>
+        <div class="pagination">
+          <span class="page-info" id="auditPageInfo"></span>
+          <button class="btn btn-secondary btn-sm" id="auditPrev" onclick="auditPage(-1)">Prev</button>
+          <button class="btn btn-secondary btn-sm" id="auditNext" onclick="auditPage(1)">Next</button>
+        </div>
+      </div>
+    </section>
 
-      <!-- ANALYTICS -->
-      <section class="section" id="section-analytics">
-        <div class="kpi-grid" id="analytics-kpi-grid">
-          <div class="kpi-card accent"><div class="kpi-label">Total Creators</div><div class="kpi-value" id="a-kpi-creators">—</div></div>
-          <div class="kpi-card blue"><div class="kpi-label">Total Businesses</div><div class="kpi-value" id="a-kpi-businesses">—</div></div>
-          <div class="kpi-card green"><div class="kpi-label">Approved Content</div><div class="kpi-value" id="a-kpi-content">—</div></div>
-          <div class="kpi-card yellow"><div class="kpi-label">Active Opportunities</div><div class="kpi-value" id="a-kpi-opps">—</div></div>
-          <div class="kpi-card red"><div class="kpi-label">Pending Queue</div><div class="kpi-value" id="a-kpi-queue">—</div></div>
+    <!-- SETTINGS -->
+    <section class="page" id="page-settings">
+      <div class="settings-section">
+        <h3>Change Password</h3>
+        <div class="field">
+          <label>Current Password</label>
+          <input type="password" id="pwCurrent" placeholder="Current password" />
         </div>
-        <div class="two-col">
-          <div class="stat-table-wrap">
-            <div class="stat-table-title">Content by Status</div>
-            <table><thead><tr><th>Status</th><th>Count</th></tr></thead><tbody id="tbl-by-status"></tbody></table>
-          </div>
-          <div class="stat-table-wrap">
-            <div class="stat-table-title">Creator Signups (Last 30 Days)</div>
-            <table><thead><tr><th>Date</th><th>Signups</th></tr></thead><tbody id="tbl-signups"></tbody></table>
-          </div>
+        <div class="field">
+          <label>New Password</label>
+          <input type="password" id="pwNew" placeholder="Min 8 characters" />
         </div>
-      </section>
+        <div class="field">
+          <label>Confirm New Password</label>
+          <input type="password" id="pwConfirm" placeholder="Repeat new password" />
+        </div>
+        <div id="pwError" style="color:var(--primary);font-size:12px;margin-bottom:12px;display:none"></div>
+        <button class="btn btn-primary" onclick="changePassword()">Update Password</button>
+      </div>
 
-      <!-- AUDIT LOG -->
-      <section class="section" id="section-audit">
-        <div class="table-wrap">
-          <div class="table-header">
-            <div class="table-title">Audit Log</div>
-            <select class="filter-select" id="audit-actor-filter">
-              <option value="">All actors</option>
-              <option value="admin">Admin</option>
-              <option value="creator">Creator</option>
-              <option value="business">Business</option>
-            </select>
-            <input class="search-input" id="audit-action-filter" placeholder="Filter action…" />
-            <button class="btn btn-sm btn-ghost" id="btn-export-audit">Export JSON</button>
-          </div>
-          <table>
-            <thead><tr><th>Time</th><th>Actor</th><th>Type</th><th>Action</th><th>Metadata</th></tr></thead>
-            <tbody id="tbl-audit"></tbody>
-          </table>
-          <div class="table-footer">
-            <span id="audit-info"></span>
-            <div class="pagination">
-              <button class="btn btn-sm btn-ghost" id="audit-prev">Prev</button>
-              <span id="audit-page">1</span>
-              <button class="btn btn-sm btn-ghost" id="audit-next">Next</button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- SETTINGS -->
-      <section class="section" id="section-settings">
-        <div class="settings-card">
-          <div class="form-section-title">Change Password</div>
-          <div class="form-field">
-            <label>Current Password</label>
-            <input type="password" id="pw-current" placeholder="Current password" />
-          </div>
-          <div class="form-field">
-            <label>New Password</label>
-            <input type="password" id="pw-new" placeholder="Min 8 characters" />
-          </div>
-          <div class="form-field">
-            <label>Confirm New Password</label>
-            <input type="password" id="pw-confirm" placeholder="Repeat new password" />
-          </div>
-          <div id="pw-error" class="login-error"></div>
-          <button class="btn btn-primary" id="btn-change-pw">Update Password</button>
-        </div>
-      </section>
-
-    </div>
-  </div>
+      <div class="settings-section">
+        <h3>Admin Info</h3>
+        <div id="adminInfoBlock" style="font-size:13px;color:var(--text-muted);line-height:2"></div>
+      </div>
+    </section>
+  </main>
 </div>
-
-<!-- Confirm Modal -->
-<div class="modal-overlay" id="confirm-modal">
-  <div class="modal">
-    <div class="modal-title" id="modal-title">Confirm Action</div>
-    <div class="modal-body" id="modal-body"></div>
-    <div class="form-field" id="modal-reason-wrap" style="display:none">
-      <label>Rejection Reason (optional)</label>
-      <input type="text" id="modal-reason" placeholder="Reason…" />
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" id="modal-cancel">Cancel</button>
-      <button class="btn btn-primary" id="modal-confirm">Confirm</button>
-    </div>
-  </div>
-</div>
-
-<div id="toast-container"></div>
 
 <script>
-(function () {
-  'use strict';
+  // ── CONFIG ──
+  const API_BASE = 'http://localhost:3011'; // replace with deployed URL
 
-  const API = (window.API_BASE || 'http://localhost:3011') + '/api';
-  let token = null;
-  let currentAdmin = null;
-  let activeSection = 'dashboard';
+  // ── STATE ──
+  let adminToken = localStorage.getItem('adminToken');
+  let adminEmail = localStorage.getItem('adminEmail') || '';
+  let currentSection = 'dashboard';
+  let selectedIds = new Set();
 
-  // ── State per section ──
   const state = {
-    queue:      { offset: 0, limit: 20, total: 0 },
-    content:    { offset: 0, limit: 20, total: 0, search: '', status: '' },
-    creators:   { offset: 0, limit: 20, total: 0, search: '' },
-    businesses: { offset: 0, limit: 20, total: 0, search: '' },
-    audit:      { offset: 0, limit: 50, total: 0, actor_type: '', action: '' },
+    queue:   { offset: 0, limit: 20, total: 0 },
+    content: { offset: 0, limit: 20, total: 0 },
+    users:   { offset: 0, limit: 20, total: 0 },
+    audit:   { offset: 0, limit: 50, total: 0 },
   };
 
-  // ── Helpers ──
-  function $(id) { return document.getElementById(id); }
-  function fmtDate(iso) {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-  }
-  function fmtDateTime(iso) {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-  }
-  function statusBadge(s) {
-    const map = { approved: 'green', pending: 'yellow', rejected: 'red', active: 'green', closed: 'gray' };
-    return `<span class="badge badge-${map[s] || 'gray'}">${s}</span>`;
-  }
-  function suspendBadge(suspended, verified) {
-    if (suspended) return '<span class="badge badge-red">Suspended</span>';
-    if (verified) return '<span class="badge badge-green">Verified</span>';
-    return '<span class="badge badge-gray">Active</span>';
-  }
-
-  // ── Toast ──
-  function toast(msg, type = 'info') {
-    const el = document.createElement('div');
-    el.className = `toast ${type}`;
-    el.textContent = msg;
-    $('toast-container').appendChild(el);
-    setTimeout(() => el.remove(), 3500);
-  }
-
-  // ── Modal ──
-  let _modalResolve = null;
-  function confirm(title, body, showReason = false) {
-    return new Promise(resolve => {
-      $('modal-title').textContent = title;
-      $('modal-body').textContent = body;
-      $('modal-reason-wrap').style.display = showReason ? 'block' : 'none';
-      $('modal-reason').value = '';
-      $('confirm-modal').classList.add('visible');
-      _modalResolve = resolve;
-    });
-  }
-  $('modal-cancel').onclick = () => { $('confirm-modal').classList.remove('visible'); _modalResolve && _modalResolve(null); };
-  $('modal-confirm').onclick = () => {
-    const reason = $('modal-reason').value || null;
-    $('confirm-modal').classList.remove('visible');
-    _modalResolve && _modalResolve(reason !== null || true ? { confirmed: true, reason } : null);
-  };
-
-  // ── API fetch ──
-  async function api(method, path, body) {
-    const opts = {
-      method,
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    };
-    if (body) opts.body = JSON.stringify(body);
-    const res = await fetch(API + path, opts);
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || 'Request failed');
-    return data;
-  }
-
-  // ── Auth ──
-  $('btn-login').onclick = async () => {
-    const email = $('login-email').value.trim();
-    const password = $('login-password').value;
-    const errEl = $('login-error');
-    errEl.classList.remove('visible');
-    $('btn-login').disabled = true;
-    try {
-      const data = await api('POST', '/admin/auth/login', { email, password });
-      token = data.token;
-      currentAdmin = data.admin;
-      showApp();
-    } catch (e) {
-      errEl.textContent = e.message;
-      errEl.classList.add('visible');
-    } finally {
-      $('btn-login').disabled = false;
-    }
-  };
-  $('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn-login').click(); });
-
-  $('btn-logout').onclick = () => {
-    token = null; currentAdmin = null;
-    document.getElementById('app').style.display = 'none';
-    $('login-screen').classList.add('visible');
-    $('login-email').value = ''; $('login-password').value = '';
-  };
-
-  function showApp() {
-    $('login-screen').classList.remove('visible');
-    document.getElementById('app').style.display = 'flex';
-    $('admin-avatar').textContent = (currentAdmin.email || 'A')[0].toUpperCase();
-    $('admin-name').textContent = currentAdmin.email;
-    $('admin-role').textContent = currentAdmin.role || 'admin';
+  // ── INIT ──
+  (function init() {
+    if (!adminToken) { showLogin(); return; }
+    hideLogin();
+    setAdminUI();
     navigate('dashboard');
+  })();
+
+  function showLogin()  { document.getElementById('loginOverlay').classList.remove('hidden'); }
+  function hideLogin()  { document.getElementById('loginOverlay').classList.add('hidden'); }
+
+  function setAdminUI() {
+    document.getElementById('sidebarAdminEmail').textContent = adminEmail;
+    document.getElementById('topbarAdmin').textContent = adminEmail;
   }
 
-  // ── Navigation ──
-  document.querySelectorAll('.nav-item').forEach(el => {
-    el.addEventListener('click', () => navigate(el.dataset.section));
-  });
+  // ── AUTH ──
+  async function doLogin() {
+    const email    = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const errEl    = document.getElementById('loginError');
+    const btn      = document.getElementById('loginBtn');
 
-  function navigate(section) {
-    activeSection = section;
-    document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.section === section));
-    document.querySelectorAll('.section').forEach(el => el.classList.toggle('active', el.id === `section-${section}`));
-    const titles = { dashboard:'Dashboard', queue:'Moderation Queue', content:'Content', creators:'Creators', businesses:'Businesses', analytics:'Analytics', audit:'Audit Log', settings:'Settings' };
-    $('page-title').textContent = titles[section] || section;
-    $('header-actions').innerHTML = '';
-    switch (section) {
-      case 'dashboard': loadDashboard(); break;
-      case 'queue': loadQueue(); break;
-      case 'content': loadContent(); break;
-      case 'creators': loadCreators(); break;
-      case 'businesses': loadBusinesses(); break;
-      case 'analytics': loadAnalytics(); break;
-      case 'audit': loadAudit(); break;
-    }
-  }
+    errEl.classList.remove('show');
+    btn.disabled = true;
+    btn.textContent = 'Logging in...';
 
-  // ── Dashboard ──
-  async function loadDashboard() {
     try {
-      const [kpis, content] = await Promise.all([
-        api('GET', '/admin/analytics'),
-        api('GET', '/admin/analytics/content'),
-      ]);
-      $('kpi-creators').textContent = kpis.kpis.total_creators;
-      $('kpi-businesses').textContent = kpis.kpis.total_businesses;
-      $('kpi-content').textContent = kpis.kpis.approved_content;
-      $('kpi-opps').textContent = kpis.kpis.active_opportunities;
-      $('kpi-queue').textContent = kpis.kpis.pending_queue;
-      if (kpis.kpis.pending_queue > 0) {
-        $('queue-badge').textContent = kpis.kpis.pending_queue;
-        $('queue-badge').style.display = 'inline';
-      }
-      $('tbl-by-type').innerHTML = content.by_type.map(r =>
-        `<tr><td><span class="badge badge-blue">${r.content_type}</span></td><td>${r.count}</td></tr>`
-      ).join('') || '<tr><td colspan="2" class="loading-row">No data</td></tr>';
-      $('tbl-top-creators').innerHTML = content.top_creators.map(r =>
-        `<tr><td>${r.display_name}</td><td><span class="badge badge-gray">${r.sport}</span></td><td>${r.content_count}</td></tr>`
-      ).join('') || '<tr><td colspan="3" class="loading-row">No data</td></tr>';
-    } catch (e) { toast(e.message, 'error'); }
-  }
+      const res  = await apiFetch('/api/admin/auth/login', { method: 'POST', body: { email, password } }, false);
+      const data = await res.json();
 
-  // ── Queue ──
-  let queueSelected = new Set();
-
-  async function loadQueue() {
-    const s = state.queue;
-    $('tbl-queue').innerHTML = '<tr class="loading-row"><td colspan="7">Loading…</td></tr>';
-    try {
-      const data = await api('GET', `/admin/queue?limit=${s.limit}&offset=${s.offset}`);
-      s.total = data.total;
-      $('queue-count').textContent = `(${s.total} pending)`;
-      $('queue-info').textContent = `Showing ${s.offset + 1}–${Math.min(s.offset + s.limit, s.total)} of ${s.total}`;
-      $('queue-page').textContent = Math.floor(s.offset / s.limit) + 1;
-      $('queue-prev').disabled = s.offset === 0;
-      $('queue-next').disabled = s.offset + s.limit >= s.total;
-      queueSelected.clear();
-      $('queue-check-all').checked = false;
-      updateBulkButtons();
-
-      if (data.queue.length === 0) {
-        $('tbl-queue').innerHTML = '<tr><td colspan="7"><div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><p>Queue is clear — nothing to review</p></div></td></tr>';
+      if (!res.ok) {
+        errEl.textContent = data.error || 'Invalid credentials';
+        errEl.classList.add('show');
         return;
       }
 
-      $('tbl-queue').innerHTML = data.queue.map(item => `
-        <tr data-id="${item.id}">
-          <td><input type="checkbox" class="queue-cb" data-id="${item.id}" /></td>
-          <td><div style="font-weight:600">${escHtml(item.title)}</div><div class="content-preview">${escHtml(item.body)}</div></td>
-          <td>${escHtml(item.display_name)}<br><span style="color:var(--text-faint);font-size:11px">@${escHtml(item.username)}</span></td>
-          <td><span class="badge badge-orange">${escHtml(item.sport || '—')}</span></td>
-          <td><span class="badge badge-blue">${escHtml(item.content_type)}</span></td>
-          <td style="white-space:nowrap">${fmtDate(item.created_at)}</td>
-          <td style="white-space:nowrap">
-            <button class="btn btn-sm btn-success" onclick="queueAction(${item.id},'approve')">Approve</button>
-            <button class="btn btn-sm btn-danger" onclick="queueAction(${item.id},'reject')">Reject</button>
-          </td>
-        </tr>
-      `).join('');
-
-      document.querySelectorAll('.queue-cb').forEach(cb => {
-        cb.addEventListener('change', () => {
-          if (cb.checked) queueSelected.add(parseInt(cb.dataset.id));
-          else queueSelected.delete(parseInt(cb.dataset.id));
-          updateBulkButtons();
-        });
-      });
-    } catch (e) { toast(e.message, 'error'); }
-  }
-
-  function updateBulkButtons() {
-    const has = queueSelected.size > 0;
-    $('btn-bulk-approve').disabled = !has;
-    $('btn-bulk-reject').disabled = !has;
-    if (has) {
-      $('btn-bulk-approve').textContent = `Approve (${queueSelected.size})`;
-      $('btn-bulk-reject').textContent = `Reject (${queueSelected.size})`;
-    } else {
-      $('btn-bulk-approve').textContent = 'Approve Selected';
-      $('btn-bulk-reject').textContent = 'Reject Selected';
+      adminToken = data.token;
+      adminEmail = data.admin?.email || email;
+      localStorage.setItem('adminToken', adminToken);
+      localStorage.setItem('adminEmail', adminEmail);
+      hideLogin();
+      setAdminUI();
+      navigate('dashboard');
+      toast('Logged in successfully', 'success');
+    } catch (e) {
+      errEl.textContent = 'Connection error. Is the backend running?';
+      errEl.classList.add('show');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Log In';
     }
   }
 
-  $('queue-check-all').onchange = function() {
-    document.querySelectorAll('.queue-cb').forEach(cb => {
-      cb.checked = this.checked;
-      if (this.checked) queueSelected.add(parseInt(cb.dataset.id));
-      else queueSelected.delete(parseInt(cb.dataset.id));
+  function doLogout() {
+    confirm2('Log Out', 'Are you sure you want to log out?', () => {
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('adminEmail');
+      adminToken = null;
+      adminEmail = '';
+      showLogin();
     });
-    updateBulkButtons();
-  };
+  }
 
-  window.queueAction = async (id, action) => {
-    const showReason = action === 'reject';
-    const result = await confirm(
-      action === 'approve' ? 'Approve Content' : 'Reject Content',
-      action === 'approve' ? 'This content will go live on the public feed.' : 'This content will be rejected and the creator notified.',
-      showReason
-    );
-    if (!result || !result.confirmed) return;
-    try {
-      await api('PATCH', `/admin/queue/${id}`, { action, rejection_reason: result.reason });
-      toast(`Content ${action}d`, 'success');
-      loadQueue();
-      loadDashboard();
-    } catch (e) { toast(e.message, 'error'); }
-  };
-
-  $('btn-bulk-approve').onclick = async () => {
-    if (!queueSelected.size) return;
-    const result = await confirm('Bulk Approve', `Approve ${queueSelected.size} selected items?`);
-    if (!result || !result.confirmed) return;
-    try {
-      const data = await api('POST', '/admin/queue/bulk', { ids: [...queueSelected], action: 'approve' });
-      toast(`${data.updated} items approved`, 'success');
-      loadQueue(); loadDashboard();
-    } catch (e) { toast(e.message, 'error'); }
-  };
-
-  $('btn-bulk-reject').onclick = async () => {
-    if (!queueSelected.size) return;
-    const result = await confirm('Bulk Reject', `Reject ${queueSelected.size} selected items?`, true);
-    if (!result || !result.confirmed) return;
-    try {
-      const data = await api('POST', '/admin/queue/bulk', { ids: [...queueSelected], action: 'reject', rejection_reason: result.reason });
-      toast(`${data.updated} items rejected`, 'success');
-      loadQueue(); loadDashboard();
-    } catch (e) { toast(e.message, 'error'); }
-  };
-
-  $('queue-prev').onclick = () => { state.queue.offset = Math.max(0, state.queue.offset - state.queue.limit); loadQueue(); };
-  $('queue-next').onclick = () => { state.queue.offset += state.queue.limit; loadQueue(); };
-
-  // ── Content ──
-  let contentSearchTimer;
-  $('content-search').addEventListener('input', function() {
-    clearTimeout(contentSearchTimer);
-    contentSearchTimer = setTimeout(() => { state.content.search = this.value; state.content.offset = 0; loadContent(); }, 400);
-  });
-  $('content-status-filter').addEventListener('change', function() {
-    state.content.status = this.value; state.content.offset = 0; loadContent();
+  document.getElementById('loginPassword').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
   });
 
+  // ── API ──
+  async function apiFetch(path, opts = {}, auth = true) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (auth && adminToken) headers['Authorization'] = `Bearer ${adminToken}`;
+    return fetch(`${API_BASE}${path}`, {
+      method: opts.method || 'GET',
+      headers,
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    });
+  }
+
+  // ── NAVIGATION ──
+  function navigate(section) {
+    currentSection = section;
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    document.querySelector(`[data-section="${section}"]`)?.classList.add('active');
+    document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+    document.getElementById(`page-${section}`)?.classList.add('active');
+    document.getElementById('topbarTitle').textContent = section.charAt(0).toUpperCase() + section.slice(1).replace('-', ' ');
+    document.documentElement.setAttribute('data-section', section);
+
+    const loaders = {
+      dashboard: loadDashboard,
+      queue:     loadQueue,
+      content:   loadContent,
+      users:     loadUsers,
+      audit:     loadAudit,
+      settings:  loadSettings,
+    };
+    if (loaders[section]) loaders[section]();
+  }
+
+  // ── DASHBOARD ──
+  async function loadDashboard() {
+    const kpiGrid = document.getElementById('kpiGrid');
+    kpiGrid.innerHTML = `
+      <div class="kpi-card skeleton skel-kpi"></div>
+      <div class="kpi-card skeleton skel-kpi"></div>
+      <div class="kpi-card skeleton skel-kpi"></div>
+      <div class="kpi-card skeleton skel-kpi"></div>
+      <div class="kpi-card skeleton skel-kpi"></div>`;
+
+    try {
+      const res  = await apiFetch('/api/admin/analytics');
+      if (!res.ok) { if (res.status === 401) return showLogin(); throw new Error(); }
+      const data = await res.json();
+      const k    = data.kpis;
+
+      kpiGrid.innerHTML = `
+        <div class="kpi-card">
+          <div class="kpi-label">Total Creators</div>
+          <div class="kpi-value">${k.total_creators}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Total Businesses</div>
+          <div class="kpi-value">${k.total_businesses}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Published Content</div>
+          <div class="kpi-value green">${k.approved_content}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Pending Queue</div>
+          <div class="kpi-value pending">${k.pending_queue}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Active Opportunities</div>
+          <div class="kpi-value">${k.active_opportunities}</div>
+        </div>`;
+
+      // update queue badge
+      const badge = document.getElementById('queueBadge');
+      if (k.pending_queue > 0) {
+        badge.textContent = k.pending_queue;
+        badge.style.display = 'inline';
+      } else { badge.style.display = 'none'; }
+
+      // chart
+      const signups = data.creator_signups_30d || [];
+      const max     = Math.max(...signups.map(s => parseInt(s.count)), 1);
+      const chartEl = document.getElementById('signupChart');
+
+      if (signups.length === 0) {
+        chartEl.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:20px">No signup data yet</div>';
+      } else {
+        chartEl.innerHTML = signups.slice(-14).map(s => `
+          <div class="chart-bar-wrap">
+            <div class="chart-bar" style="height:${Math.round((parseInt(s.count)/max)*100)}%" title="${s.count} signups"></div>
+            <span class="chart-label">${new Date(s.day).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})}</span>
+          </div>`).join('');
+      }
+    } catch {
+      kpiGrid.innerHTML = '<div style="color:var(--text-muted);padding:20px">Failed to load analytics</div>';
+    }
+
+    // alerts
+    try {
+      const res  = await apiFetch('/api/admin/audit?limit=10');
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      const list = document.getElementById('alertsList');
+
+      if (!data.logs || data.logs.length === 0) {
+        list.innerHTML = '<div class="empty-state"><p>No recent activity</p></div>';
+        return;
+      }
+
+      list.innerHTML = data.logs.map(l => `
+        <div class="alert-item">
+          <div class="alert-dot"></div>
+          <div>
+            <div class="alert-action">${escHtml(l.action)}</div>
+            <div class="alert-meta">${escHtml(l.actor_type)} #${l.actor_id} &mdash; ${fmtDate(l.created_at)}</div>
+          </div>
+        </div>`).join('');
+    } catch { /* silent */ }
+  }
+
+  // ── MOD QUEUE ──
+  let queuePage_n = 0;
+  async function loadQueue() {
+    const type   = document.getElementById('queueTypeFilter').value;
+    const offset = state.queue.offset;
+    const limit  = state.queue.limit;
+
+    const params = new URLSearchParams({ limit, offset });
+    if (type) params.set('content_type', type);
+
+    try {
+      const res  = await apiFetch(`/api/admin/queue?${params}`);
+      if (!res.ok) { if (res.status === 401) return showLogin(); throw new Error(); }
+      const data = await res.json();
+
+      state.queue.total = data.total;
+      document.getElementById('queueTotal').textContent = `${data.total} items`;
+      document.getElementById('queuePageInfo').textContent = `${offset + 1}–${Math.min(offset + limit, data.total)} of ${data.total}`;
+      document.getElementById('queuePrev').disabled = offset === 0;
+      document.getElementById('queueNext').disabled = offset + limit >= data.total;
+
+      const tbody = document.getElementById('queueTbody');
+      if (!data.queue || data.queue.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><p>No pending items</p></div></td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = data.queue.map(item => `
+        <tr id="qrow-${item.id}">
+          <td><input type="checkbox" class="row-check" value="${item.id}" onchange="onRowCheck(this)" /></td>
+          <td class="muted">${item.id}</td>
+          <td><span class="badge badge-pending">creator</span></td>
+          <td>${escHtml(item.title)}</td>
+          <td>${escHtml(item.username || item.display_name || '')}</td>
+          <td class="muted">${fmtDate(item.created_at)}</td>
+          <td>
+            <div class="actions-cell">
+              <button class="btn btn-success btn-sm" onclick="queueSingle(${item.id},'approve')">Approve</button>
+              <button class="btn btn-danger btn-sm" onclick="queueSingle(${item.id},'reject')">Reject</button>
+            </div>
+          </td>
+        </tr>`).join('');
+    } catch {
+      toast('Failed to load queue', 'error');
+    }
+  }
+
+  function queuePage(dir) {
+    state.queue.offset = Math.max(0, state.queue.offset + dir * state.queue.limit);
+    loadQueue();
+  }
+
+  async function queueSingle(id, action) {
+    const label = action === 'approve' ? 'Approve' : 'Reject';
+    confirm2(`${label} Content`, `Are you sure you want to ${action} this item?`, async () => {
+      try {
+        const res = await apiFetch(`/api/admin/queue/${id}`, { method: 'PATCH', body: { action } });
+        if (!res.ok) throw new Error((await res.json()).error);
+        document.getElementById(`qrow-${id}`)?.remove();
+        toast(`Content ${action}d`, 'success');
+        loadDashboard();
+      } catch (e) {
+        toast(e.message || 'Action failed', 'error');
+      }
+    });
+  }
+
+  async function bulkAction(action) {
+    if (selectedIds.size === 0) { toast('No items selected', 'warning'); return; }
+    const note = document.getElementById('bulkNote').value;
+    const label = action === 'approve' ? 'Approve' : 'Reject';
+
+    confirm2(`Bulk ${label}`, `${label} ${selectedIds.size} item(s)?`, async () => {
+      try {
+        const res = await apiFetch('/api/admin/queue/bulk', {
+          method: 'POST',
+          body: { ids: [...selectedIds], action, rejection_reason: note || undefined },
+        });
+        if (!res.ok) throw new Error((await res.json()).error);
+        const data = await res.json();
+        toast(`${data.updated} item(s) ${action}d`, 'success');
+        clearSelection();
+        loadQueue();
+        loadDashboard();
+      } catch (e) {
+        toast(e.message || 'Bulk action failed', 'error');
+      }
+    });
+  }
+
+  function onRowCheck(cb) {
+    if (cb.checked) selectedIds.add(parseInt(cb.value));
+    else selectedIds.delete(parseInt(cb.value));
+    updateBulkBar();
+  }
+
+  function toggleSelectAll(cb) {
+    document.querySelectorAll('.row-check').forEach(el => {
+      el.checked = cb.checked;
+      if (cb.checked) selectedIds.add(parseInt(el.value));
+      else selectedIds.delete(parseInt(el.value));
+    });
+    updateBulkBar();
+  }
+
+  function clearSelection() {
+    selectedIds.clear();
+    document.querySelectorAll('.row-check').forEach(el => el.checked = false);
+    const sa = document.getElementById('selectAll');
+    if (sa) sa.checked = false;
+    updateBulkBar();
+  }
+
+  function updateBulkBar() {
+    const bar = document.getElementById('bulkBar');
+    const cnt = document.getElementById('bulkCount');
+    if (selectedIds.size > 0) {
+      bar.classList.add('show');
+      cnt.textContent = `${selectedIds.size} selected`;
+    } else {
+      bar.classList.remove('show');
+    }
+  }
+
+  // ── CONTENT ──
   async function loadContent() {
-    const s = state.content;
-    const params = new URLSearchParams({ limit: s.limit, offset: s.offset });
-    if (s.status) params.set('status', s.status);
-    $('tbl-content').innerHTML = '<tr class="loading-row"><td colspan="7">Loading…</td></tr>';
+    const search = document.getElementById('contentSearch').value;
+    const status = document.getElementById('contentStatusFilter').value;
+    const { offset, limit } = state.content;
+    const params = new URLSearchParams({ limit, offset });
+    if (search) params.set('search', search);
+    if (status) params.set('status', status);
+
     try {
-      const data = await api('GET', `/admin/content?${params}`);
-      $('content-info').textContent = `Showing ${s.offset + 1}–${Math.min(s.offset + s.limit, s.offset + data.content.length)} results`;
-      $('content-page').textContent = Math.floor(s.offset / s.limit) + 1;
-      $('content-prev').disabled = s.offset === 0;
-      $('content-next').disabled = data.content.length < s.limit;
+      const res  = await apiFetch(`/api/admin/content?${params}`);
+      if (!res.ok) { if (res.status === 401) return showLogin(); throw new Error(); }
+      const data = await res.json();
 
-      if (data.content.length === 0) { $('tbl-content').innerHTML = '<tr><td colspan="7"><div class="empty-state"><p>No content found</p></div></td></tr>'; return; }
+      state.content.total = data.content?.length || 0;
+      document.getElementById('contentPageInfo').textContent = `Showing ${offset + 1}–${offset + (data.content?.length || 0)}`;
+      document.getElementById('contentPrev').disabled = offset === 0;
+      document.getElementById('contentNext').disabled = (data.content?.length || 0) < limit;
 
-      $('tbl-content').innerHTML = data.content.map(c => `
+      const tbody = document.getElementById('contentTbody');
+      if (!data.content || data.content.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><p>No content found</p></div></td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = data.content.map(c => `
         <tr>
-          <td><div style="font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(c.title)}</div></td>
-          <td>${escHtml(c.display_name)}</td>
-          <td><span class="badge badge-orange">${escHtml(c.sport || '—')}</span></td>
-          <td><span class="badge badge-blue">${escHtml(c.content_type)}</span></td>
-          <td>${statusBadge(c.status)}</td>
-          <td style="white-space:nowrap">${fmtDate(c.created_at)}</td>
-          <td><button class="btn btn-sm btn-danger" onclick="deleteContent(${c.id})">Delete</button></td>
-        </tr>
-      `).join('');
-    } catch (e) { toast(e.message, 'error'); }
-  }
-
-  window.deleteContent = async (id) => {
-    const result = await confirm('Delete Content', 'This will permanently delete this content. This cannot be undone.');
-    if (!result || !result.confirmed) return;
-    try {
-      await api('DELETE', `/admin/content/${id}`);
-      toast('Content deleted', 'success');
-      loadContent();
-    } catch (e) { toast(e.message, 'error'); }
-  };
-
-  $('content-prev').onclick = () => { state.content.offset = Math.max(0, state.content.offset - state.content.limit); loadContent(); };
-  $('content-next').onclick = () => { state.content.offset += state.content.limit; loadContent(); };
-
-  // ── Creators ──
-  let creatorsSearchTimer;
-  $('creators-search').addEventListener('input', function() {
-    clearTimeout(creatorsSearchTimer);
-    creatorsSearchTimer = setTimeout(() => { state.creators.search = this.value; state.creators.offset = 0; loadCreators(); }, 400);
-  });
-  $('btn-refresh-creators').onclick = () => loadCreators();
-
-  async function loadCreators() {
-    const s = state.creators;
-    const params = new URLSearchParams({ limit: s.limit, offset: s.offset });
-    if (s.search) params.set('search', s.search);
-    $('tbl-creators').innerHTML = '<tr class="loading-row"><td colspan="7">Loading…</td></tr>';
-    try {
-      const data = await api('GET', `/admin/users/creators?${params}`);
-      $('creators-info').textContent = `${data.creators.length} creators`;
-      $('creators-page').textContent = Math.floor(s.offset / s.limit) + 1;
-      $('creators-prev').disabled = s.offset === 0;
-      $('creators-next').disabled = data.creators.length < s.limit;
-
-      if (data.creators.length === 0) { $('tbl-creators').innerHTML = '<tr><td colspan="7"><div class="empty-state"><p>No creators found</p></div></td></tr>'; return; }
-
-      $('tbl-creators').innerHTML = data.creators.map(c => `
-        <tr>
-          <td>@${escHtml(c.username)}</td>
-          <td>${escHtml(c.display_name)}</td>
-          <td><span class="badge badge-orange">${escHtml(c.sport || '—')}</span></td>
-          <td>${c.follower_count || 0}</td>
-          <td>${suspendBadge(c.is_suspended, c.is_verified)}</td>
-          <td style="white-space:nowrap">${fmtDate(c.created_at)}</td>
-          <td style="white-space:nowrap;display:flex;gap:4px">
-            ${!c.is_verified ? `<button class="btn btn-sm btn-ghost" onclick="verifyCreator(${c.id})">Verify</button>` : ''}
-            ${!c.is_suspended
-              ? `<button class="btn btn-sm btn-danger" onclick="suspendCreator(${c.id})">Suspend</button>`
-              : `<button class="btn btn-sm btn-success" onclick="reactivateCreator(${c.id})">Reactivate</button>`
-            }
+          <td class="muted">${c.id}</td>
+          <td>${escHtml(c.title)}</td>
+          <td>${escHtml(c.display_name || c.username || '')}</td>
+          <td class="muted">${escHtml(c.content_type || '')}</td>
+          <td><span class="badge badge-${c.status}">${c.status}</span></td>
+          <td class="muted">${fmtDate(c.created_at)}</td>
+          <td>
+            <div class="actions-cell">
+              <button class="btn btn-danger btn-sm" onclick="deleteContent(${c.id})">Delete</button>
+            </div>
           </td>
-        </tr>
-      `).join('');
-    } catch (e) { toast(e.message, 'error'); }
+        </tr>`).join('');
+    } catch {
+      toast('Failed to load content', 'error');
+    }
   }
 
-  window.verifyCreator = async (id) => {
-    const result = await confirm('Verify Creator', 'Grant this creator a verified badge?');
-    if (!result || !result.confirmed) return;
-    try { await api('PATCH', `/admin/users/creators/${id}/verify`); toast('Creator verified', 'success'); loadCreators(); }
-    catch (e) { toast(e.message, 'error'); }
-  };
-  window.suspendCreator = async (id) => {
-    const result = await confirm('Suspend Creator', 'This will prevent the creator from logging in.', true);
-    if (!result || !result.confirmed) return;
-    try { await api('PATCH', `/admin/users/creators/${id}/suspend`, { reason: result.reason }); toast('Creator suspended', 'success'); loadCreators(); }
-    catch (e) { toast(e.message, 'error'); }
-  };
-  window.reactivateCreator = async (id) => {
-    const result = await confirm('Reactivate Creator', 'Restore this creator\'s access?');
-    if (!result || !result.confirmed) return;
-    try { await api('PATCH', `/admin/users/creators/${id}/reactivate`); toast('Creator reactivated', 'success'); loadCreators(); }
-    catch (e) { toast(e.message, 'error'); }
-  };
+  function contentPage(dir) {
+    state.content.offset = Math.max(0, state.content.offset + dir * state.content.limit);
+    loadContent();
+  }
 
-  $('creators-prev').onclick = () => { state.creators.offset = Math.max(0, state.creators.offset - state.creators.limit); loadCreators(); };
-  $('creators-next').onclick = () => { state.creators.offset += state.creators.limit; loadCreators(); };
+  async function deleteContent(id) {
+    confirm2('Delete Content', 'Permanently delete this content? This cannot be undone.', async () => {
+      try {
+        const res = await apiFetch(`/api/admin/content/${id}`, { method: 'DELETE' });
+        if (!res.ok && res.status !== 204) throw new Error((await res.json()).error);
+        toast('Content deleted', 'success');
+        loadContent();
+      } catch (e) {
+        toast(e.message || 'Delete failed', 'error');
+      }
+    });
+  }
 
-  // ── Businesses ──
-  let bizSearchTimer;
-  $('businesses-search').addEventListener('input', function() {
-    clearTimeout(bizSearchTimer);
-    bizSearchTimer = setTimeout(() => { state.businesses.search = this.value; state.businesses.offset = 0; loadBusinesses(); }, 400);
-  });
-  $('btn-refresh-businesses').onclick = () => loadBusinesses();
+  // ── USERS ──
+  async function loadUsers() {
+    const type   = document.getElementById('usersTypeFilter').value;
+    const search = document.getElementById('usersSearch').value;
+    const { offset, limit } = state.users;
+    const params = new URLSearchParams({ limit, offset });
+    if (search) params.set('search', search);
 
-  async function loadBusinesses() {
-    const s = state.businesses;
-    const params = new URLSearchParams({ limit: s.limit, offset: s.offset });
-    if (s.search) params.set('search', s.search);
-    $('tbl-businesses').innerHTML = '<tr class="loading-row"><td colspan="6">Loading…</td></tr>';
+    const thead = document.getElementById('usersThead');
+    const tbody = document.getElementById('usersTbody');
+
     try {
-      const data = await api('GET', `/admin/users/businesses?${params}`);
-      $('businesses-info').textContent = `${data.businesses.length} businesses`;
-      $('businesses-page').textContent = Math.floor(s.offset / s.limit) + 1;
-      $('businesses-prev').disabled = s.offset === 0;
-      $('businesses-next').disabled = data.businesses.length < s.limit;
+      const res  = await apiFetch(`/api/admin/users/${type}?${params}`);
+      if (!res.ok) { if (res.status === 401) return showLogin(); throw new Error(); }
+      const data = await res.json();
 
-      if (data.businesses.length === 0) { $('tbl-businesses').innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>No businesses found</p></div></td></tr>'; return; }
+      const rows = data.creators || data.businesses || [];
+      document.getElementById('usersPageInfo').textContent = `Showing ${offset + 1}–${offset + rows.length}`;
+      document.getElementById('usersPrev').disabled = offset === 0;
+      document.getElementById('usersNext').disabled = rows.length < limit;
 
-      $('tbl-businesses').innerHTML = data.businesses.map(b => `
-        <tr>
-          <td>${escHtml(b.business_name)}</td>
-          <td style="color:var(--text-muted)">${escHtml(b.email)}</td>
-          <td><span class="badge badge-blue">${escHtml(b.industry || '—')}</span></td>
-          <td>${suspendBadge(b.is_suspended, b.is_verified)}</td>
-          <td style="white-space:nowrap">${fmtDate(b.created_at)}</td>
-          <td style="white-space:nowrap;display:flex;gap:4px">
-            ${!b.is_suspended
-              ? `<button class="btn btn-sm btn-danger" onclick="suspendBusiness(${b.id})">Suspend</button>`
-              : `<button class="btn btn-sm btn-success" onclick="reactivateBusiness(${b.id})">Reactivate</button>`
-            }
-          </td>
-        </tr>
-      `).join('');
-    } catch (e) { toast(e.message, 'error'); }
+      if (type === 'creators') {
+        thead.innerHTML = '<th>ID</th><th>Username</th><th>Email</th><th>Sport</th><th>Verified</th><th>Status</th><th>Joined</th><th>Actions</th>';
+        if (rows.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><p>No creators found</p></div></td></tr>`;
+          return;
+        }
+        tbody.innerHTML = rows.map(u => `
+          <tr>
+            <td class="muted">${u.id}</td>
+            <td>${escHtml(u.username)}</td>
+            <td class="muted">${escHtml(u.email)}</td>
+            <td class="muted">${escHtml(u.sport || '—')}</td>
+            <td>${u.is_verified ? '<span class="badge badge-approved">✓</span>' : '—'}</td>
+            <td><span class="badge badge-${u.is_suspended ? 'suspended' : 'active'}">${u.is_suspended ? 'Suspended' : 'Active'}</span></td>
+            <td class="muted">${fmtDate(u.created_at)}</td>
+            <td>
+              <div class="actions-cell">
+                ${u.is_suspended
+                  ? `<button class="btn btn-success btn-sm" onclick="userAction('creators',${u.id},'reactivate')">Reactivate</button>`
+                  : `<button class="btn btn-danger btn-sm" onclick="userAction('creators',${u.id},'suspend')">Suspend</button>`
+                }
+                ${!u.is_verified ? `<button class="btn btn-secondary btn-sm" onclick="userAction('creators',${u.id},'verify')">Verify</button>` : ''}
+              </div>
+            </td>
+          </tr>`).join('');
+      } else {
+        thead.innerHTML = '<th>ID</th><th>Company</th><th>Email</th><th>Industry</th><th>Verified</th><th>Status</th><th>Joined</th><th>Actions</th>';
+        if (rows.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><p>No businesses found</p></div></td></tr>`;
+          return;
+        }
+        tbody.innerHTML = rows.map(b => `
+          <tr>
+            <td class="muted">${b.id}</td>
+            <td>${escHtml(b.business_name)}</td>
+            <td class="muted">${escHtml(b.email)}</td>
+            <td class="muted">${escHtml(b.industry || '—')}</td>
+            <td>${b.is_verified ? '<span class="badge badge-approved">✓</span>' : '—'}</td>
+            <td><span class="badge badge-${b.is_suspended ? 'suspended' : 'active'}">${b.is_suspended ? 'Suspended' : 'Active'}</span></td>
+            <td class="muted">${fmtDate(b.created_at)}</td>
+            <td>
+              <div class="actions-cell">
+                ${b.is_suspended
+                  ? `<button class="btn btn-success btn-sm" onclick="userAction('businesses',${b.id},'reactivate')">Reactivate</button>`
+                  : `<button class="btn btn-danger btn-sm" onclick="userAction('businesses',${b.id},'suspend')">Suspend</button>`
+                }
+              </div>
+            </td>
+          </tr>`).join('');
+      }
+    } catch {
+      toast('Failed to load users', 'error');
+    }
   }
 
-  window.suspendBusiness = async (id) => {
-    const result = await confirm('Suspend Business', 'This will prevent the business from logging in.');
-    if (!result || !result.confirmed) return;
-    try { await api('PATCH', `/admin/users/businesses/${id}/suspend`); toast('Business suspended', 'success'); loadBusinesses(); }
-    catch (e) { toast(e.message, 'error'); }
-  };
-  window.reactivateBusiness = async (id) => {
-    const result = await confirm('Reactivate Business', 'Restore this business\'s access?');
-    if (!result || !result.confirmed) return;
-    try { await api('PATCH', `/admin/users/businesses/${id}/reactivate`); toast('Business reactivated', 'success'); loadBusinesses(); }
-    catch (e) { toast(e.message, 'error'); }
-  };
-
-  $('businesses-prev').onclick = () => { state.businesses.offset = Math.max(0, state.businesses.offset - state.businesses.limit); loadBusinesses(); };
-  $('businesses-next').onclick = () => { state.businesses.offset += state.businesses.limit; loadBusinesses(); };
-
-  // ── Analytics ──
-  async function loadAnalytics() {
-    try {
-      const [kpis, content] = await Promise.all([api('GET', '/admin/analytics'), api('GET', '/admin/analytics/content')]);
-      $('a-kpi-creators').textContent = kpis.kpis.total_creators;
-      $('a-kpi-businesses').textContent = kpis.kpis.total_businesses;
-      $('a-kpi-content').textContent = kpis.kpis.approved_content;
-      $('a-kpi-opps').textContent = kpis.kpis.active_opportunities;
-      $('a-kpi-queue').textContent = kpis.kpis.pending_queue;
-      $('tbl-by-status').innerHTML = content.by_status.map(r =>
-        `<tr><td>${statusBadge(r.status)}</td><td>${r.count}</td></tr>`
-      ).join('');
-      $('tbl-signups').innerHTML = kpis.creator_signups_30d.map(r =>
-        `<tr><td>${fmtDate(r.day)}</td><td>${r.count}</td></tr>`
-      ).join('') || '<tr><td colspan="2" style="color:var(--text-faint);padding:12px">No signups in last 30 days</td></tr>';
-    } catch (e) { toast(e.message, 'error'); }
+  function usersPage(dir) {
+    state.users.offset = Math.max(0, state.users.offset + dir * state.users.limit);
+    loadUsers();
   }
 
-  // ── Audit ──
-  let auditActionTimer;
-  $('audit-actor-filter').addEventListener('change', function() { state.audit.actor_type = this.value; state.audit.offset = 0; loadAudit(); });
-  $('audit-action-filter').addEventListener('input', function() {
-    clearTimeout(auditActionTimer);
-    auditActionTimer = setTimeout(() => { state.audit.action = this.value; state.audit.offset = 0; loadAudit(); }, 400);
-  });
+  async function userAction(type, id, action) {
+    const labels = { suspend: 'Suspend', reactivate: 'Reactivate', verify: 'Verify' };
+    confirm2(labels[action], `${labels[action]} this user?`, async () => {
+      try {
+        const res = await apiFetch(`/api/admin/users/${type}/${id}/${action}`, { method: 'PATCH' });
+        if (!res.ok) throw new Error((await res.json()).error);
+        toast(`User ${action}d`, 'success');
+        loadUsers();
+      } catch (e) {
+        toast(e.message || 'Action failed', 'error');
+      }
+    });
+  }
 
+  // ── AUDIT ──
   async function loadAudit() {
-    const s = state.audit;
-    const params = new URLSearchParams({ limit: s.limit, offset: s.offset });
-    if (s.actor_type) params.set('actor_type', s.actor_type);
-    if (s.action) params.set('action', s.action);
-    $('tbl-audit').innerHTML = '<tr class="loading-row"><td colspan="5">Loading…</td></tr>';
+    const actor  = document.getElementById('auditActorFilter').value;
+    const action = document.getElementById('auditActionFilter').value;
+    const { offset, limit } = state.audit;
+    const params = new URLSearchParams({ limit, offset });
+    if (actor) params.set('actor_type', actor);
+    if (action) params.set('action', action);
+
     try {
-      const data = await api('GET', `/admin/audit?${params}`);
-      s.total = data.total;
-      $('audit-info').textContent = `${data.total} total entries`;
-      $('audit-page').textContent = Math.floor(s.offset / s.limit) + 1;
-      $('audit-prev').disabled = s.offset === 0;
-      $('audit-next').disabled = s.offset + s.limit >= s.total;
+      const res  = await apiFetch(`/api/admin/audit?${params}`);
+      if (!res.ok) { if (res.status === 401) return showLogin(); throw new Error(); }
+      const data = await res.json();
 
-      if (data.logs.length === 0) { $('tbl-audit').innerHTML = '<tr><td colspan="5"><div class="empty-state"><p>No audit entries found</p></div></td></tr>'; return; }
+      state.audit.total = data.total;
+      document.getElementById('auditPageInfo').textContent = `${offset + 1}–${Math.min(offset + limit, data.total)} of ${data.total}`;
+      document.getElementById('auditPrev').disabled = offset === 0;
+      document.getElementById('auditNext').disabled = offset + limit >= data.total;
 
-      $('tbl-audit').innerHTML = data.logs.map(l => `
+      const tbody = document.getElementById('auditTbody');
+      if (!data.logs || data.logs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><p>No audit logs found</p></div></td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = data.logs.map(l => `
         <tr>
-          <td style="white-space:nowrap;color:var(--text-muted)">${fmtDateTime(l.created_at)}</td>
-          <td>${l.actor_id}</td>
-          <td><span class="badge badge-gray">${escHtml(l.actor_type)}</span></td>
-          <td><code style="font-size:11px;background:var(--surface-3);padding:2px 6px;border-radius:4px">${escHtml(l.action)}</code></td>
-          <td style="font-size:11px;color:var(--text-muted);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(JSON.stringify(l.metadata || {}))}</td>
-        </tr>
-      `).join('');
-    } catch (e) { toast(e.message, 'error'); }
+          <td class="muted">${l.id}</td>
+          <td><span class="badge badge-${l.actor_type}">${escHtml(l.actor_type)}</span> #${l.actor_id}</td>
+          <td style="font-family:monospace;font-size:12px">${escHtml(l.action)}</td>
+          <td class="muted" style="font-size:12px">${l.metadata ? escHtml(JSON.stringify(l.metadata).slice(0, 80)) : '—'}</td>
+          <td class="muted">${fmtDate(l.created_at)}</td>
+        </tr>`).join('');
+    } catch {
+      toast('Failed to load audit log', 'error');
+    }
   }
 
-  $('btn-export-audit').onclick = async () => {
+  function auditPage(dir) {
+    state.audit.offset = Math.max(0, state.audit.offset + dir * state.audit.limit);
+    loadAudit();
+  }
+
+  async function exportAudit() {
     try {
-      const res = await fetch(`${API}/admin/audit/export`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await apiFetch('/api/admin/audit/export');
+      if (!res.ok) throw new Error();
       const blob = await res.blob();
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url;
       a.download = `audit-export-${Date.now()}.json`;
       a.click();
+      URL.revokeObjectURL(url);
       toast('Audit log exported', 'success');
-    } catch (e) { toast('Export failed', 'error'); }
-  };
-
-  $('audit-prev').onclick = () => { state.audit.offset = Math.max(0, state.audit.offset - state.audit.limit); loadAudit(); };
-  $('audit-next').onclick = () => { state.audit.offset += state.audit.limit; loadAudit(); };
-
-  // ── Settings ──
-  $('btn-change-pw').onclick = async () => {
-    const current = $('pw-current').value;
-    const next = $('pw-new').value;
-    const confirm2 = $('pw-confirm').value;
-    const errEl = $('pw-error');
-    errEl.classList.remove('visible');
-
-    if (next !== confirm2) { errEl.textContent = 'Passwords do not match'; errEl.classList.add('visible'); return; }
-    if (next.length < 8) { errEl.textContent = 'New password must be at least 8 characters'; errEl.classList.add('visible'); return; }
-
-    try {
-      await api('POST', '/admin/auth/change-password', { current_password: current, new_password: next });
-      toast('Password updated successfully', 'success');
-      $('pw-current').value = ''; $('pw-new').value = ''; $('pw-confirm').value = '';
-    } catch (e) { errEl.textContent = e.message; errEl.classList.add('visible'); }
-  };
-
-  // ── XSS guard ──
-  function escHtml(s) {
-    if (s == null) return '';
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    } catch {
+      toast('Export failed', 'error');
+    }
   }
 
-})();
+  // ── SETTINGS ──
+  async function loadSettings() {
+    try {
+      const res  = await apiFetch('/api/admin/auth/me');
+      if (!res.ok) return;
+      const data = await res.json();
+      const a    = data.admin;
+      document.getElementById('adminInfoBlock').innerHTML = `
+        <div><strong style="color:var(--text)">Email:</strong> ${escHtml(a.email)}</div>
+        <div><strong style="color:var(--text)">Role:</strong> ${escHtml(a.role || 'admin')}</div>
+        <div><strong style="color:var(--text)">Joined:</strong> ${fmtDate(a.created_at)}</div>`;
+    } catch { /* silent */ }
+  }
+
+  async function changePassword() {
+    const current = document.getElementById('pwCurrent').value;
+    const newPw   = document.getElementById('pwNew').value;
+    const confirm = document.getElementById('pwConfirm').value;
+    const errEl   = document.getElementById('pwError');
+
+    errEl.style.display = 'none';
+
+    if (!current || !newPw || !confirm) {
+      errEl.textContent = 'All fields are required'; errEl.style.display = 'block'; return;
+    }
+    if (newPw.length < 8) {
+      errEl.textContent = 'New password must be at least 8 characters'; errEl.style.display = 'block'; return;
+    }
+    if (newPw !== confirm) {
+      errEl.textContent = 'Passwords do not match'; errEl.style.display = 'block'; return;
+    }
+
+    try {
+      const res = await apiFetch('/api/admin/auth/change-password', {
+        method: 'POST',
+        body: { current_password: current, new_password: newPw },
+      });
+      const data = await res.json();
+      if (!res.ok) { errEl.textContent = data.error || 'Failed'; errEl.style.display = 'block'; return; }
+      toast('Password updated successfully', 'success');
+      document.getElementById('pwCurrent').value = '';
+      document.getElementById('pwNew').value = '';
+      document.getElementById('pwConfirm').value = '';
+    } catch {
+      errEl.textContent = 'Connection error'; errEl.style.display = 'block';
+    }
+  }
+
+  // ── CONFIRM MODAL ──
+  let _confirmCb = null;
+  function confirm2(title, body, cb) {
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmBody').textContent  = body;
+    document.getElementById('confirmModal').classList.remove('hidden');
+    _confirmCb = cb;
+  }
+  function closeConfirm() {
+    document.getElementById('confirmModal').classList.add('hidden');
+    _confirmCb = null;
+  }
+  document.getElementById('confirmOkBtn').onclick = () => {
+    closeConfirm();
+    if (_confirmCb) _confirmCb();
+  };
+
+  // ── TOAST ──
+  function toast(msg, type = 'success') {
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    const icons = { success: '✓', error: '✕', warning: '⚠' };
+    el.innerHTML = `<span style="font-size:15px">${icons[type] || '✓'}</span><span>${escHtml(msg)}</span>`;
+    document.getElementById('toastContainer').appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+  }
+
+  // ── UTILS ──
+  function escHtml(str) {
+    if (str == null) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) +
+           ' ' + new Date(iso).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+  }
+
+  function debounce(fn, ms) {
+    let t;
+    return function(...args) {
+      clearTimeout(t);
+      t = setTimeout(() => fn.apply(this, args), ms);
+    };
+  }
 </script>
 </body>
 </html>

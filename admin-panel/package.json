@@ -1,11 +1,14 @@
 {
-  "name": "plxyground-admin",
+  "name": "plxyground-admin-panel",
   "version": "1.0.0",
-  "description": "PLXYGROUND Admin Panel",
+  "description": "PLXYGROUND Admin Panel - vanilla HTML/CSS/JS SPA",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js"
   },
-  "dependencies": {}
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "license": "UNLICENSED"
 }
