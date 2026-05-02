@@ -1,24 +1,27 @@
 'use strict';
 
-const { getPool } = require('../db/client');
+const pool = require('../db/client');
 const logger = require('../logger');
 
 /**
  * Fire-and-forget audit log writer.
- * Never throws — errors are swallowed and logged to the app logger.
+ * @param {object} opts
+ * @param {'admin'|'creator'|'business'|'system'} opts.actorType
+ * @param {number|null} opts.actorId
+ * @param {string} opts.action
+ * @param {string|null} [opts.targetType]
+ * @param {number|null} [opts.targetId]
+ * @param {object|null} [opts.metadata]
+ * @param {string|null} [opts.ipAddress]
  */
-function writeAudit({ actorId, actorType, action, targetId, targetType, metadata = {}, ip }) {
-  setImmediate(async () => {
-    try {
-      await getPool().query(
-        `INSERT INTO audit_log (actor_id, actor_type, action, target_id, target_type, metadata, ip_address)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [actorId || null, actorType || null, action, targetId || null, targetType || null, metadata, ip || null],
-      );
-    } catch (err) {
-      logger.error('Failed to write audit log', { action, error: err.message });
-    }
+function auditLog({ actorType, actorId, action, targetType = null, targetId = null, metadata = null, ipAddress = null }) {
+  pool.query(
+    `INSERT INTO audit_log (actortype, actorid, action, targettype, targetid, metadata, ipaddress)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [actorType, actorId, action, targetType, targetId, metadata ? JSON.stringify(metadata) : null, ipAddress]
+  ).catch((err) => {
+    logger.error('auditLog write failed', err);
   });
 }
 
-module.exports = { writeAudit };
+module.exports = auditLog;

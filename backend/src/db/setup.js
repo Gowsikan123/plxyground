@@ -1,131 +1,135 @@
 'use strict';
 
-const { getPool } = require('./client');
+const pool = require('./client');
 const logger = require('../logger');
 
 async function setup() {
-  const pool = getPool();
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS admins (
+      id           SERIAL PRIMARY KEY,
+      email        TEXT UNIQUE NOT NULL,
+      passwordhash TEXT NOT NULL,
+      createdat    TIMESTAMPTZ DEFAULT NOW()
+    );
 
-  const sql = `
     CREATE TABLE IF NOT EXISTS creators (
       id            SERIAL PRIMARY KEY,
-      username      VARCHAR(50)  UNIQUE NOT NULL,
-      email         VARCHAR(255) UNIQUE NOT NULL,
-      password_hash TEXT         NOT NULL,
-      display_name  VARCHAR(100),
+      username      TEXT UNIQUE NOT NULL,
+      slug          TEXT UNIQUE NOT NULL,
+      displayname   TEXT NOT NULL,
       bio           TEXT,
-      sport         VARCHAR(50),
-      avatar_url    TEXT,
-      slug          VARCHAR(80)  UNIQUE,
-      follower_count INT         NOT NULL DEFAULT 0,
-      is_verified   BOOLEAN      NOT NULL DEFAULT FALSE,
-      is_suspended  BOOLEAN      NOT NULL DEFAULT FALSE,
-      created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-      updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      avatarurl     TEXT,
+      sport         TEXT,
+      location      TEXT,
+      followercount INTEGER DEFAULT 0,
+      isverified    BOOLEAN DEFAULT FALSE,
+      createdat     TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS creator_accounts (
+      id               SERIAL PRIMARY KEY,
+      creatorid        INTEGER NOT NULL REFERENCES creators(id) ON DELETE CASCADE,
+      email            TEXT UNIQUE NOT NULL,
+      passwordhash     TEXT NOT NULL,
+      role             TEXT DEFAULT 'creator' CHECK (role IN ('creator', 'admin')),
+      issuspended      BOOLEAN DEFAULT FALSE,
+      isemailverified  BOOLEAN DEFAULT FALSE,
+      lastlogin        TIMESTAMPTZ,
+      createdat        TIMESTAMPTZ DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS businesses (
-      id            SERIAL PRIMARY KEY,
-      company_name  VARCHAR(150) NOT NULL,
-      email         VARCHAR(255) UNIQUE NOT NULL,
-      password_hash TEXT         NOT NULL,
-      website       TEXT,
-      bio           TEXT,
-      logo_url      TEXT,
-      slug          VARCHAR(80)  UNIQUE,
-      is_verified   BOOLEAN      NOT NULL DEFAULT FALSE,
-      is_suspended  BOOLEAN      NOT NULL DEFAULT FALSE,
-      created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-      updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS admins (
-      id            SERIAL PRIMARY KEY,
-      username      VARCHAR(50)  UNIQUE NOT NULL,
-      email         VARCHAR(255) UNIQUE NOT NULL,
-      password_hash TEXT         NOT NULL,
-      role          VARCHAR(30)  NOT NULL DEFAULT 'moderator',
-      is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
-      created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      id               SERIAL PRIMARY KEY,
+      email            TEXT UNIQUE NOT NULL,
+      passwordhash     TEXT NOT NULL,
+      companyname      TEXT NOT NULL,
+      slug             TEXT UNIQUE NOT NULL,
+      bio              TEXT,
+      logourl          TEXT,
+      industry         TEXT,
+      website          TEXT,
+      location         TEXT,
+      issuspended      BOOLEAN DEFAULT FALSE,
+      isemailverified  BOOLEAN DEFAULT FALSE,
+      lastlogin        TIMESTAMPTZ,
+      createdat        TIMESTAMPTZ DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS content (
-      id            SERIAL PRIMARY KEY,
-      creator_id    INT          NOT NULL REFERENCES creators(id) ON DELETE CASCADE,
-      title         VARCHAR(200) NOT NULL,
-      body          TEXT,
-      media_url     TEXT,
-      media_type    VARCHAR(20)  NOT NULL DEFAULT 'none',
-      tags          TEXT[]       NOT NULL DEFAULT '{}',
-      sport         VARCHAR(50),
-      status        VARCHAR(20)  NOT NULL DEFAULT 'pending',
-      view_count    INT          NOT NULL DEFAULT 0,
-      like_count    INT          NOT NULL DEFAULT 0,
-      is_flagged    BOOLEAN      NOT NULL DEFAULT FALSE,
-      created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-      updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      id          SERIAL PRIMARY KEY,
+      creatorid   INTEGER NOT NULL REFERENCES creators(id) ON DELETE CASCADE,
+      title       TEXT NOT NULL,
+      body        TEXT,
+      mediaurl    TEXT,
+      mediatype   TEXT DEFAULT 'none' CHECK (mediatype IN ('image', 'video', 'none')),
+      tags        JSONB DEFAULT '[]',
+      status      TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'published', 'rejected', 'deleted')),
+      viewcount   INTEGER DEFAULT 0,
+      likecount   INTEGER DEFAULT 0,
+      createdat   TIMESTAMPTZ DEFAULT NOW(),
+      updatedat   TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS business_content (
+      id           SERIAL PRIMARY KEY,
+      businessid   INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+      title        TEXT NOT NULL,
+      body         TEXT,
+      mediaurl     TEXT,
+      budgetrange  TEXT,
+      targetsport  TEXT,
+      status       TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'published', 'rejected', 'deleted')),
+      createdat    TIMESTAMPTZ DEFAULT NOW(),
+      updatedat    TIMESTAMPTZ DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS opportunities (
       id            SERIAL PRIMARY KEY,
-      poster_id     INT          NOT NULL,
-      poster_type   VARCHAR(20)  NOT NULL CHECK (poster_type IN ('creator','business')),
-      title         VARCHAR(200) NOT NULL,
-      description   TEXT         NOT NULL,
-      sport         VARCHAR(50),
-      budget        VARCHAR(100),
-      location      VARCHAR(150),
-      deadline      DATE,
-      status        VARCHAR(20)  NOT NULL DEFAULT 'open',
-      tags          TEXT[]       NOT NULL DEFAULT '{}',
-      applications  INT          NOT NULL DEFAULT 0,
-      created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-      updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS applications (
-      id              SERIAL PRIMARY KEY,
-      opportunity_id  INT         NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
-      creator_id      INT         NOT NULL REFERENCES creators(id)      ON DELETE CASCADE,
-      message         TEXT,
-      status          VARCHAR(20) NOT NULL DEFAULT 'pending',
-      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (opportunity_id, creator_id)
+      postedbytype  TEXT NOT NULL CHECK (postedbytype IN ('creator', 'business')),
+      postedbyid    INTEGER NOT NULL,
+      title         TEXT NOT NULL,
+      description   TEXT NOT NULL,
+      sport         TEXT,
+      location      TEXT,
+      budget        TEXT,
+      deadline      TEXT,
+      status        TEXT DEFAULT 'published' CHECK (status IN ('published', 'closed', 'deleted')),
+      createdat     TIMESTAMPTZ DEFAULT NOW(),
+      updatedat     TIMESTAMPTZ DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS moderation_queue (
-      id            SERIAL PRIMARY KEY,
-      content_id    INT          REFERENCES content(id) ON DELETE SET NULL,
-      reason        VARCHAR(100),
-      status        VARCHAR(20)  NOT NULL DEFAULT 'pending',
-      reviewed_by   INT          REFERENCES admins(id),
-      reviewed_at   TIMESTAMPTZ,
-      created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      id          SERIAL PRIMARY KEY,
+      contenttype TEXT NOT NULL CHECK (contenttype IN ('creator_content', 'business_content')),
+      contentid   INTEGER NOT NULL,
+      status      TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+      reviewedby  INTEGER REFERENCES admins(id),
+      reviewnote  TEXT,
+      submittedat TIMESTAMPTZ DEFAULT NOW(),
+      reviewedat  TIMESTAMPTZ
     );
 
     CREATE TABLE IF NOT EXISTS audit_log (
-      id            SERIAL PRIMARY KEY,
-      actor_id      INT,
-      actor_type    VARCHAR(20),
-      action        VARCHAR(100) NOT NULL,
-      target_id     INT,
-      target_type   VARCHAR(50),
-      metadata      JSONB        NOT NULL DEFAULT '{}',
-      ip_address    VARCHAR(45),
-      created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      id         SERIAL PRIMARY KEY,
+      actortype  TEXT NOT NULL CHECK (actortype IN ('admin', 'creator', 'business', 'system')),
+      actorid    INTEGER,
+      action     TEXT NOT NULL,
+      targettype TEXT,
+      targetid   INTEGER,
+      metadata   JSONB,
+      ipaddress  TEXT,
+      createdat  TIMESTAMPTZ DEFAULT NOW()
     );
+  `);
 
-    CREATE INDEX IF NOT EXISTS idx_content_creator  ON content(creator_id);
-    CREATE INDEX IF NOT EXISTS idx_content_status   ON content(status);
-    CREATE INDEX IF NOT EXISTS idx_content_sport    ON content(sport);
-    CREATE INDEX IF NOT EXISTS idx_opps_poster      ON opportunities(poster_id, poster_type);
-    CREATE INDEX IF NOT EXISTS idx_opps_status      ON opportunities(status);
-    CREATE INDEX IF NOT EXISTS idx_audit_actor      ON audit_log(actor_id, actor_type);
-    CREATE INDEX IF NOT EXISTS idx_audit_created    ON audit_log(created_at);
-  `;
+  logger.info('Database schema ready');
 
-  await pool.query(sql);
-  logger.info('Database tables created / verified');
+  const { rows } = await pool.query('SELECT COUNT(*) FROM admins');
+  if (parseInt(rows[0].count, 10) === 0) {
+    logger.info('No admins found — running seed');
+    const seed = require('./seed');
+    await seed();
+  }
 }
 
-module.exports = { setup };
+module.exports = setup;

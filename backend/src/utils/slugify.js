@@ -1,41 +1,34 @@
 'use strict';
 
-const { getPool } = require('../db/client');
+const pool = require('../db/client');
 
 /**
- * Converts a string to a URL-safe slug.
+ * Generate a URL-safe slug from a string.
+ * Appends a numeric suffix if the slug already exists in the given table.
+ * @param {string} input
+ * @param {'creators'|'businesses'} table
+ * @returns {Promise<string>}
  */
-function toSlug(input) {
-  return input
+async function slugify(input, table) {
+  const base = input
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/[\s-]+/g, '-')
+    .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+
+  const { rows } = await pool.query(
+    `SELECT slug FROM ${table} WHERE slug LIKE $1 ORDER BY slug`,
+    [`${base}%`]
+  );
+
+  if (rows.length === 0) return base;
+
+  const existing = new Set(rows.map((r) => r.slug));
+  if (!existing.has(base)) return base;
+
+  let i = 2;
+  while (existing.has(`${base}-${i}`)) i++;
+  return `${base}-${i}`;
 }
 
-/**
- * Generates a unique slug for a given table + column.
- * Appends a numeric suffix on collision: john-doe, john-doe-2, john-doe-3, ...
- */
-async function uniqueSlug(base, table, column = 'slug', excludeId = null) {
-  const pool = getPool();
-  const slug = toSlug(base);
-  let candidate = slug;
-  let attempt = 1;
-
-  while (true) {
-    const params = [candidate];
-    let query = `SELECT id FROM ${table} WHERE ${column} = $1`;
-    if (excludeId) {
-      query += ' AND id != $2';
-      params.push(excludeId);
-    }
-    const { rows } = await pool.query(query, params);
-    if (!rows.length) return candidate;
-    attempt += 1;
-    candidate = `${slug}-${attempt}`;
-  }
-}
-
-module.exports = { toSlug, uniqueSlug };
+module.exports = slugify;
