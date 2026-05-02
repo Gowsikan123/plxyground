@@ -10,10 +10,6 @@ beforeAll(async () => {
   app = createApp();
 }, 30000);
 
-aftreAll(() => {
-  // teardown — pg pool closes on process exit
-});
-
 describe('Health checks', () => {
   it('GET /healthz returns ok', async () => {
     const res = await request(app).get('/healthz');

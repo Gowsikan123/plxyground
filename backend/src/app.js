@@ -10,44 +10,43 @@ function createApp() {
   app.use(cors({ origin: '*', credentials: false }));
   app.use(express.json({ limit: '10mb' }));
 
-  // Health
-  app.get('/healthz', (req, res) =>
+  app.get('/healthz', (_req, res) =>
     res.json({ status: 'ok', timestamp: new Date().toISOString() })
   );
-  app.get('/', (req, res) =>
+  app.get('/', (_req, res) =>
     res.json({ name: 'PLXYGROUND API', version: '1.0.0' })
   );
 
   // Creator auth
   app.use('/api/auth', require('./routes/auth'));
 
-  // Business — /content BEFORE /business root
+  // Business — /content BEFORE root /business
   app.use('/api/business/content', require('./routes/businessContent'));
   app.use('/api/business', require('./routes/business'));
 
-  // Public content + creators + opportunities
+  // Content, creators, opportunities
   app.use('/api/content', require('./routes/content'));
   app.use('/api/creators', require('./routes/creators'));
   app.use('/api/opportunities', require('./routes/opportunities'));
 
   // Admin
-  app.use('/api/admin/auth', require('./routes/admin/adminAuth'));
-  app.use('/api/admin/queue', require('./routes/admin/adminQueue'));
-  app.use('/api/admin/users', require('./routes/admin/adminUsers'));
-  app.use('/api/admin/analytics', require('./routes/admin/adminAnalytics'));
-  app.use('/api/admin/audit', require('./routes/admin/adminAudit'));
-  app.use('/api/admin/alerts', require('./routes/admin/adminAlerts'));
-  app.use('/api/admin/content', require('./routes/admin/adminContent'));
+  app.use('/api/admin/auth',        require('./routes/admin/adminAuth'));
+  app.use('/api/admin/queue',       require('./routes/admin/adminQueue'));
+  app.use('/api/admin/users',       require('./routes/admin/adminUsers'));
+  app.use('/api/admin/analytics',   require('./routes/admin/adminAnalytics'));
+  app.use('/api/admin/audit',       require('./routes/admin/adminAudit'));
+  app.use('/api/admin/alerts',      require('./routes/admin/adminAlerts'));
+  app.use('/api/admin/content',     require('./routes/admin/adminContent'));
   app.use('/api/admin/opportunities', require('./routes/admin/adminOpportunities'));
 
   // 404
-  app.use((req, res) =>
+  app.use((_req, res) =>
     res.status(404).json({ success: false, error: 'Route not found' })
   );
 
-  // Error handler
+  // Global error handler
   // eslint-disable-next-line no-unused-vars
-  app.use((err, req, res, next) => {
+  app.use((err, _req, res, _next) => {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
   });

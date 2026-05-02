@@ -11,7 +11,6 @@ let opportunityId;
 beforeAll(async () => {
   await setup();
   app = createApp();
-  // Create a creator to own the opportunities
   const res = await request(app).post('/api/auth/signup').send({
     username: `oppsmoke${uid}`,
     display_name: 'Opp Smoke',
@@ -26,23 +25,24 @@ describe('Opportunities', () => {
     const res = await request(app).get('/api/opportunities');
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data.items)).toBe(true);
   });
 
-  it('POST /api/opportunities creates one when authenticated', async () => {
-    if (!token) return;
+  it('POST creates opportunity when authenticated', async () => {
     const res = await request(app)
       .post('/api/opportunities')
       .set('Authorization', `Bearer ${token}`)
       .send({
         title: `Smoke Opp ${uid}`,
-        description: 'Smoke test opportunity',
+        description: 'Smoke test opportunity description',
         sport: 'Football',
       });
-    expect([201, 200]).toContain(res.status);
-    opportunityId = res.body.data && (res.body.data.id || res.body.data.opportunity_id);
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    opportunityId = res.body.data.id;
   });
 
-  it('POST /api/opportunities returns 401 without auth', async () => {
+  it('POST returns 401 without auth', async () => {
     const res = await request(app).post('/api/opportunities').send({
       title: 'Unauth opp',
       description: 'Should fail',
@@ -52,10 +52,11 @@ describe('Opportunities', () => {
   });
 
   it('DELETE own opportunity', async () => {
-    if (!token || !opportunityId) return;
+    if (!opportunityId) return;
     const res = await request(app)
       .delete(`/api/opportunities/${opportunityId}`)
       .set('Authorization', `Bearer ${token}`);
-    expect([200, 204]).toContain(res.status);
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
   });
 });
