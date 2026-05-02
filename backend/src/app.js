@@ -20,16 +20,27 @@ app.use(globalLimiter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: Date.now() }));
 
-app.use('/api/auth', require('./routes/auth'));
+// Core auth
+app.use('/api/auth',          require('./routes/auth'));
 app.use('/api/business/auth', require('./routes/businessAuth'));
-app.use('/api/creators', require('./routes/creators'));
-app.use('/api/content', require('./routes/content'));
-app.use('/api/opportunities', require('./routes/opportunities'));
-app.use('/api/applications', require('./routes/applications'));
-app.use('/api/follows', require('./routes/follows'));
-app.use('/api/messages', require('./routes/messages'));
-app.use('/api/notifications', require('./routes/notifications'));
-app.use('/api/admin', require('./routes/admin'));
+
+// Creator & business resources
+app.use('/api/creators',      require('./routes/creators'));
+app.use('/api/content',       require('./routes/content'));
+app.use('/api/partners',      require('./routes/partners'));
+app.use('/api/business-plan', require('./routes/business-plan'));
+
+// Opportunities & applications
+app.use('/api/opportunities',  require('./routes/opportunities'));
+app.use('/api/applications',   require('./routes/applications'));
+
+// Social & messaging
+app.use('/api/follows',        require('./routes/follows'));
+app.use('/api/messages',       require('./routes/messages'));
+app.use('/api/notifications',  require('./routes/notifications'));
+
+// Admin
+app.use('/api/admin',          require('./routes/admin'));
 
 app.use(errorHandler);
 

@@ -1,6 +1,11 @@
-import Constants from 'expo-constants';
+/**
+ * DEPRECATED — this file is no longer used.
+ * All API config has moved to frontend/constants/api.js
+ * which is the single source of truth for API_BASE_URL and ENDPOINTS.
+ *
+ * This file is kept temporarily to avoid breaking any existing imports,
+ * but all new code should import from ../constants/api instead.
+ */
+import { API_BASE_URL } from './api';
 
-// Pull from app.config.js extra → falls back to localhost for local dev
-export const API_BASE_URL =
-  Constants.expoConfig?.extra?.apiBaseUrl ||
-  'http://localhost:3000/api';
+export { API_BASE_URL };
