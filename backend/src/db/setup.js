@@ -1,7 +1,7 @@
 'use strict';
 const pool = require('./client');
 const logger = require('../logger');
-const { autoSeed } = require('./seed');
+const seed = require('./seed');
 
 async function setupDatabase() {
   const client = await pool.connect();
@@ -13,8 +13,7 @@ async function setupDatabase() {
         password_hash TEXT NOT NULL,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
-    `);
-    await client.query(`
+
       CREATE TABLE IF NOT EXISTS creators (
         id SERIAL PRIMARY KEY,
         username TEXT UNIQUE NOT NULL,
@@ -28,8 +27,7 @@ async function setupDatabase() {
         is_verified BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
-    `);
-    await client.query(`
+
       CREATE TABLE IF NOT EXISTS creator_accounts (
         id SERIAL PRIMARY KEY,
         creator_id INTEGER NOT NULL REFERENCES creators(id) ON DELETE CASCADE,
@@ -41,8 +39,7 @@ async function setupDatabase() {
         last_login TIMESTAMPTZ,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
-    `);
-    await client.query(`
+
       CREATE TABLE IF NOT EXISTS businesses (
         id SERIAL PRIMARY KEY,
         email TEXT UNIQUE NOT NULL,
@@ -59,8 +56,7 @@ async function setupDatabase() {
         last_login TIMESTAMPTZ,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
-    `);
-    await client.query(`
+
       CREATE TABLE IF NOT EXISTS content (
         id SERIAL PRIMARY KEY,
         creator_id INTEGER NOT NULL REFERENCES creators(id) ON DELETE CASCADE,
@@ -75,8 +71,7 @@ async function setupDatabase() {
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
-    `);
-    await client.query(`
+
       CREATE TABLE IF NOT EXISTS business_content (
         id SERIAL PRIMARY KEY,
         business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
@@ -89,8 +84,7 @@ async function setupDatabase() {
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
-    `);
-    await client.query(`
+
       CREATE TABLE IF NOT EXISTS opportunities (
         id SERIAL PRIMARY KEY,
         posted_by_type TEXT NOT NULL CHECK (posted_by_type IN ('creator', 'business')),
@@ -105,8 +99,7 @@ async function setupDatabase() {
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
-    `);
-    await client.query(`
+
       CREATE TABLE IF NOT EXISTS moderation_queue (
         id SERIAL PRIMARY KEY,
         content_type TEXT NOT NULL CHECK (content_type IN ('creator_content', 'business_content')),
@@ -117,8 +110,7 @@ async function setupDatabase() {
         submitted_at TIMESTAMPTZ DEFAULT NOW(),
         reviewed_at TIMESTAMPTZ
       );
-    `);
-    await client.query(`
+
       CREATE TABLE IF NOT EXISTS audit_log (
         id SERIAL PRIMARY KEY,
         actor_type TEXT NOT NULL CHECK (actor_type IN ('admin', 'creator', 'business', 'system')),
@@ -131,10 +123,18 @@ async function setupDatabase() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
     `);
-    logger.info('Database schema ready.');
-    await autoSeed(client);
+    logger.info('Database schema applied successfully');
+    await autoSeed();
   } finally {
     client.release();
+  }
+}
+
+async function autoSeed() {
+  const result = await pool.query('SELECT COUNT(*) FROM admins');
+  if (parseInt(result.rows[0].count, 10) === 0) {
+    logger.info('Empty database detected — running seed');
+    await seed.runSeed();
   }
 }
 

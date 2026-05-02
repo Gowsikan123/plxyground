@@ -1,20 +1,26 @@
 'use strict';
-const { createLogger, format, transports } = require('winston');
 
-const logger = createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: format.combine(
-    format.timestamp(),
-    format.errors({ stack: true }),
-    format.json()
-  ),
-  transports: [
-    new transports.Console({
-      format: process.env.NODE_ENV === 'development'
-        ? format.combine(format.colorize(), format.simple())
-        : format.json(),
-    }),
-  ],
-});
+const levels = { info: 'INFO', warn: 'WARN', error: 'ERROR' };
+
+function formatMessage(level, message, meta) {
+  const ts = new Date().toISOString();
+  const base = `[${ts}] [${level}] ${message}`;
+  if (meta !== undefined) {
+    return `${base} ${typeof meta === 'object' ? JSON.stringify(meta) : meta}`;
+  }
+  return base;
+}
+
+const logger = {
+  info(message, meta) {
+    process.stdout.write(formatMessage(levels.info, message, meta) + '\n');
+  },
+  warn(message, meta) {
+    process.stderr.write(formatMessage(levels.warn, message, meta) + '\n');
+  },
+  error(message, meta) {
+    process.stderr.write(formatMessage(levels.error, message, meta) + '\n');
+  },
+};
 
 module.exports = logger;

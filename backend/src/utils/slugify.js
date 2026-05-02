@@ -1,22 +1,25 @@
 'use strict';
 const pool = require('../db/client');
 
-function slugify(str) {
-  return str.toLowerCase().trim()
+function baseSlug(str) {
+  return str
+    .toLowerCase()
+    .trim()
     .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/[\s-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
 }
 
-async function uniqueSlug(base, table) {
-  const baseSlug = slugify(base);
-  let candidate = baseSlug;
-  let i = 1;
-  for (;;) {
-    const { rows } = await pool.query(`SELECT 1 FROM ${table} WHERE slug = $1`, [candidate]);
-    if (!rows[0]) return candidate;
-    candidate = `${baseSlug}-${i++}`;
-  }
+async function generateUniqueSlug(str, table, column = 'slug') {
+  const slug = baseSlug(str);
+  const result = await pool.query(
+    `SELECT COUNT(*) FROM ${table} WHERE ${column} = $1`,
+    [slug]
+  );
+  if (parseInt(result.rows[0].count, 10) === 0) return slug;
+  const suffix = Math.floor(1000 + Math.random() * 9000);
+  return `${slug}-${suffix}`;
 }
 
-module.exports = { slugify, uniqueSlug };
+module.exports = { baseSlug, generateUniqueSlug };
