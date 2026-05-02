@@ -1,48 +1,69 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors }  from '../../constants/colors';
-import { fontSize } from '../../constants/typography';
-import { spacing }  from '../../constants/spacing';
+import { colors } from '../../constants/colors';
+import { typography } from '../../constants/typography';
+import { spacing } from '../../constants/spacing';
 
-export function TabBar({ tabs, activeTab, onTabPress }) {
+const CREATOR_TABS = [
+  { key: 'feed',          label: 'Feed',     icon: '⚡' },
+  { key: 'create',        label: 'Create',   icon: '＋' },
+  { key: 'opportunities', label: 'Collab',   icon: '🤝' },
+  { key: 'profile',       label: 'Profile',  icon: '👤' },
+];
+
+const BUSINESS_TABS = [
+  { key: 'dashboard',        label: 'Home',     icon: '📊' },
+  { key: 'my-content',       label: 'Content',  icon: '📄' },
+  { key: 'search-creators',  label: 'Discover', icon: '🔍' },
+  { key: 'opportunities',    label: 'Collab',   icon: '🤝' },
+  { key: 'profile',          label: 'Profile',  icon: '🏢' },
+];
+
+export const TabBar = React.memo(({ state, descriptors, navigation, userType }) => {
   const insets = useSafeAreaInsets();
+  const tabs   = userType === 'business' ? BUSINESS_TABS : CREATOR_TABS;
 
   return (
-    <View style={[styles.container, { paddingBottom: insets.bottom || spacing[2] }]}>
+    <View style={[styles.container, { paddingBottom: insets.bottom || spacing.sm }]}>
       {tabs.map((tab) => {
-        const isActive = activeTab === tab.key;
+        const route   = state.routes.find(r => r.name === tab.key) || state.routes[0];
+        const focused = state.routes[state.index]?.name === tab.key;
+
+        const onPress = useCallback(() => {
+          const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+          if (!focused && !event.defaultPrevented) navigation.navigate(tab.key);
+        }, [focused, route.key]);
+
         return (
           <TouchableOpacity
             key={tab.key}
+            onPress={onPress}
             style={styles.tab}
-            onPress={() => onTabPress(tab.key)}
-            activeOpacity={0.7}
+            accessibilityRole="tab"
+            accessibilityLabel={tab.label}
+            accessibilityState={{ selected: focused }}
           >
-            <Text style={[styles.icon, isActive && styles.iconActive]}>
-              {tab.icon}
-            </Text>
-            <Text style={[styles.label, isActive && styles.labelActive]}>
-              {tab.label}
-            </Text>
+            <Text style={[styles.icon, focused && styles.iconActive]}>{tab.icon}</Text>
+            <Text style={[styles.label, focused && styles.labelActive]}>{tab.label}</Text>
           </TouchableOpacity>
         );
       })}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection:   'row',
+    flexDirection: 'row',
     backgroundColor: colors.surface,
-    borderTopWidth:  1,
-    borderTopColor:  '#2A2A2A',
-    paddingTop:      spacing[2],
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing.sm,
   },
-  tab:        { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2 },
-  icon:       { fontSize: 22, opacity: 0.45 },
-  iconActive: { opacity: 1 },
-  label:      { color: colors.textMuted,   fontSize: fontSize.xs, fontFamily: 'DMSans_500Medium' },
-  labelActive:{ color: colors.textPrimary, fontFamily: 'DMSans_600SemiBold' },
+  tab:          { flex: 1, alignItems: 'center', gap: 3 },
+  icon:         { fontSize: 20 },
+  iconActive:   { },
+  label:        { ...typography.label, fontSize: 10, color: colors.textMuted },
+  labelActive:  { color: colors.primary },
 });

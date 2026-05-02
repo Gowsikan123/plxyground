@@ -1,31 +1,51 @@
 import api from './api';
 
-async function safeCall(fn) {
-  try {
-    const res = await fn();
-    return { data: res.data, error: null };
-  } catch (err) {
-    return { data: null, error: err.message || 'Request failed' };
-  }
-}
-
 export const opportunityService = {
-  getAll: ({ search = '', sport = '', limit = 20, offset = 0 } = {}) => {
-    const params = { limit, offset };
-    if (search) params.search = search;
-    if (sport)  params.sport  = sport;
-    return safeCall(() => api.get('/api/opportunities', { params }));
+  getOpportunities: async ({ search, sport, limit = 20, offset = 0 } = {}) => {
+    try {
+      const params = { limit, offset };
+      if (search) params.search = search;
+      if (sport)  params.sport  = sport;
+      const res = await api.get('/api/opportunities', { params });
+      return { data: res.data, error: null };
+    } catch (err) {
+      return { data: null, error: err.message };
+    }
   },
 
-  getOne: (id) =>
-    safeCall(() => api.get(`/api/opportunities/${id}`)),
+  getOpportunity: async (id) => {
+    try {
+      const res = await api.get(`/api/opportunities/${id}`);
+      return { data: res.data, error: null };
+    } catch (err) {
+      return { data: null, error: err.message };
+    }
+  },
 
-  create: (fields) =>
-    safeCall(() => api.post('/api/opportunities', fields)),
+  createOpportunity: async (payload) => {
+    try {
+      const res = await api.post('/api/opportunities', payload);
+      return { data: res.data, error: null };
+    } catch (err) {
+      return { data: null, error: err.message };
+    }
+  },
 
-  update: (id, fields) =>
-    safeCall(() => api.put(`/api/opportunities/${id}`, fields)),
+  updateOpportunity: async (id, payload) => {
+    try {
+      const res = await api.put(`/api/opportunities/${id}`, payload);
+      return { data: res.data, error: null };
+    } catch (err) {
+      return { data: null, error: err.message };
+    }
+  },
 
-  remove: (id) =>
-    safeCall(() => api.delete(`/api/opportunities/${id}`)),
+  deleteOpportunity: async (id) => {
+    try {
+      const res = await api.delete(`/api/opportunities/${id}`);
+      return { data: res.data, error: null };
+    } catch (err) {
+      return { data: null, error: err.message };
+    }
+  },
 };

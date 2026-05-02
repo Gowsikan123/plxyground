@@ -1,43 +1,52 @@
 import api from './api';
 
-async function safeCall(fn) {
-  try {
-    const res = await fn();
-    return { data: res.data, error: null };
-  } catch (err) {
-    return { data: null, error: err.message || 'Request failed' };
-  }
-}
-
 export const contentService = {
-  getFeed: ({ limit = 20, offset = 0, search = '', sport = '' } = {}) => {
-    const params = { limit, offset };
-    if (search) params.search = search;
-    if (sport)  params.sport  = sport;
-    return safeCall(() => api.get('/api/content', { params }));
+  getFeed: async ({ limit = 20, offset = 0, search, sport, tags } = {}) => {
+    try {
+      const params = { limit, offset };
+      if (search) params.search = search;
+      if (sport)  params.sport  = sport;
+      if (tags)   params.tags   = tags;
+      const res = await api.get('/api/content', { params });
+      return { data: res.data, error: null };
+    } catch (err) {
+      return { data: null, error: err.message };
+    }
   },
 
-  getPost: (id) =>
-    safeCall(() => api.get(`/api/content/${id}`)),
+  getPost: async (id) => {
+    try {
+      const res = await api.get(`/api/content/${id}`);
+      return { data: res.data, error: null };
+    } catch (err) {
+      return { data: null, error: err.message };
+    }
+  },
 
-  createPost: (fields) =>
-    safeCall(() => api.post('/api/content', fields)),
+  createPost: async (payload) => {
+    try {
+      const res = await api.post('/api/content', payload);
+      return { data: res.data, error: null };
+    } catch (err) {
+      return { data: null, error: err.message };
+    }
+  },
 
-  updatePost: (id, fields) =>
-    safeCall(() => api.put(`/api/content/${id}`, fields)),
+  updatePost: async (id, payload) => {
+    try {
+      const res = await api.put(`/api/content/${id}`, payload);
+      return { data: res.data, error: null };
+    } catch (err) {
+      return { data: null, error: err.message };
+    }
+  },
 
-  deletePost: (id) =>
-    safeCall(() => api.delete(`/api/content/${id}`)),
-
-  getMyContent: ({ limit = 20, offset = 0 } = {}) =>
-    safeCall(() => api.get('/api/content/mine', { params: { limit, offset } })),
-
-  getBusinessContent: ({ limit = 20, offset = 0 } = {}) =>
-    safeCall(() => api.get('/api/business-auth/content/mine', { params: { limit, offset } })),
-
-  createBusinessContent: (fields) =>
-    safeCall(() => api.post('/api/business-auth/content', fields)),
-
-  updateBusinessContent: (id, fields) =>
-    safeCall(() => api.put(`/api/business-auth/content/${id}`, fields)),
+  deletePost: async (id) => {
+    try {
+      const res = await api.delete(`/api/content/${id}`);
+      return { data: res.data, error: null };
+    } catch (err) {
+      return { data: null, error: err.message };
+    }
+  },
 };

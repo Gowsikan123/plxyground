@@ -1,28 +1,42 @@
 import api from './api';
 
-async function safeCall(fn) {
-  try {
-    const res = await fn();
-    return { data: res.data, error: null };
-  } catch (err) {
-    return { data: null, error: err.message || 'Request failed' };
-  }
-}
-
 export const creatorService = {
-  search: ({ search = '', sport = '', limit = 20, offset = 0 } = {}) => {
-    const params = { limit, offset };
-    if (search) params.search = search;
-    if (sport)  params.sport  = sport;
-    return safeCall(() => api.get('/api/creators', { params }));
+  getCreators: async ({ search, sport, limit = 20, offset = 0 } = {}) => {
+    try {
+      const params = { limit, offset };
+      if (search) params.search = search;
+      if (sport)  params.sport  = sport;
+      const res = await api.get('/api/creators', { params });
+      return { data: res.data, error: null };
+    } catch (err) {
+      return { data: null, error: err.message };
+    }
   },
 
-  getBySlug: (slug) =>
-    safeCall(() => api.get(`/api/creators/slug/${slug}`)),
+  getCreatorBySlug: async (slug) => {
+    try {
+      const res = await api.get(`/api/creators/slug/${slug}`);
+      return { data: res.data, error: null };
+    } catch (err) {
+      return { data: null, error: err.message };
+    }
+  },
 
-  getById: (id) =>
-    safeCall(() => api.get(`/api/creators/${id}`)),
+  getCreatorById: async (id) => {
+    try {
+      const res = await api.get(`/api/creators/id/${id}`);
+      return { data: res.data, error: null };
+    } catch (err) {
+      return { data: null, error: err.message };
+    }
+  },
 
-  updateProfile: (id, fields) =>
-    safeCall(() => api.put(`/api/creators/${id}`, fields)),
+  updateCreator: async (id, payload) => {
+    try {
+      const res = await api.put(`/api/creators/${id}`, payload);
+      return { data: res.data, error: null };
+    } catch (err) {
+      return { data: null, error: err.message };
+    }
+  },
 };

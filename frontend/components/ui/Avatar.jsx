@@ -1,43 +1,48 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
-import { colors }   from '../../constants/colors';
-import { fontSize } from '../../constants/typography';
+import { colors } from '../../constants/colors';
+import { typography } from '../../constants/typography';
 import { borderRadius } from '../../constants/spacing';
 
-const SIZE_MAP = { xs: 24, sm: 32, md: 40, lg: 56, xl: 72 };
+export const Avatar = React.memo(({ uri, name, size = 40, style }) => {
+  const [error, setError] = useState(false);
 
-export const Avatar = React.memo(function Avatar({ uri, name, size = 'md', style }) {
-  const dim = SIZE_MAP[size] || SIZE_MAP.md;
   const initials = name
-    ? name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+    ? name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
     : '?';
 
+  if (uri && !error) {
+    return (
+      <Image
+        source={{ uri }}
+        style={[styles.img, { width: size, height: size, borderRadius: size / 2 }, style]}
+        onError={() => setError(true)}
+        accessibilityLabel={name ? `${name} avatar` : 'Avatar'}
+      />
+    );
+  }
+
   return (
-    <View style={[styles.base, { width: dim, height: dim, borderRadius: dim / 2 }, style]}>
-      {uri ? (
-        <Image
-          source={{ uri }}
-          style={{ width: dim, height: dim, borderRadius: dim / 2 }}
-          resizeMode="cover"
-        />
-      ) : (
-        <Text style={[styles.initials, { fontSize: dim * 0.35 }]}>{initials}</Text>
-      )}
+    <View style={[styles.fallback, { width: size, height: size, borderRadius: size / 2 }, style]}>
+      <Text style={[styles.initials, { fontSize: size * 0.36 }]}>{initials}</Text>
     </View>
   );
 });
 
 const styles = StyleSheet.create({
-  base: {
+  img: {
     backgroundColor: colors.surfaceElevated,
-    alignItems:      'center',
-    justifyContent:  'center',
-    overflow:        'hidden',
-    borderWidth:     1,
-    borderColor:     colors.border,
+  },
+  fallback: {
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   initials: {
-    color:      colors.textSecondary,
-    fontFamily: 'Syne_700Bold',
+    ...typography.bodyMd,
+    color: colors.textSecondary,
+    fontWeight: '700',
   },
 });

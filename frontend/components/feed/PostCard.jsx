@@ -1,72 +1,80 @@
 import React, { useCallback } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { colors }      from '../../constants/colors';
-import { fontSize }    from '../../constants/typography';
+import { colors } from '../../constants/colors';
+import { typography } from '../../constants/typography';
 import { spacing, borderRadius } from '../../constants/spacing';
-import { Avatar }  from '../ui/Avatar';
-import { Badge }   from '../ui/Badge';
-import { Card }    from '../ui/Card';
+import { Card } from '../ui/Card';
+import { Avatar } from '../ui/Avatar';
+import { Badge } from '../ui/Badge';
 
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1)  return 'just now';
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1)  return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24)  return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7)  return `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 }
 
-export const PostCard = React.memo(function PostCard({ post }) {
+export const PostCard = React.memo(({ post }) => {
   const router = useRouter();
 
-  const onPress = useCallback(() => {
+  const handlePress = useCallback(() => {
     router.push(`/post/${post.id}`);
   }, [post.id]);
 
   const tags = Array.isArray(post.tags) ? post.tags.slice(0, 2) : [];
 
   return (
-    <Card onPress={onPress} style={styles.card}>
+    <Card onPress={handlePress} style={styles.card}>
       {/* Creator row */}
       <View style={styles.header}>
-        <Avatar uri={post.avatar_url} name={post.display_name} size="sm" />
+        <Avatar
+          uri={post.avatar_url}
+          name={post.display_name}
+          size={38}
+        />
         <View style={styles.headerText}>
-          <Text style={styles.creatorName} numberOfLines={1}>{post.display_name || 'Creator'}</Text>
-          <Text style={styles.meta}>{post.sport ? `${post.sport} · ` : ''}{timeAgo(post.created_at)}</Text>
+          <Text style={styles.displayName} numberOfLines={1}>{post.display_name}</Text>
+          <View style={styles.metaRow}>
+            {post.sport && <Badge label={post.sport} variant="primary" style={styles.sportBadge} />}
+            <Text style={styles.time}>{timeAgo(post.created_at)}</Text>
+          </View>
         </View>
-        {post.sport && <Badge label={post.sport} variant="default" />}
       </View>
 
       {/* Title */}
-      <Text style={styles.title} numberOfLines={2}>{post.title}</Text>
+      {post.title ? (
+        <Text style={styles.title} numberOfLines={2}>{post.title}</Text>
+      ) : null}
 
       {/* Body preview */}
-      {!!post.body && (
+      {post.body ? (
         <Text style={styles.body} numberOfLines={3}>{post.body}</Text>
-      )}
+      ) : null}
 
       {/* Media thumbnail */}
-      {!!post.media_url && (
+      {post.media_url && post.media_type !== 'none' ? (
         <Image
           source={{ uri: post.media_url }}
           style={styles.media}
           resizeMode="cover"
+          accessibilityLabel={`Media for ${post.title}`}
         />
-      )}
+      ) : null}
 
       {/* Footer */}
       <View style={styles.footer}>
-        <View style={styles.footerLeft}>
-          {tags.map((tag, i) => (
-            <Badge key={i} label={`#${tag}`} variant="default" style={styles.tag} />
+        <Text style={styles.stat}>👁 {post.view_count ?? 0}</Text>
+        <Text style={styles.stat}>❤️ {post.like_count ?? 0}</Text>
+        <View style={styles.tags}>
+          {tags.map(tag => (
+            <Badge key={tag} label={tag} style={styles.tag} />
           ))}
-        </View>
-        <View style={styles.footerRight}>
-          <Text style={styles.statText}>👁 {post.view_count ?? 0}</Text>
-          <Text style={styles.statText}>❤️ {post.like_count ?? 0}</Text>
         </View>
       </View>
     </Card>
@@ -74,17 +82,23 @@ export const PostCard = React.memo(function PostCard({ post }) {
 });
 
 const styles = StyleSheet.create({
-  card:        { marginHorizontal: spacing[4], marginBottom: spacing[3] },
-  header:      { flexDirection: 'row', alignItems: 'center', marginBottom: spacing[3], gap: spacing[2] },
+  card:        { marginBottom: spacing.sm },
+  header:      { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
   headerText:  { flex: 1 },
-  creatorName: { color: colors.textPrimary, fontSize: fontSize.sm, fontFamily: 'Syne_700Bold' },
-  meta:        { color: colors.textMuted, fontSize: fontSize.xs, fontFamily: 'DMSans_400Regular', marginTop: 2 },
-  title:       { color: colors.textPrimary, fontSize: fontSize.md, fontFamily: 'Syne_700Bold', marginBottom: spacing[2], lineHeight: 24 },
-  body:        { color: colors.textSecondary, fontSize: fontSize.sm, fontFamily: 'DMSans_400Regular', lineHeight: 20, marginBottom: spacing[3] },
-  media:       { width: '100%', aspectRatio: 16 / 9, borderRadius: borderRadius.lg, marginBottom: spacing[3], backgroundColor: colors.surfaceElevated },
-  footer:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[1] },
-  footerLeft:  { flexDirection: 'row', gap: spacing[2], flexWrap: 'wrap', flex: 1 },
-  footerRight: { flexDirection: 'row', gap: spacing[3] },
-  tag:         {},
-  statText:    { color: colors.textMuted, fontSize: fontSize.xs, fontFamily: 'DMSans_400Regular' },
+  displayName: { ...typography.bodyMd, color: colors.textPrimary },
+  metaRow:     { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 },
+  sportBadge:  { },
+  time:        { ...typography.caption },
+  title:       { ...typography.h3, fontSize: 16, marginBottom: spacing.xs },
+  body:        { ...typography.body, color: colors.textSecondary, marginBottom: spacing.sm },
+  media: {
+    width: '100%', height: 180,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.surfaceElevated,
+  },
+  footer:      { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  stat:        { ...typography.caption, color: colors.textSecondary },
+  tags:        { flexDirection: 'row', gap: spacing.xs, flex: 1, justifyContent: 'flex-end' },
+  tag:         { },
 });

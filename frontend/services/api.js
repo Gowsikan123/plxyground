@@ -1,32 +1,31 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
-if (!BASE_URL) throw new Error('EXPO_PUBLIC_API_BASE_URL is not set in environment variables');
+const AUTH_TOKEN_KEY = 'plxyground_token';
 
 const api = axios.create({
-  baseURL: BASE_URL,
+  baseURL: process.env.EXPO_PUBLIC_API_BASE_URL,
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
 });
 
 api.interceptors.request.use(async (config) => {
   try {
-    const token = await SecureStore.getItemAsync('plxyground_auth_token');
+    const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
     if (token) config.headers.Authorization = `Bearer ${token}`;
-  } catch { /* SecureStore unavailable — proceed unauthenticated */ }
+  } catch { /* no token available */ }
   return config;
 });
 
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const msg =
-      error.response?.data?.error ||
-      error.response?.data?.message ||
-      error.message ||
+    const message =
+      error?.response?.data?.error ||
+      error?.response?.data?.message ||
+      error?.message ||
       'An unexpected error occurred';
-    return Promise.reject(new Error(msg));
+    return Promise.reject(new Error(message));
   }
 );
 

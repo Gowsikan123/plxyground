@@ -1,34 +1,45 @@
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
-import { colors }  from '../../constants/colors';
+import { colors } from '../../constants/colors';
 import { spacing, borderRadius } from '../../constants/spacing';
 
-export const Card = React.memo(function Card({ children, onPress, style, contentStyle }) {
+export const Card = React.memo(({ children, onPress, style, elevated = false }) => {
+  const containerStyle = [
+    styles.card,
+    elevated && styles.elevated,
+    style,
+  ];
+
   if (onPress) {
     return (
       <TouchableOpacity
-        activeOpacity={0.82}
         onPress={onPress}
-        style={[styles.card, style]}
+        activeOpacity={0.8}
+        style={containerStyle}
+        accessibilityRole="button"
       >
-        <View style={contentStyle}>{children}</View>
+        {children}
       </TouchableOpacity>
     );
   }
-  return (
-    <View style={[styles.card, style]}>
-      <View style={contentStyle}>{children}</View>
-    </View>
-  );
+
+  return <View style={containerStyle}>{children}</View>;
 });
 
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
-    borderRadius:    borderRadius.xl,
-    borderWidth:     1,
-    borderColor:     colors.border,
-    padding:         spacing[4],
-    overflow:        'hidden',
+    borderRadius: borderRadius.lg,
+    padding: spacing.base,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  elevated: {
+    backgroundColor: colors.surfaceElevated,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
   },
 });

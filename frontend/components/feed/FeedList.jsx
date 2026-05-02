@@ -1,102 +1,65 @@
 import React, { useCallback } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import { colors }     from '../../constants/colors';
-import { fontSize }   from '../../constants/typography';
-import { spacing }    from '../../constants/spacing';
-import { PostCard }   from './PostCard';
-import { Skeleton }   from '../ui/Skeleton';
+import { colors } from '../../constants/colors';
+import { spacing } from '../../constants/spacing';
+import { PostCard } from './PostCard';
+import { SkeletonCard } from '../ui/Skeleton';
 import { EmptyState } from '../ui/EmptyState';
 
-function SkeletonCard() {
-  return (
-    <View style={styles.skeletonCard}>
-      <View style={styles.skeletonHeader}>
-        <Skeleton width={40} height={40} radius={20} />
-        <View style={{ flex: 1, gap: 6 }}>
-          <Skeleton width={120} height={12} />
-          <Skeleton width={80}  height={10} />
-        </View>
-      </View>
-      <Skeleton height={18} style={{ marginBottom: 8 }} />
-      <Skeleton height={14} style={{ marginBottom: 4 }} />
-      <Skeleton height={14} width="75%" />
-    </View>
-  );
-}
+const SKELETON_COUNT = 4;
 
-export const FeedList = React.memo(function FeedList({
-  posts,
-  isLoading,
-  isRefreshing,
-  hasMore,
-  error,
-  onRefresh,
-  onLoadMore,
-  emptyTitle       = 'No posts yet',
-  emptyDescription = 'Be the first to share something.',
-  ListHeaderComponent,
-}) {
+export const FeedList = React.memo(({ posts, isLoading, isRefreshing, hasMore, onLoadMore, onRefresh, ListHeaderComponent }) => {
   const renderItem = useCallback(({ item }) => <PostCard post={item} />, []);
+
   const keyExtractor = useCallback((item) => String(item.id), []);
 
-  const ListFooter = useCallback(() => {
-    if (!isLoading || posts.length === 0) return null;
-    return (
-      <View style={styles.footerLoader}>
-        <Skeleton height={12} width={120} />
-      </View>
-    );
-  }, [isLoading, posts.length]);
-
-  const ListEmpty = useCallback(() => {
+  const ListEmptyComponent = useCallback(() => {
     if (isLoading) {
       return (
-        <View>
-          {[1, 2, 3].map(k => <SkeletonCard key={k} />)}
+        <View style={styles.skeletons}>
+          {Array.from({ length: SKELETON_COUNT }).map((_, i) => <SkeletonCard key={i} />)}
         </View>
-      );
-    }
-    if (error) {
-      return (
-        <EmptyState
-          title="Failed to load"
-          description={error}
-          actionLabel="Retry"
-          onAction={onRefresh}
-        />
       );
     }
     return (
       <EmptyState
-        title={emptyTitle}
-        description={emptyDescription}
+        title="No posts yet"
+        message="Follow creators and check back soon."
       />
     );
-  }, [isLoading, error, emptyTitle, emptyDescription, onRefresh]);
+  }, [isLoading]);
+
+  const ListFooterComponent = useCallback(() => {
+    if (!hasMore || !isLoading || posts.length === 0) return <View style={styles.footer} />;
+    return (
+      <View style={styles.skeletons}>
+        {Array.from({ length: 2 }).map((_, i) => <SkeletonCard key={i} />)}
+      </View>
+    );
+  }, [hasMore, isLoading, posts.length]);
 
   return (
     <FlashList
       data={posts}
       renderItem={renderItem}
       keyExtractor={keyExtractor}
-      estimatedItemSize={220}
-      onEndReached={hasMore ? onLoadMore : null}
-      onEndReachedThreshold={0.5}
+      estimatedItemSize={280}
+      contentContainerStyle={styles.list}
+      onEndReached={hasMore ? onLoadMore : undefined}
+      onEndReachedThreshold={0.4}
       refreshing={isRefreshing}
       onRefresh={onRefresh}
+      ListEmptyComponent={ListEmptyComponent}
+      ListFooterComponent={ListFooterComponent}
       ListHeaderComponent={ListHeaderComponent}
-      ListFooterComponent={ListFooter}
-      ListEmptyComponent={ListEmpty}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.list}
     />
   );
 });
 
 const styles = StyleSheet.create({
-  list:         { paddingTop: spacing[3], paddingBottom: spacing[12] },
-  footerLoader: { padding: spacing[6], alignItems: 'center' },
-  skeletonCard: { marginHorizontal: spacing[4], marginBottom: spacing[3], backgroundColor: '#141414', borderRadius: 16, padding: spacing[4], gap: spacing[3] },
-  skeletonHeader: { flexDirection: 'row', gap: spacing[3], alignItems: 'center' },
+  list:     { padding: spacing.base, backgroundColor: colors.background },
+  skeletons:{ paddingTop: spacing.sm },
+  footer:   { height: spacing.xxxl },
 });

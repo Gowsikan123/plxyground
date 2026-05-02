@@ -1,46 +1,37 @@
-import { useCallback } from 'react';
+import { useEffect } from 'react';
+import { useRouter, useSegments } from 'expo-router';
 import { useAuthStore } from '../store/authStore';
 
 export function useAuth() {
-  const store = useAuthStore();
+  const { token, user, userType, isLoading, error, logout, refreshUser, clearError } = useAuthStore();
+  return { token, user, userType, isLoading, error, logout, refreshUser, clearError, isAuthenticated: !!token };
+}
 
-  const loginCreator = useCallback(
-    (email, password) => store.loginCreator(email, password),
-    [store.loginCreator]
-  );
+export function useProtectedRoute() {
+  const { token, userType, isLoading } = useAuthStore();
+  const segments  = useSegments();
+  const router    = useRouter();
 
-  const signupCreator = useCallback(
-    (fields) => store.signupCreator(fields),
-    [store.signupCreator]
-  );
+  useEffect(() => {
+    if (isLoading) return;
+    const inAuthGroup     = segments[0] === 'auth';
+    const inCreatorGroup  = segments[0] === 'creator';
+    const inBusinessGroup = segments[0] === 'business';
 
-  const loginBusiness = useCallback(
-    (email, password) => store.loginBusiness(email, password),
-    [store.loginBusiness]
-  );
-
-  const signupBusiness = useCallback(
-    (fields) => store.signupBusiness(fields),
-    [store.signupBusiness]
-  );
-
-  const logout = useCallback(() => store.logout(), [store.logout]);
-
-  return {
-    user:         store.user,
-    token:        store.token,
-    userType:     store.userType,
-    isLoading:    store.isLoading,
-    error:        store.error,
-    isAuthenticated: !!store.token,
-    isCreator:    store.userType === 'creator',
-    isBusiness:   store.userType === 'business',
-    loginCreator,
-    signupCreator,
-    loginBusiness,
-    signupBusiness,
-    logout,
-    clearError:   store.clearError,
-    updateUser:   store.updateUser,
-  };
+    if (!token && !inAuthGroup) {
+      router.replace('/auth/login');
+      return;
+    }
+    if (token && inAuthGroup) {
+      router.replace(userType === 'business' ? '/business/dashboard' : '/creator/feed');
+      return;
+    }
+    if (token && userType === 'creator' && inBusinessGroup) {
+      router.replace('/creator/feed');
+      return;
+    }
+    if (token && userType === 'business' && inCreatorGroup) {
+      router.replace('/business/dashboard');
+    }
+  }, [token, userType, isLoading, segments]);
 }
