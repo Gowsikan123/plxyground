@@ -4,14 +4,13 @@ on:
   push:
     branches:
       - main
-      - master
   pull_request:
+    branches:
+      - main
 
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     services:
       postgres:
@@ -19,9 +18,9 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: plxyground_test
+          POSTGRES_DB: plxyground
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -32,25 +31,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
 
       - name: Install backend dependencies
-        run: npm install
         working-directory: backend
+        run: npm ci
+
+      - name: Install admin-panel dependencies
+        working-directory: admin-panel
+        run: npm ci
 
       - name: Run backend smoke suite
-        run: npm run smoke
         working-directory: backend
         env:
+          NODE_ENV: test
           PORT: 3011
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/plxyground_test
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/plxyground
           JWT_SECRET: github_actions_test_secret_minimum_32_characters_long
           JWT_EXPIRES_IN: 7d
           CORS_ORIGIN: http://localhost:19006,http://localhost:3012
-          LOCAL_STUB_EMAIL: "true"
-          RESEND_API_KEY: re_placeholder
-          RESEND_FROM_EMAIL: noreply@plxyground.local
           NODE_ENV: test
+        run: npm run smoke
