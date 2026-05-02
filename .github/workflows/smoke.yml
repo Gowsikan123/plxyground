@@ -55,5 +55,4 @@ jobs:
           JWT_SECRET: github_actions_test_secret_minimum_32_characters_long
           JWT_EXPIRES_IN: 7d
           CORS_ORIGIN: http://localhost:19006,http://localhost:3012
-          NODE_ENV: test
         run: npm run smoke
