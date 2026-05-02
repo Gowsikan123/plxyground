@@ -1,183 +1,183 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert,
+  View, Text, ScrollView, StyleSheet,
+  TouchableOpacity, ActivityIndicator, Alert,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants/colors';
 import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING } from '../../constants/spacing';
-import SafeScreen from '../../components/layout/SafeScreen';
-import ScreenHeader from '../../components/layout/ScreenHeader';
-import Badge from '../../components/ui/Badge';
-import Button from '../../components/ui/Button';
-import opportunityService from '../../services/opportunityService';
+import { opportunityService } from '../../services/opportunityService';
+import { useAuthStore } from '../../store/authStore';
 
-export default function OpportunityDetail() {
+export default function OpportunityDetailScreen() {
   const { id } = useLocalSearchParams();
-  const [opp, setOpp] = useState(null);
+  const router = useRouter();
+  const { token } = useAuthStore();
+  const [opportunity, setOpportunity] = useState(null);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    async function load() {
-      try {
-        const { data, error: err } = await opportunityService.getById(id);
-        if (err) throw new Error(err);
-        setOpp(data);
-      } catch (e) {
-        setError(e.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
+    (async () => {
+      setLoading(true);
+      const { data, error: err } = await opportunityService.getById(id);
+      if (err) { setError(err); setLoading(false); return; }
+      setOpportunity(data);
+      setLoading(false);
+    })();
   }, [id]);
 
-  async function handleApply() {
+  const handleApply = async () => {
+    if (!token) { router.push('/login'); return; }
     setApplying(true);
-    try {
-      const { error: err } = await opportunityService.apply(id);
-      if (err) throw new Error(err);
-      Alert.alert('Applied! 🎉', 'The business will be in touch.');
-    } catch (e) {
-      Alert.alert('Error', e.message);
-    } finally {
-      setApplying(false);
+    const { error: err } = await opportunityService.apply(id);
+    setApplying(false);
+    if (err) {
+      Alert.alert('Error', err);
+    } else {
+      Alert.alert('Applied!', 'Your application has been submitted.');
     }
-  }
+  };
 
   if (loading) {
     return (
-      <SafeScreen>
-        <ScreenHeader title="Opportunity" />
-        <View style={styles.center}><ActivityIndicator color={COLORS.primary} /></View>
-      </SafeScreen>
+      <View style={styles.center}>
+        <ActivityIndicator color={COLORS.primary} size="large" />
+      </View>
     );
   }
 
-  if (error || !opp) {
+  if (error || !opportunity) {
     return (
-      <SafeScreen>
-        <ScreenHeader title="Opportunity" />
-        <View style={styles.center}>
-          <Text style={styles.errorText}>{error || 'Not found'}</Text>
-        </View>
-      </SafeScreen>
+      <View style={styles.center}>
+        <Ionicons name="alert-circle-outline" size={48} color={COLORS.error} />
+        <Text style={styles.errorText}>Opportunity not found</Text>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Text style={styles.backBtnText}>Go back</Text>
+        </TouchableOpacity>
+      </View>
     );
   }
 
   return (
-    <SafeScreen>
-      <ScreenHeader title="Opportunity" />
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Badge label={opp.sport} />
-          {opp.is_paid && <Badge label="Paid" variant="success" />}
-          {opp.is_remote && <Badge label="Remote" variant="info" />}
-        </View>
-        <Text style={styles.title}>{opp.title}</Text>
-        <Text style={styles.business}>{opp.business_name}</Text>
+    <View style={styles.wrapper}>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        <TouchableOpacity style={styles.backRow} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={20} color={COLORS.text} />
+          <Text style={styles.backLabel}>Back</Text>
+        </TouchableOpacity>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About this opportunity</Text>
-          <Text style={styles.body}>{opp.description}</Text>
-        </View>
-
-        {opp.requirements ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Requirements</Text>
-            <Text style={styles.body}>{opp.requirements}</Text>
+        <View style={styles.body}>
+          <View style={styles.header}>
+            <Text style={styles.title}>{opportunity.title}</Text>
+            <Text style={styles.company}>{opportunity.business_name}</Text>
           </View>
-        ) : null}
 
-        {opp.compensation ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Compensation</Text>
-            <Text style={styles.body}>{opp.compensation}</Text>
+          <View style={styles.tags}>
+            {opportunity.sport ? (
+              <View style={styles.tag}>
+                <Text style={styles.tagText}>{opportunity.sport}</Text>
+              </View>
+            ) : null}
+            {opportunity.deal_type ? (
+              <View style={[styles.tag, styles.tagSecondary]}>
+                <Text style={styles.tagText}>{opportunity.deal_type}</Text>
+              </View>
+            ) : null}
           </View>
-        ) : null}
 
-        <View style={styles.deadline}>
-          <Text style={styles.deadlineLabel}>Deadline</Text>
-          <Text style={styles.deadlineValue}>
-            {opp.deadline
-              ? new Date(opp.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-              : 'Open'}
-          </Text>
+          {opportunity.budget ? (
+            <View style={styles.budgetRow}>
+              <Ionicons name="cash-outline" size={20} color={COLORS.primary} />
+              <Text style={styles.budget}>£{opportunity.budget}</Text>
+            </View>
+          ) : null}
+
+          <Text style={styles.sectionTitle}>Description</Text>
+          <Text style={styles.description}>{opportunity.description}</Text>
+
+          {opportunity.requirements ? (
+            <>
+              <Text style={styles.sectionTitle}>Requirements</Text>
+              <Text style={styles.description}>{opportunity.requirements}</Text>
+            </>
+          ) : null}
+
+          <View style={styles.metaGrid}>
+            {opportunity.deadline ? (
+              <View style={styles.metaItem}>
+                <Ionicons name="calendar-outline" size={16} color={COLORS.textMuted} />
+                <Text style={styles.metaText}>
+                  Deadline: {new Date(opportunity.deadline).toLocaleDateString()}
+                </Text>
+              </View>
+            ) : null}
+            {opportunity.min_followers ? (
+              <View style={styles.metaItem}>
+                <Ionicons name="people-outline" size={16} color={COLORS.textMuted} />
+                <Text style={styles.metaText}>
+                  Min followers: {opportunity.min_followers.toLocaleString()}
+                </Text>
+              </View>
+            ) : null}
+          </View>
         </View>
       </ScrollView>
 
       <View style={styles.footer}>
-        <Button
-          label={applying ? 'Applying...' : 'Apply Now'}
+        <TouchableOpacity
+          style={[styles.applyBtn, applying && styles.applyBtnDisabled]}
           onPress={handleApply}
           disabled={applying}
-          fullWidth
-        />
+        >
+          {applying ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.applyBtnText}>Apply Now</Text>
+          )}
+        </TouchableOpacity>
       </View>
-    </SafeScreen>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1 },
-  content: { padding: SPACING.md, paddingBottom: SPACING.xl, gap: SPACING.md },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  errorText: { color: COLORS.error, fontFamily: TYPOGRAPHY.fonts.body, fontSize: TYPOGRAPHY.sizes.base },
-  header: { flexDirection: 'row', gap: SPACING.xs, flexWrap: 'wrap' },
-  title: {
-    fontFamily: TYPOGRAPHY.fonts.display,
-    fontSize: TYPOGRAPHY.sizes.xl,
-    fontWeight: '800',
-    color: COLORS.text,
-    lineHeight: 30,
-  },
-  business: {
-    fontFamily: TYPOGRAPHY.fonts.body,
-    fontSize: TYPOGRAPHY.sizes.base,
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
-  section: { gap: SPACING.xs },
-  sectionTitle: {
-    fontFamily: TYPOGRAPHY.fonts.display,
-    fontSize: TYPOGRAPHY.sizes.base,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  body: {
-    fontFamily: TYPOGRAPHY.fonts.body,
-    fontSize: TYPOGRAPHY.sizes.base,
-    color: COLORS.textMuted,
-    lineHeight: 22,
-  },
-  deadline: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: SPACING.md,
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  deadlineLabel: {
-    fontFamily: TYPOGRAPHY.fonts.body,
-    fontSize: TYPOGRAPHY.sizes.sm,
-    color: COLORS.textMuted,
-    fontWeight: '600',
-  },
-  deadlineValue: {
-    fontFamily: TYPOGRAPHY.fonts.body,
-    fontSize: TYPOGRAPHY.sizes.sm,
-    color: COLORS.text,
-    fontWeight: '700',
-  },
+  wrapper: { flex: 1, backgroundColor: COLORS.background },
+  container: { flex: 1 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.background },
+  backRow: { flexDirection: 'row', alignItems: 'center', padding: SPACING.md, gap: SPACING.xs },
+  backLabel: { color: COLORS.text, ...TYPOGRAPHY.body },
+  body: { padding: SPACING.lg, paddingBottom: SPACING.xl },
+  header: { marginBottom: SPACING.md },
+  title: { ...TYPOGRAPHY.h2, color: COLORS.text, marginBottom: 4 },
+  company: { ...TYPOGRAPHY.label, color: COLORS.textMuted },
+  tags: { flexDirection: 'row', gap: SPACING.xs, marginBottom: SPACING.md },
+  tag: { backgroundColor: COLORS.primaryLight, borderRadius: 12, paddingHorizontal: SPACING.sm, paddingVertical: 4 },
+  tagSecondary: { backgroundColor: COLORS.surface },
+  tagText: { ...TYPOGRAPHY.caption, color: COLORS.primary },
+  budgetRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, marginBottom: SPACING.md },
+  budget: { ...TYPOGRAPHY.h3, color: COLORS.primary },
+  sectionTitle: { ...TYPOGRAPHY.label, color: COLORS.text, marginBottom: SPACING.xs, marginTop: SPACING.md },
+  description: { ...TYPOGRAPHY.body, color: COLORS.textMuted, lineHeight: 24 },
+  metaGrid: { marginTop: SPACING.lg, gap: SPACING.sm },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
+  metaText: { ...TYPOGRAPHY.caption, color: COLORS.textMuted },
   footer: {
-    padding: SPACING.md,
+    padding: SPACING.lg,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
     backgroundColor: COLORS.background,
   },
+  applyBtn: {
+    backgroundColor: COLORS.primary, borderRadius: 12,
+    paddingVertical: SPACING.md, alignItems: 'center',
+  },
+  applyBtnDisabled: { opacity: 0.6 },
+  applyBtnText: { color: '#fff', ...TYPOGRAPHY.label, fontSize: 16 },
+  errorText: { ...TYPOGRAPHY.body, color: COLORS.error, marginVertical: SPACING.md },
+  backBtn: { paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm, backgroundColor: COLORS.primary, borderRadius: 8 },
+  backBtnText: { color: '#fff', ...TYPOGRAPHY.label },
 });
