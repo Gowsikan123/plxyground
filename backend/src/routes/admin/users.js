@@ -1,176 +1,117 @@
 'use strict';
 
-const router = require('express').Router();
-const { param, body, validationResult } = require('express-validator');
+const express = require('express');
+const { query: qv, body } = require('express-validator');
+const router = express.Router();
+
 const db = require('../../db/client');
-const { requireAdmin } = require('../../middleware/auth');
-const audit = require('../../utils/auditLogger');
+const auditLog = require('../../utils/auditLogger');
+const { requireAuth, requireAdmin } = require('../../middleware/auth');
+const { validate } = require('../../middleware/validate');
 const logger = require('../../logger');
 
-// GET /api/admin/users/creators — list all creators
-router.get('/creators', requireAdmin, async (req, res) => {
-  try {
-    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
-    const offset = parseInt(req.query.offset) || 0;
-    const search = req.query.search || null;
+// GET /api/admin/users  — list all users with optional search
+router.get(
+  '/',
+  requireAuth,
+  requireAdmin,
+  [
+    qv('page').optional().isInt({ min: 1 }).toInt(),
+    qv('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
+    qv('search').optional().trim(),
+    qv('role').optional().isIn(['creator', 'admin']),
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const page = req.query.page || 1;
+      const limit = req.query.limit || 20;
+      const offset = (page - 1) * limit;
+      const search = req.query.search || null;
+      const role = req.query.role || null;
 
-    const params = [];
-    let searchClause = '';
-    if (search) {
-      params.push(`%${search}%`);
-      searchClause = `WHERE username ILIKE $1 OR display_name ILIKE $1 OR email ILIKE $1`;
+      const params = [limit, offset];
+      const clauses = [];
+
+      if (search) {
+        params.push(`%${search}%`);
+        clauses.push(`(username ILIKE $${params.length} OR email ILIKE $${params.length} OR display_name ILIKE $${params.length})`);
+      }
+      if (role) {
+        params.push(role);
+        clauses.push(`role = $${params.length}`);
+      }
+
+      const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+
+      const { rows } = await db.query(
+        `SELECT id, username, email, display_name, role, sport, is_verified, is_suspended, follower_count, created_at
+         FROM users
+         ${where}
+         ORDER BY created_at DESC
+         LIMIT $1 OFFSET $2`,
+        params
+      );
+
+      const { rows: countRows } = await db.query(`SELECT COUNT(*) AS total FROM users ${where}`, params.slice(2));
+      res.json({ users: rows, pagination: { page, limit, total: parseInt(countRows[0].total, 10) } });
+    } catch (err) {
+      logger.error('admin.users.list error', { message: err.message });
+      res.status(500).json({ error: 'Failed to fetch users' });
     }
-    params.push(limit, offset);
+  }
+);
 
+// POST /api/admin/users/:id/suspend
+router.post('/:id/suspend', requireAuth, requireAdmin, async (req, res) => {
+  try {
     const { rows } = await db.query(
-      `SELECT id, username, email, display_name, sport, slug,
-              is_verified, is_suspended, follower_count, created_at
-       FROM creators
-       ${searchClause}
-       ORDER BY created_at DESC
-       LIMIT $${params.length - 1} OFFSET $${params.length}`,
-      params
+      `UPDATE users SET is_suspended = TRUE, updated_at = NOW()
+       WHERE id = $1 AND role != 'admin' RETURNING id, username, is_suspended`,
+      [req.params.id]
     );
+    if (!rows.length) return res.status(404).json({ error: 'User not found or is admin' });
 
-    return res.json({ creators: rows, limit, offset });
+    auditLog({ actorId: req.user.id, actorType: 'admin', action: 'user.suspended', targetType: 'user', targetId: req.params.id, ip: req.ip });
+    res.json({ user: rows[0] });
   } catch (err) {
-    logger.error('Admin users creators error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('admin.users.suspend error', { message: err.message });
+    res.status(500).json({ error: 'Failed to suspend user' });
   }
 });
 
-// GET /api/admin/users/businesses — list all businesses
-router.get('/businesses', requireAdmin, async (req, res) => {
-  try {
-    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
-    const offset = parseInt(req.query.offset) || 0;
-    const search = req.query.search || null;
-
-    const params = [];
-    let searchClause = '';
-    if (search) {
-      params.push(`%${search}%`);
-      searchClause = `WHERE business_name ILIKE $1 OR email ILIKE $1`;
-    }
-    params.push(limit, offset);
-
-    const { rows } = await db.query(
-      `SELECT id, business_name, email, industry, website,
-              is_verified, is_suspended, created_at
-       FROM businesses
-       ${searchClause}
-       ORDER BY created_at DESC
-       LIMIT $${params.length - 1} OFFSET $${params.length}`,
-      params
-    );
-
-    return res.json({ businesses: rows, limit, offset });
-  } catch (err) {
-    logger.error('Admin users businesses error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// PATCH /api/admin/users/creators/:id/suspend — suspend creator
-router.patch('/creators/:id/suspend', requireAdmin, param('id').isInt(), [
-  body('reason').optional().trim().isLength({ max: 500 }),
-], async (req, res) => {
-  if (!validationResult(req).isEmpty()) return res.status(422).json({ error: 'Invalid id' });
-
+// POST /api/admin/users/:id/reactivate
+router.post('/:id/reactivate', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { rows } = await db.query(
-      `UPDATE creators SET is_suspended = true, updated_at = NOW()
+      `UPDATE users SET is_suspended = FALSE, updated_at = NOW()
        WHERE id = $1 RETURNING id, username, is_suspended`,
       [req.params.id]
     );
-    if (rows.length === 0) return res.status(404).json({ error: 'Creator not found' });
+    if (!rows.length) return res.status(404).json({ error: 'User not found' });
 
-    audit(req.user.sub, 'admin', 'creator.suspend', { creator_id: req.params.id, reason: req.body.reason });
-    logger.warn('Creator suspended', { admin_id: req.user.sub, creator_id: req.params.id });
-    return res.json({ creator: rows[0] });
+    auditLog({ actorId: req.user.id, actorType: 'admin', action: 'user.reactivated', targetType: 'user', targetId: req.params.id, ip: req.ip });
+    res.json({ user: rows[0] });
   } catch (err) {
-    logger.error('Creator suspend error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('admin.users.reactivate error', { message: err.message });
+    res.status(500).json({ error: 'Failed to reactivate user' });
   }
 });
 
-// PATCH /api/admin/users/creators/:id/reactivate — reactivate creator
-router.patch('/creators/:id/reactivate', requireAdmin, param('id').isInt(), async (req, res) => {
-  if (!validationResult(req).isEmpty()) return res.status(422).json({ error: 'Invalid id' });
-
+// POST /api/admin/users/:id/verify
+router.post('/:id/verify', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { rows } = await db.query(
-      `UPDATE creators SET is_suspended = false, updated_at = NOW()
-       WHERE id = $1 RETURNING id, username, is_suspended`,
+      `UPDATE users SET is_verified = TRUE, updated_at = NOW() WHERE id = $1 RETURNING id, username, is_verified`,
       [req.params.id]
     );
-    if (rows.length === 0) return res.status(404).json({ error: 'Creator not found' });
+    if (!rows.length) return res.status(404).json({ error: 'User not found' });
 
-    audit(req.user.sub, 'admin', 'creator.reactivate', { creator_id: req.params.id });
-    return res.json({ creator: rows[0] });
+    auditLog({ actorId: req.user.id, actorType: 'admin', action: 'user.verified', targetType: 'user', targetId: req.params.id, ip: req.ip });
+    res.json({ user: rows[0] });
   } catch (err) {
-    logger.error('Creator reactivate error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// PATCH /api/admin/users/creators/:id/verify — verify creator
-router.patch('/creators/:id/verify', requireAdmin, param('id').isInt(), async (req, res) => {
-  if (!validationResult(req).isEmpty()) return res.status(422).json({ error: 'Invalid id' });
-
-  try {
-    const { rows } = await db.query(
-      `UPDATE creators SET is_verified = true, updated_at = NOW()
-       WHERE id = $1 RETURNING id, username, is_verified`,
-      [req.params.id]
-    );
-    if (rows.length === 0) return res.status(404).json({ error: 'Creator not found' });
-
-    audit(req.user.sub, 'admin', 'creator.verify', { creator_id: req.params.id });
-    return res.json({ creator: rows[0] });
-  } catch (err) {
-    logger.error('Creator verify error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// PATCH /api/admin/users/businesses/:id/suspend — suspend business
-router.patch('/businesses/:id/suspend', requireAdmin, param('id').isInt(), async (req, res) => {
-  if (!validationResult(req).isEmpty()) return res.status(422).json({ error: 'Invalid id' });
-
-  try {
-    const { rows } = await db.query(
-      `UPDATE businesses SET is_suspended = true, updated_at = NOW()
-       WHERE id = $1 RETURNING id, business_name, is_suspended`,
-      [req.params.id]
-    );
-    if (rows.length === 0) return res.status(404).json({ error: 'Business not found' });
-
-    audit(req.user.sub, 'admin', 'business.suspend', { business_id: req.params.id });
-    return res.json({ business: rows[0] });
-  } catch (err) {
-    logger.error('Business suspend error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// PATCH /api/admin/users/businesses/:id/reactivate — reactivate business
-router.patch('/businesses/:id/reactivate', requireAdmin, param('id').isInt(), async (req, res) => {
-  if (!validationResult(req).isEmpty()) return res.status(422).json({ error: 'Invalid id' });
-
-  try {
-    const { rows } = await db.query(
-      `UPDATE businesses SET is_suspended = false, updated_at = NOW()
-       WHERE id = $1 RETURNING id, business_name, is_suspended`,
-      [req.params.id]
-    );
-    if (rows.length === 0) return res.status(404).json({ error: 'Business not found' });
-
-    audit(req.user.sub, 'admin', 'business.reactivate', { business_id: req.params.id });
-    return res.json({ business: rows[0] });
-  } catch (err) {
-    logger.error('Business reactivate error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('admin.users.verify error', { message: err.message });
+    res.status(500).json({ error: 'Failed to verify user' });
   }
 });
 

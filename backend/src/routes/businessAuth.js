@@ -1,144 +1,147 @@
 'use strict';
 
-const router = require('express').Router();
+const express = require('express');
 const bcrypt = require('bcrypt');
-const { body, validationResult } = require('express-validator');
+const { body } = require('express-validator');
+const router = express.Router();
+
 const db = require('../db/client');
-const { signToken } = require('../utils/jwt');
-const { requireAuth } = require('../middleware/auth');
+const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/jwt');
+const auditLog = require('../utils/auditLogger');
+const { requireAuth, requireBusiness } = require('../middleware/auth');
+const { validate } = require('../middleware/validate');
 const { authLimiter } = require('../middleware/rateLimiter');
-const audit = require('../utils/auditLogger');
+const config = require('../config');
 const logger = require('../logger');
 
-const signupValidation = [
-  body('business_name').trim().isLength({ min: 2, max: 100 }),
-  body('email').isEmail().normalizeEmail(),
-  body('password').isLength({ min: 8 }),
-  body('industry').trim().isLength({ min: 1, max: 80 }),
-];
-
-const loginValidation = [
-  body('email').isEmail().normalizeEmail(),
-  body('password').notEmpty(),
-];
-
 // POST /api/business/signup
-router.post('/signup', authLimiter, signupValidation, async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(422).json({ error: 'Validation failed', details: errors.array() });
+router.post(
+  '/signup',
+  authLimiter,
+  [
+    body('email').isEmail().normalizeEmail(),
+    body('password').isLength({ min: 8 }),
+    body('company_name').trim().isLength({ min: 2, max: 150 }),
+    body('industry').optional().trim().isLength({ max: 100 }),
+    body('website').optional().isURL(),
+    body('contact_name').optional().trim().isLength({ max: 100 }),
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const { email, password, company_name, industry, website, contact_name, contact_phone, description } = req.body;
 
-  const { business_name, email, password, industry, website, description, location } = req.body;
+      const { rows: existing } = await db.query(
+        'SELECT id FROM businesses WHERE email = $1',
+        [email]
+      );
+      if (existing.length) {
+        return res.status(409).json({ error: 'Email already registered' });
+      }
 
-  try {
-    const exists = await db.query('SELECT id FROM businesses WHERE email = $1', [email]);
-    if (exists.rows.length > 0) {
-      return res.status(409).json({ error: 'Email already registered' });
+      const password_hash = await bcrypt.hash(password, config.bcrypt.rounds);
+      const { rows } = await db.query(
+        `INSERT INTO businesses (email, password_hash, company_name, industry, website, contact_name, contact_phone, description)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING id, email, company_name, industry, website, is_verified, created_at`,
+        [email, password_hash, company_name, industry || null, website || null, contact_name || null, contact_phone || null, description || null]
+      );
+
+      const biz = rows[0];
+      const accessToken = signAccessToken({ sub: biz.id, type: 'business' });
+      const refreshToken = signRefreshToken({ sub: biz.id, type: 'business' });
+
+      auditLog({ actorId: biz.id, actorType: 'business', action: 'business.signup', ip: req.ip });
+
+      res.status(201).json({ business: biz, accessToken, refreshToken });
+    } catch (err) {
+      logger.error('businessAuth.signup error', { message: err.message });
+      res.status(500).json({ error: 'Signup failed' });
     }
-
-    const password_hash = await bcrypt.hash(password, 12);
-
-    const { rows } = await db.query(
-      `INSERT INTO businesses
-         (business_name, email, password_hash, industry, website, description, location)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)
-       RETURNING id, business_name, email, industry, website, description, location, created_at`,
-      [business_name, email, password_hash, industry, website || null, description || null, location || null]
-    );
-
-    const business = rows[0];
-    const token = signToken({ sub: business.id, role: 'business' });
-
-    audit(business.id, 'business', 'business.signup', { business_name, email });
-    logger.info('Business signed up', { id: business.id, business_name });
-
-    return res.status(201).json({ token, business });
-  } catch (err) {
-    logger.error('Business signup error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
   }
-});
+);
 
 // POST /api/business/login
-router.post('/login', authLimiter, loginValidation, async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(422).json({ error: 'Validation failed', details: errors.array() });
+router.post(
+  '/login',
+  authLimiter,
+  [
+    body('email').isEmail().normalizeEmail(),
+    body('password').notEmpty(),
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const { email, password } = req.body;
 
-  const { email, password } = req.body;
+      const { rows } = await db.query(
+        'SELECT id, email, company_name, password_hash, is_suspended, is_verified FROM businesses WHERE email = $1',
+        [email]
+      );
+      if (!rows.length) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
 
+      const biz = rows[0];
+      const match = await bcrypt.compare(password, biz.password_hash);
+      if (!match) return res.status(401).json({ error: 'Invalid credentials' });
+      if (biz.is_suspended) return res.status(403).json({ error: 'Account suspended' });
+
+      const accessToken = signAccessToken({ sub: biz.id, type: 'business' });
+      const refreshToken = signRefreshToken({ sub: biz.id, type: 'business' });
+
+      delete biz.password_hash;
+      auditLog({ actorId: biz.id, actorType: 'business', action: 'business.login', ip: req.ip });
+
+      res.json({ business: biz, accessToken, refreshToken });
+    } catch (err) {
+      logger.error('businessAuth.login error', { message: err.message });
+      res.status(500).json({ error: 'Login failed' });
+    }
+  }
+);
+
+// POST /api/business/refresh
+router.post('/refresh', async (req, res) => {
   try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) return res.status(400).json({ error: 'Refresh token required' });
+
+    const payload = verifyRefreshToken(refreshToken);
+    if (!payload || payload.type !== 'business') {
+      return res.status(401).json({ error: 'Invalid refresh token' });
+    }
+
     const { rows } = await db.query(
-      'SELECT id, business_name, email, industry, password_hash, is_suspended FROM businesses WHERE email = $1',
-      [email]
+      'SELECT id, is_suspended FROM businesses WHERE id = $1',
+      [payload.sub]
     );
+    if (!rows.length || rows[0].is_suspended) {
+      return res.status(401).json({ error: 'Account not found or suspended' });
+    }
 
-    if (rows.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
-
-    const business = rows[0];
-
-    if (business.is_suspended) return res.status(403).json({ error: 'Account suspended' });
-
-    const valid = await bcrypt.compare(password, business.password_hash);
-    if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
-
-    const token = signToken({ sub: business.id, role: 'business' });
-    const { password_hash: _, ...safeBusiness } = business;
-
-    audit(business.id, 'business', 'business.login', { email });
-    logger.info('Business logged in', { id: business.id });
-
-    return res.json({ token, business: safeBusiness });
+    const accessToken = signAccessToken({ sub: rows[0].id, type: 'business' });
+    res.json({ accessToken });
   } catch (err) {
-    logger.error('Business login error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('businessAuth.refresh error', { message: err.message });
+    res.status(500).json({ error: 'Token refresh failed' });
   }
 });
 
 // GET /api/business/me
-router.get('/me', requireAuth('business'), async (req, res) => {
+router.get('/me', requireAuth, requireBusiness, async (req, res) => {
   try {
     const { rows } = await db.query(
-      `SELECT id, business_name, email, industry, website, description, location, is_verified, created_at
+      `SELECT id, email, company_name, industry, website, logo_url, description,
+              contact_name, contact_phone, is_verified, created_at
        FROM businesses WHERE id = $1`,
-      [req.user.sub]
+      [req.business.id]
     );
-    if (rows.length === 0) return res.status(404).json({ error: 'Business not found' });
-    return res.json({ business: rows[0] });
+    if (!rows.length) return res.status(404).json({ error: 'Business not found' });
+    res.json({ business: rows[0] });
   } catch (err) {
-    logger.error('Business /me error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// GET /api/business/content — business sees all content from creators
-router.get('/content', requireAuth('business'), async (req, res) => {
-  try {
-    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
-    const offset = parseInt(req.query.offset) || 0;
-    const sport = req.query.sport || null;
-
-    const params = [limit, offset];
-    let sportClause = '';
-    if (sport) {
-      params.push(sport);
-      sportClause = `AND cr.sport = $${params.length}`;
-    }
-
-    const { rows } = await db.query(
-      `SELECT c.id, c.title, c.body, c.media_url, c.content_type, c.status,
-              c.created_at, cr.display_name, cr.username, cr.sport, cr.slug
-       FROM content c
-       JOIN creators cr ON cr.id = c.creator_id
-       WHERE c.status = 'approved'
-       ${sportClause}
-       ORDER BY c.created_at DESC
-       LIMIT $1 OFFSET $2`,
-      params
-    );
-
-    return res.json({ content: rows, limit, offset });
-  } catch (err) {
-    logger.error('Business content list error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('businessAuth.me error', { message: err.message });
+    res.status(500).json({ error: 'Failed to fetch profile' });
   }
 });
 

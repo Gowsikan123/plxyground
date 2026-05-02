@@ -1,91 +1,82 @@
 'use strict';
 
-const router = require('express').Router();
+const express = require('express');
 const bcrypt = require('bcrypt');
-const { body, validationResult } = require('express-validator');
+const { body } = require('express-validator');
+const router = express.Router();
+
 const db = require('../../db/client');
-const { signToken } = require('../../utils/jwt');
+const { signAccessToken } = require('../../utils/jwt');
+const auditLog = require('../../utils/auditLogger');
 const { requireAuth, requireAdmin } = require('../../middleware/auth');
+const { validate } = require('../../middleware/validate');
 const { authLimiter } = require('../../middleware/rateLimiter');
-const audit = require('../../utils/auditLogger');
+const config = require('../../config');
 const logger = require('../../logger');
 
 // POST /api/admin/auth/login
-router.post('/login', authLimiter, [
-  body('email').isEmail().normalizeEmail(),
-  body('password').notEmpty(),
-], async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(422).json({ error: 'Validation failed', details: errors.array() });
+router.post(
+  '/login',
+  authLimiter,
+  [
+    body('email').isEmail().normalizeEmail(),
+    body('password').notEmpty(),
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const { email, password } = req.body;
 
-  const { email, password } = req.body;
+      const { rows } = await db.query(
+        `SELECT id, email, username, password_hash, role FROM users WHERE email = $1 AND role = 'admin'`,
+        [email]
+      );
+      if (!rows.length) return res.status(401).json({ error: 'Invalid credentials' });
 
-  try {
-    const { rows } = await db.query(
-      'SELECT id, email, password_hash, role FROM admins WHERE email = $1',
-      [email]
-    );
+      const admin = rows[0];
+      const match = await bcrypt.compare(password, admin.password_hash);
+      if (!match) return res.status(401).json({ error: 'Invalid credentials' });
 
-    if (rows.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
+      const accessToken = signAccessToken({ sub: admin.id, role: admin.role, type: 'creator' });
+      delete admin.password_hash;
 
-    const admin = rows[0];
-    const valid = await bcrypt.compare(password, admin.password_hash);
-    if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
-
-    const token = signToken({ sub: admin.id, role: 'admin', adminRole: admin.role });
-    const { password_hash: _, ...safeAdmin } = admin;
-
-    audit(admin.id, 'admin', 'admin.login', { email });
-    logger.info('Admin logged in', { id: admin.id, email });
-
-    return res.json({ token, admin: safeAdmin });
-  } catch (err) {
-    logger.error('Admin login error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+      auditLog({ actorId: admin.id, actorType: 'admin', action: 'admin.login', ip: req.ip });
+      res.json({ admin, accessToken });
+    } catch (err) {
+      logger.error('admin.auth.login error', { message: err.message });
+      res.status(500).json({ error: 'Login failed' });
+    }
   }
-});
-
-// GET /api/admin/auth/me
-router.get('/me', requireAdmin, async (req, res) => {
-  try {
-    const { rows } = await db.query(
-      'SELECT id, email, role, created_at FROM admins WHERE id = $1',
-      [req.user.sub]
-    );
-    if (rows.length === 0) return res.status(404).json({ error: 'Admin not found' });
-    return res.json({ admin: rows[0] });
-  } catch (err) {
-    logger.error('Admin /me error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
+);
 
 // POST /api/admin/auth/change-password
-router.post('/change-password', requireAdmin, [
-  body('current_password').notEmpty(),
-  body('new_password').isLength({ min: 8 }),
-], async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(422).json({ error: 'Validation failed', details: errors.array() });
+router.post(
+  '/change-password',
+  requireAuth,
+  requireAdmin,
+  [
+    body('current_password').notEmpty(),
+    body('new_password').isLength({ min: 8 }),
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const { current_password, new_password } = req.body;
+      const { rows } = await db.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
 
-  const { current_password, new_password } = req.body;
+      const match = await bcrypt.compare(current_password, rows[0].password_hash);
+      if (!match) return res.status(401).json({ error: 'Current password incorrect' });
 
-  try {
-    const { rows } = await db.query('SELECT password_hash FROM admins WHERE id = $1', [req.user.sub]);
-    if (rows.length === 0) return res.status(404).json({ error: 'Admin not found' });
+      const newHash = await bcrypt.hash(new_password, config.bcrypt.rounds);
+      await db.query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [newHash, req.user.id]);
 
-    const valid = await bcrypt.compare(current_password, rows[0].password_hash);
-    if (!valid) return res.status(401).json({ error: 'Current password incorrect' });
-
-    const new_hash = await bcrypt.hash(new_password, 12);
-    await db.query('UPDATE admins SET password_hash = $1 WHERE id = $2', [new_hash, req.user.sub]);
-
-    audit(req.user.sub, 'admin', 'admin.change_password', {});
-    return res.json({ message: 'Password changed successfully' });
-  } catch (err) {
-    logger.error('Admin change-password error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+      auditLog({ actorId: req.user.id, actorType: 'admin', action: 'admin.password.changed', ip: req.ip });
+      res.json({ message: 'Password updated successfully' });
+    } catch (err) {
+      logger.error('admin.auth.changePassword error', { message: err.message });
+      res.status(500).json({ error: 'Failed to change password' });
+    }
   }
-});
+);
 
 module.exports = router;

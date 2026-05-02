@@ -1,145 +1,211 @@
 'use strict';
 
-const router = require('express').Router();
-const { body, param, validationResult } = require('express-validator');
+const express = require('express');
+const { body, query: qv } = require('express-validator');
+const router = express.Router();
+
 const db = require('../db/client');
-const { requireAuth } = require('../middleware/auth');
-const audit = require('../utils/auditLogger');
+const auditLog = require('../utils/auditLogger');
+const { requireAuth, requireBusiness } = require('../middleware/auth');
+const { validate } = require('../middleware/validate');
 const logger = require('../logger');
 
-const opportunityValidation = [
-  body('title').trim().isLength({ min: 2, max: 160 }),
-  body('description').trim().isLength({ min: 10, max: 3000 }),
-  body('opportunity_type').isIn(['sponsorship', 'collab', 'event', 'ambassador', 'other']),
-  body('sport').optional().trim().isLength({ max: 80 }),
-  body('location').optional().trim().isLength({ max: 100 }),
-  body('deadline').optional().isISO8601(),
-  body('budget').optional({ nullable: true }).isNumeric(),
-];
+// GET /api/opportunities  — public list
+router.get(
+  '/',
+  [
+    qv('page').optional().isInt({ min: 1 }).toInt(),
+    qv('limit').optional().isInt({ min: 1, max: 50 }).toInt(),
+    qv('sport').optional().trim(),
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const page = req.query.page || 1;
+      const limit = req.query.limit || 20;
+      const offset = (page - 1) * limit;
+      const sport = req.query.sport || null;
 
-// GET /api/opportunities — public list
-router.get('/', async (req, res) => {
-  try {
-    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
-    const offset = parseInt(req.query.offset) || 0;
-    const type = req.query.type || null;
-    const sport = req.query.sport || null;
+      const params = [limit, offset];
+      let sportClause = '';
+      if (sport) {
+        params.push(sport);
+        sportClause = `AND o.sport = $${params.length}`;
+      }
 
-    const conditions = [`o.status = 'active'`];
-    const params = [];
+      const { rows } = await db.query(
+        `SELECT o.id, o.title, o.description, o.sport, o.budget_min, o.budget_max, o.currency,
+                o.deadline, o.requirements, o.status, o.application_count, o.created_at,
+                b.id AS business_id, b.company_name, b.logo_url, b.industry
+         FROM opportunities o
+         JOIN businesses b ON b.id = o.business_id
+         WHERE o.status = 'open' ${sportClause}
+         ORDER BY o.created_at DESC
+         LIMIT $1 OFFSET $2`,
+        params
+      );
 
-    if (type) { params.push(type); conditions.push(`o.opportunity_type = $${params.length}`); }
-    if (sport) { params.push(sport); conditions.push(`o.sport = $${params.length}`); }
-
-    const where = conditions.join(' AND ');
-    params.push(limit, offset);
-
-    const { rows } = await db.query(
-      `SELECT o.id, o.title, o.description, o.opportunity_type, o.sport,
-              o.location, o.deadline, o.budget, o.created_at,
-              b.business_name, b.industry
-       FROM opportunities o
-       JOIN businesses b ON b.id = o.business_id
-       WHERE ${where}
-       ORDER BY o.created_at DESC
-       LIMIT $${params.length - 1} OFFSET $${params.length}`,
-      params
-    );
-
-    return res.json({ opportunities: rows, limit, offset });
-  } catch (err) {
-    logger.error('Opportunities list error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+      res.json({ opportunities: rows, pagination: { page, limit } });
+    } catch (err) {
+      logger.error('opportunities.list error', { message: err.message });
+      res.status(500).json({ error: 'Failed to fetch opportunities' });
+    }
   }
-});
+);
 
-// GET /api/opportunities/:id — single opportunity
-router.get('/:id', param('id').isInt(), async (req, res) => {
-  if (!validationResult(req).isEmpty()) return res.status(422).json({ error: 'Invalid id' });
+// GET /api/opportunities/:id
+router.get('/:id', async (req, res) => {
   try {
     const { rows } = await db.query(
-      `SELECT o.*, b.business_name, b.industry, b.website
+      `SELECT o.*, b.company_name, b.logo_url, b.industry
        FROM opportunities o
        JOIN businesses b ON b.id = o.business_id
-       WHERE o.id = $1 AND o.status = 'active'`,
+       WHERE o.id = $1`,
       [req.params.id]
     );
-    if (rows.length === 0) return res.status(404).json({ error: 'Opportunity not found' });
-    return res.json({ opportunity: rows[0] });
+    if (!rows.length) return res.status(404).json({ error: 'Opportunity not found' });
+    res.json({ opportunity: rows[0] });
   } catch (err) {
-    logger.error('Opportunity get error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('opportunities.get error', { message: err.message });
+    res.status(500).json({ error: 'Failed to fetch opportunity' });
   }
 });
 
-// POST /api/opportunities — business creates opportunity
-router.post('/', requireAuth('business'), opportunityValidation, async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(422).json({ error: 'Validation failed', details: errors.array() });
+// POST /api/opportunities  — business creates opportunity
+router.post(
+  '/',
+  requireAuth,
+  requireBusiness,
+  [
+    body('title').trim().isLength({ min: 5, max: 200 }),
+    body('description').optional().trim(),
+    body('sport').optional().trim().isLength({ max: 50 }),
+    body('budget_min').optional().isFloat({ min: 0 }),
+    body('budget_max').optional().isFloat({ min: 0 }),
+    body('deadline').optional().isDate(),
+    body('requirements').optional().trim(),
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const { title, description, sport, budget_min, budget_max, deadline, requirements } = req.body;
 
-  const { title, description, opportunity_type, sport, location, deadline, budget } = req.body;
+      const { rows } = await db.query(
+        `INSERT INTO opportunities (business_id, title, description, sport, budget_min, budget_max, deadline, requirements, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'open')
+         RETURNING *`,
+        [req.business.id, title, description || null, sport || null, budget_min || null, budget_max || null, deadline || null, requirements || null]
+      );
 
+      auditLog({ actorId: req.business.id, actorType: 'business', action: 'opportunity.create', targetType: 'opportunity', targetId: rows[0].id, ip: req.ip });
+      res.status(201).json({ opportunity: rows[0] });
+    } catch (err) {
+      logger.error('opportunities.create error', { message: err.message });
+      res.status(500).json({ error: 'Failed to create opportunity' });
+    }
+  }
+);
+
+// PATCH /api/opportunities/:id
+router.patch(
+  '/:id',
+  requireAuth,
+  requireBusiness,
+  [
+    body('title').optional().trim().isLength({ max: 200 }),
+    body('status').optional().isIn(['open', 'closed', 'draft']),
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const { rows: existing } = await db.query(
+        'SELECT id, business_id FROM opportunities WHERE id = $1',
+        [req.params.id]
+      );
+      if (!existing.length) return res.status(404).json({ error: 'Opportunity not found' });
+      if (existing[0].business_id !== req.business.id) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+
+      const { title, description, sport, budget_min, budget_max, deadline, requirements, status } = req.body;
+      const { rows } = await db.query(
+        `UPDATE opportunities
+         SET title = COALESCE($1, title),
+             description = COALESCE($2, description),
+             sport = COALESCE($3, sport),
+             budget_min = COALESCE($4, budget_min),
+             budget_max = COALESCE($5, budget_max),
+             deadline = COALESCE($6, deadline),
+             requirements = COALESCE($7, requirements),
+             status = COALESCE($8, status),
+             updated_at = NOW()
+         WHERE id = $9
+         RETURNING *`,
+        [title, description, sport, budget_min, budget_max, deadline, requirements, status, req.params.id]
+      );
+
+      auditLog({ actorId: req.business.id, actorType: 'business', action: 'opportunity.update', targetType: 'opportunity', targetId: req.params.id, ip: req.ip });
+      res.json({ opportunity: rows[0] });
+    } catch (err) {
+      logger.error('opportunities.update error', { message: err.message });
+      res.status(500).json({ error: 'Failed to update opportunity' });
+    }
+  }
+);
+
+// DELETE /api/opportunities/:id
+router.delete('/:id', requireAuth, requireBusiness, async (req, res) => {
   try {
     const { rows } = await db.query(
-      `INSERT INTO opportunities
-         (business_id, title, description, opportunity_type, sport, location, deadline, budget, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'active')
-       RETURNING *`,
-      [req.user.sub, title, description, opportunity_type, sport || null, location || null, deadline || null, budget || null]
+      'SELECT id, business_id FROM opportunities WHERE id = $1',
+      [req.params.id]
     );
+    if (!rows.length) return res.status(404).json({ error: 'Opportunity not found' });
+    if (rows[0].business_id !== req.business.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
 
-    audit(req.user.sub, 'business', 'opportunity.create', { id: rows[0].id, title });
-    logger.info('Opportunity created', { business_id: req.user.sub, opp_id: rows[0].id });
-    return res.status(201).json({ opportunity: rows[0] });
+    await db.query('DELETE FROM opportunities WHERE id = $1', [req.params.id]);
+    auditLog({ actorId: req.business.id, actorType: 'business', action: 'opportunity.delete', targetType: 'opportunity', targetId: req.params.id, ip: req.ip });
+    res.status(204).end();
   } catch (err) {
-    logger.error('Opportunity create error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('opportunities.delete error', { message: err.message });
+    res.status(500).json({ error: 'Failed to delete opportunity' });
   }
 });
 
-// PATCH /api/opportunities/:id — business updates own opportunity
-router.patch('/:id', requireAuth('business'), param('id').isInt(), opportunityValidation, async (req, res) => {
-  if (!validationResult(req).isEmpty()) return res.status(422).json({ error: 'Validation failed' });
-
-  const { title, description, opportunity_type, sport, location, deadline, budget } = req.body;
-
+// POST /api/opportunities/:id/apply  — creator applies
+router.post('/:id/apply', requireAuth, async (req, res) => {
   try {
-    const check = await db.query('SELECT business_id FROM opportunities WHERE id = $1', [req.params.id]);
-    if (check.rows.length === 0) return res.status(404).json({ error: 'Opportunity not found' });
-    if (check.rows[0].business_id !== req.user.sub) return res.status(403).json({ error: 'Forbidden' });
+    if (!req.user) return res.status(403).json({ error: 'Creator account required' });
+
+    const { rows: opp } = await db.query(
+      'SELECT id, status FROM opportunities WHERE id = $1',
+      [req.params.id]
+    );
+    if (!opp.length) return res.status(404).json({ error: 'Opportunity not found' });
+    if (opp[0].status !== 'open') return res.status(400).json({ error: 'Opportunity is not open' });
 
     const { rows } = await db.query(
-      `UPDATE opportunities
-       SET title=$1, description=$2, opportunity_type=$3, sport=$4,
-           location=$5, deadline=$6, budget=$7, updated_at=NOW()
-       WHERE id=$8
+      `INSERT INTO applications (opportunity_id, user_id, message)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (opportunity_id, user_id) DO NOTHING
        RETURNING *`,
-      [title, description, opportunity_type, sport || null, location || null, deadline || null, budget || null, req.params.id]
+      [req.params.id, req.user.id, req.body.message || null]
     );
 
-    audit(req.user.sub, 'business', 'opportunity.update', { id: rows[0].id });
-    return res.json({ opportunity: rows[0] });
+    if (!rows.length) return res.status(409).json({ error: 'Already applied' });
+
+    await db.query(
+      'UPDATE opportunities SET application_count = application_count + 1 WHERE id = $1',
+      [req.params.id]
+    );
+
+    auditLog({ actorId: req.user.id, actorType: 'creator', action: 'opportunity.apply', targetType: 'opportunity', targetId: req.params.id, ip: req.ip });
+    res.status(201).json({ application: rows[0] });
   } catch (err) {
-    logger.error('Opportunity update error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// DELETE /api/opportunities/:id — business deletes own opportunity
-router.delete('/:id', requireAuth('business'), param('id').isInt(), async (req, res) => {
-  if (!validationResult(req).isEmpty()) return res.status(422).json({ error: 'Invalid id' });
-
-  try {
-    const check = await db.query('SELECT business_id FROM opportunities WHERE id = $1', [req.params.id]);
-    if (check.rows.length === 0) return res.status(404).json({ error: 'Opportunity not found' });
-    if (check.rows[0].business_id !== req.user.sub) return res.status(403).json({ error: 'Forbidden' });
-
-    await db.query('UPDATE opportunities SET status=$1, updated_at=NOW() WHERE id=$2', ['closed', req.params.id]);
-    audit(req.user.sub, 'business', 'opportunity.close', { id: req.params.id });
-    return res.status(204).send();
-  } catch (err) {
-    logger.error('Opportunity delete error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('opportunities.apply error', { message: err.message });
+    res.status(500).json({ error: 'Failed to apply' });
   }
 });
 

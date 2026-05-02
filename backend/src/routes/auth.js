@@ -1,125 +1,152 @@
 'use strict';
 
-const router = require('express').Router();
+const express = require('express');
 const bcrypt = require('bcrypt');
-const { body, validationResult } = require('express-validator');
+const { body } = require('express-validator');
+const router = express.Router();
+
 const db = require('../db/client');
-const { signToken } = require('../utils/jwt');
+const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/jwt');
+const { uniqueUserSlug } = require('../utils/slugify');
+const auditLog = require('../utils/auditLogger');
 const { requireAuth } = require('../middleware/auth');
+const { validate } = require('../middleware/validate');
 const { authLimiter } = require('../middleware/rateLimiter');
-const audit = require('../utils/auditLogger');
-const slugify = require('../utils/slugify');
+const config = require('../config');
 const logger = require('../logger');
 
-const signupValidation = [
-  body('username').trim().isLength({ min: 3, max: 30 }).matches(/^[a-zA-Z0-9_]+$/),
-  body('email').isEmail().normalizeEmail(),
-  body('password').isLength({ min: 8 }),
-  body('display_name').trim().isLength({ min: 1, max: 80 }),
-  body('sport').trim().isLength({ min: 1, max: 60 }),
-];
-
-const loginValidation = [
-  body('email').isEmail().normalizeEmail(),
-  body('password').notEmpty(),
-];
-
 // POST /api/auth/signup
-router.post('/signup', authLimiter, signupValidation, async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(422).json({ error: 'Validation failed', details: errors.array() });
+router.post(
+  '/signup',
+  authLimiter,
+  [
+    body('username').trim().isLength({ min: 3, max: 50 }).matches(/^[a-zA-Z0-9_]+$/),
+    body('email').isEmail().normalizeEmail(),
+    body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+    body('display_name').optional().trim().isLength({ max: 100 }),
+    body('sport').optional().trim().isLength({ max: 50 }),
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const { username, email, password, display_name, sport, position, location } = req.body;
 
-  const { username, email, password, display_name, sport, bio, location, instagram_handle, tiktok_handle } = req.body;
+      const { rows: existing } = await db.query(
+        'SELECT id FROM users WHERE email = $1 OR username = $2',
+        [email, username]
+      );
+      if (existing.length) {
+        return res.status(409).json({ error: 'Email or username already in use' });
+      }
 
-  try {
-    const exists = await db.query(
-      'SELECT id FROM creators WHERE email = $1 OR username = $2',
-      [email, username]
-    );
-    if (exists.rows.length > 0) {
-      return res.status(409).json({ error: 'Email or username already registered' });
+      const password_hash = await bcrypt.hash(password, config.bcrypt.rounds);
+      const slug = await uniqueUserSlug(username);
+
+      const { rows } = await db.query(
+        `INSERT INTO users (username, email, password_hash, display_name, sport, position, location, slug, role)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'creator')
+         RETURNING id, username, email, display_name, slug, role, created_at`,
+        [username, email, password_hash, display_name || username, sport || null, position || null, location || null, slug]
+      );
+
+      const user = rows[0];
+      const accessToken = signAccessToken({ sub: user.id, role: user.role, type: 'creator' });
+      const refreshToken = signRefreshToken({ sub: user.id, type: 'creator' });
+
+      auditLog({ actorId: user.id, actorType: 'creator', action: 'creator.signup', ip: req.ip });
+
+      res.status(201).json({ user, accessToken, refreshToken });
+    } catch (err) {
+      logger.error('auth.signup error', { message: err.message });
+      res.status(500).json({ error: 'Signup failed' });
     }
-
-    const password_hash = await bcrypt.hash(password, 12);
-    const slug = await slugify(username, 'creators');
-
-    const { rows } = await db.query(
-      `INSERT INTO creators
-         (username, email, password_hash, display_name, sport, bio, location, instagram_handle, tiktok_handle, slug)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-       RETURNING id, username, email, display_name, sport, slug, created_at`,
-      [username, email, password_hash, display_name, sport, bio || null, location || null, instagram_handle || null, tiktok_handle || null, slug]
-    );
-
-    const creator = rows[0];
-    const token = signToken({ sub: creator.id, role: 'creator' });
-
-    audit(creator.id, 'creator', 'creator.signup', { username, email });
-    logger.info('Creator signed up', { id: creator.id, username });
-
-    return res.status(201).json({ token, creator });
-  } catch (err) {
-    logger.error('Creator signup error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
   }
-});
+);
 
 // POST /api/auth/login
-router.post('/login', authLimiter, loginValidation, async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(422).json({ error: 'Validation failed', details: errors.array() });
+router.post(
+  '/login',
+  authLimiter,
+  [
+    body('email').isEmail().normalizeEmail(),
+    body('password').notEmpty(),
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const { email, password } = req.body;
 
-  const { email, password } = req.body;
+      const { rows } = await db.query(
+        'SELECT id, username, email, password_hash, display_name, slug, role, is_suspended FROM users WHERE email = $1',
+        [email]
+      );
+      if (!rows.length) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
 
+      const user = rows[0];
+      const match = await bcrypt.compare(password, user.password_hash);
+      if (!match) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+      if (user.is_suspended) {
+        return res.status(403).json({ error: 'Account suspended' });
+      }
+
+      const accessToken = signAccessToken({ sub: user.id, role: user.role, type: 'creator' });
+      const refreshToken = signRefreshToken({ sub: user.id, type: 'creator' });
+
+      delete user.password_hash;
+      auditLog({ actorId: user.id, actorType: 'creator', action: 'creator.login', ip: req.ip });
+
+      res.json({ user, accessToken, refreshToken });
+    } catch (err) {
+      logger.error('auth.login error', { message: err.message });
+      res.status(500).json({ error: 'Login failed' });
+    }
+  }
+);
+
+// POST /api/auth/refresh
+router.post('/refresh', async (req, res) => {
   try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) return res.status(400).json({ error: 'Refresh token required' });
+
+    const payload = verifyRefreshToken(refreshToken);
+    if (!payload) return res.status(401).json({ error: 'Invalid or expired refresh token' });
+
     const { rows } = await db.query(
-      'SELECT id, username, email, display_name, sport, slug, password_hash, is_suspended FROM creators WHERE email = $1',
-      [email]
+      'SELECT id, role, is_suspended FROM users WHERE id = $1',
+      [payload.sub]
     );
-
-    if (rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    if (!rows.length || rows[0].is_suspended) {
+      return res.status(401).json({ error: 'Account not found or suspended' });
     }
 
-    const creator = rows[0];
-
-    if (creator.is_suspended) {
-      return res.status(403).json({ error: 'Account suspended' });
-    }
-
-    const valid = await bcrypt.compare(password, creator.password_hash);
-    if (!valid) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    const token = signToken({ sub: creator.id, role: 'creator' });
-    const { password_hash: _, ...safeCreator } = creator;
-
-    audit(creator.id, 'creator', 'creator.login', { email });
-    logger.info('Creator logged in', { id: creator.id });
-
-    return res.json({ token, creator: safeCreator });
+    const user = rows[0];
+    const accessToken = signAccessToken({ sub: user.id, role: user.role, type: 'creator' });
+    res.json({ accessToken });
   } catch (err) {
-    logger.error('Creator login error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('auth.refresh error', { message: err.message });
+    res.status(500).json({ error: 'Token refresh failed' });
   }
 });
 
 // GET /api/auth/me
-router.get('/me', requireAuth('creator'), async (req, res) => {
+router.get('/me', requireAuth, async (req, res) => {
   try {
     const { rows } = await db.query(
-      `SELECT id, username, email, display_name, sport, bio, location,
-              instagram_handle, tiktok_handle, slug, follower_count,
-              is_verified, created_at
-       FROM creators WHERE id = $1`,
-      [req.user.sub]
+      `SELECT id, username, email, display_name, bio, avatar_url, sport, position, location,
+              follower_count, following_count, is_verified, slug, role, created_at
+       FROM users WHERE id = $1`,
+      [req.user.id]
     );
-    if (rows.length === 0) return res.status(404).json({ error: 'Creator not found' });
-    return res.json({ creator: rows[0] });
+    if (!rows.length) return res.status(404).json({ error: 'User not found' });
+    res.json({ user: rows[0] });
   } catch (err) {
-    logger.error('Creator /me error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('auth.me error', { message: err.message });
+    res.status(500).json({ error: 'Failed to fetch profile' });
   }
 });
 

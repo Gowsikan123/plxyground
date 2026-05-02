@@ -1,116 +1,136 @@
 'use strict';
 
-const router = require('express').Router();
-const { body, param, validationResult } = require('express-validator');
+const express = require('express');
+const { body, query: qv } = require('express-validator');
+const router = express.Router();
+
 const db = require('../db/client');
+const { uniqueUserSlug } = require('../utils/slugify');
+const auditLog = require('../utils/auditLogger');
 const { requireAuth } = require('../middleware/auth');
-const audit = require('../utils/auditLogger');
+const { validate } = require('../middleware/validate');
 const logger = require('../logger');
 
-// GET /api/creators — public list
-router.get('/', async (req, res) => {
-  try {
-    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
-    const offset = parseInt(req.query.offset) || 0;
-    const sport = req.query.sport || null;
+// GET /api/creators  — list all creators
+router.get(
+  '/',
+  [
+    qv('page').optional().isInt({ min: 1 }).toInt(),
+    qv('limit').optional().isInt({ min: 1, max: 50 }).toInt(),
+    qv('sport').optional().trim(),
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const page = req.query.page || 1;
+      const limit = req.query.limit || 20;
+      const offset = (page - 1) * limit;
+      const sport = req.query.sport || null;
 
-    const params = [];
-    let sportClause = '';
-    if (sport) { params.push(sport); sportClause = `WHERE sport = $${params.length}`; }
-    params.push(limit, offset);
+      const params = [limit, offset];
+      let sportClause = '';
+      if (sport) {
+        params.push(sport);
+        sportClause = `AND sport = $${params.length}`;
+      }
 
-    const { rows } = await db.query(
-      `SELECT id, username, display_name, sport, bio, location,
-              instagram_handle, tiktok_handle, slug, follower_count, is_verified, created_at
-       FROM creators
-       ${sportClause}
-       ORDER BY follower_count DESC
-       LIMIT $${params.length - 1} OFFSET $${params.length}`,
-      params
-    );
+      const { rows } = await db.query(
+        `SELECT id, username, display_name, bio, avatar_url, sport, position, location,
+                follower_count, is_verified, slug, created_at
+         FROM users
+         WHERE role = 'creator' AND is_suspended = FALSE ${sportClause}
+         ORDER BY follower_count DESC
+         LIMIT $1 OFFSET $2`,
+        params
+      );
 
-    return res.json({ creators: rows, limit, offset });
-  } catch (err) {
-    logger.error('Creators list error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+      res.json({ creators: rows, pagination: { page, limit } });
+    } catch (err) {
+      logger.error('creators.list error', { message: err.message });
+      res.status(500).json({ error: 'Failed to fetch creators' });
+    }
   }
-});
+);
 
-// GET /api/creators/slug/:slug — public profile by slug
+// GET /api/creators/:slug  — public profile by slug
 router.get('/slug/:slug', async (req, res) => {
   try {
     const { rows } = await db.query(
-      `SELECT id, username, display_name, sport, bio, location,
-              instagram_handle, tiktok_handle, slug, follower_count, is_verified, created_at
-       FROM creators WHERE slug = $1 AND is_suspended = false`,
+      `SELECT id, username, display_name, bio, avatar_url, sport, position, location,
+              follower_count, following_count, is_verified, slug, created_at
+       FROM users WHERE slug = $1 AND role = 'creator' AND is_suspended = FALSE`,
       [req.params.slug]
     );
-    if (rows.length === 0) return res.status(404).json({ error: 'Creator not found' });
-    return res.json({ creator: rows[0] });
+    if (!rows.length) return res.status(404).json({ error: 'Creator not found' });
+    res.json({ creator: rows[0] });
   } catch (err) {
-    logger.error('Creator by slug error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('creators.bySlug error', { message: err.message });
+    res.status(500).json({ error: 'Failed to fetch creator' });
   }
 });
 
-// GET /api/creators/:id — public profile by id
-router.get('/:id', param('id').isInt(), async (req, res) => {
-  if (!validationResult(req).isEmpty()) return res.status(422).json({ error: 'Invalid id' });
+// GET /api/creators/:id
+router.get('/:id', async (req, res) => {
   try {
     const { rows } = await db.query(
-      `SELECT id, username, display_name, sport, bio, location,
-              instagram_handle, tiktok_handle, slug, follower_count, is_verified, created_at
-       FROM creators WHERE id = $1 AND is_suspended = false`,
+      `SELECT id, username, display_name, bio, avatar_url, sport, position, location,
+              follower_count, following_count, is_verified, slug, created_at
+       FROM users WHERE id = $1 AND role = 'creator' AND is_suspended = FALSE`,
       [req.params.id]
     );
-    if (rows.length === 0) return res.status(404).json({ error: 'Creator not found' });
-    return res.json({ creator: rows[0] });
+    if (!rows.length) return res.status(404).json({ error: 'Creator not found' });
+    res.json({ creator: rows[0] });
   } catch (err) {
-    logger.error('Creator by id error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('creators.byId error', { message: err.message });
+    res.status(500).json({ error: 'Failed to fetch creator' });
   }
 });
 
-// PATCH /api/creators/me — authenticated creator updates own profile
-router.patch('/me', requireAuth('creator'), [
-  body('display_name').optional().trim().isLength({ min: 1, max: 80 }),
-  body('bio').optional().trim().isLength({ max: 500 }),
-  body('location').optional().trim().isLength({ max: 100 }),
-  body('instagram_handle').optional().trim().isLength({ max: 60 }),
-  body('tiktok_handle').optional().trim().isLength({ max: 60 }),
-], async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(422).json({ error: 'Validation failed', details: errors.array() });
+// PATCH /api/creators/me  — update own profile
+router.patch(
+  '/me',
+  requireAuth,
+  [
+    body('display_name').optional().trim().isLength({ max: 100 }),
+    body('bio').optional().trim().isLength({ max: 500 }),
+    body('sport').optional().trim().isLength({ max: 50 }),
+    body('position').optional().trim().isLength({ max: 50 }),
+    body('location').optional().trim().isLength({ max: 100 }),
+    body('avatar_url').optional().isURL(),
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      if (!req.user) return res.status(403).json({ error: 'Creator account required' });
+      const { display_name, bio, sport, position, location, avatar_url } = req.body;
 
-  const { display_name, bio, location, instagram_handle, tiktok_handle } = req.body;
+      let slug;
+      if (display_name) {
+        slug = await uniqueUserSlug(display_name, req.user.id);
+      }
 
-  const fields = [];
-  const values = [];
+      const { rows } = await db.query(
+        `UPDATE users
+         SET display_name = COALESCE($1, display_name),
+             bio = COALESCE($2, bio),
+             sport = COALESCE($3, sport),
+             position = COALESCE($4, position),
+             location = COALESCE($5, location),
+             avatar_url = COALESCE($6, avatar_url),
+             slug = COALESCE($7, slug),
+             updated_at = NOW()
+         WHERE id = $8
+         RETURNING id, username, display_name, bio, avatar_url, sport, position, location, slug`,
+        [display_name, bio, sport, position, location, avatar_url, slug || null, req.user.id]
+      );
 
-  if (display_name !== undefined) { values.push(display_name); fields.push(`display_name = $${values.length}`); }
-  if (bio !== undefined) { values.push(bio); fields.push(`bio = $${values.length}`); }
-  if (location !== undefined) { values.push(location); fields.push(`location = $${values.length}`); }
-  if (instagram_handle !== undefined) { values.push(instagram_handle); fields.push(`instagram_handle = $${values.length}`); }
-  if (tiktok_handle !== undefined) { values.push(tiktok_handle); fields.push(`tiktok_handle = $${values.length}`); }
-
-  if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
-
-  values.push(req.user.sub);
-
-  try {
-    const { rows } = await db.query(
-      `UPDATE creators SET ${fields.join(', ')}, updated_at = NOW()
-       WHERE id = $${values.length}
-       RETURNING id, username, display_name, sport, bio, location, instagram_handle, tiktok_handle, slug`,
-      values
-    );
-
-    audit(req.user.sub, 'creator', 'creator.update', { fields: Object.keys(req.body) });
-    return res.json({ creator: rows[0] });
-  } catch (err) {
-    logger.error('Creator update error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+      auditLog({ actorId: req.user.id, actorType: 'creator', action: 'creator.profile.update', ip: req.ip });
+      res.json({ creator: rows[0] });
+    } catch (err) {
+      logger.error('creators.updateMe error', { message: err.message });
+      res.status(500).json({ error: 'Failed to update profile' });
+    }
   }
-});
+);
 
 module.exports = router;
