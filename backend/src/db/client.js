@@ -1,17 +1,18 @@
 'use strict';
 
 const { Pool } = require('pg');
-const { databaseUrl } = require('../config');
+const config = require('../config');
 const logger = require('../logger');
 
-const pool = new Pool({ connectionString: databaseUrl });
-
-pool.on('connect', () => {
-  logger.info('PostgreSQL pool connection established');
+const pool = new Pool({
+  connectionString: config.databaseUrl,
+  max: 10,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
 });
 
 pool.on('error', (err) => {
-  logger.error('Unexpected PostgreSQL pool error', err);
+  logger.error('Unexpected pg pool error', err);
 });
 
 module.exports = pool;

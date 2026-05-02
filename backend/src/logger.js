@@ -1,26 +1,25 @@
 'use strict';
 
-const levels = { info: 'INFO', warn: 'WARN', error: 'ERROR' };
+const LEVELS = { info: 'INFO', warn: 'WARN', error: 'ERROR' };
 
 function log(level, message, meta) {
-  const timestamp = new Date().toISOString();
-  const prefix = `[${timestamp}] [${levels[level]}]`;
+  const ts = new Date().toISOString();
+  const label = LEVELS[level] || 'INFO';
+  const base = `[${ts}] [${label}] ${message}`;
   if (meta !== undefined) {
-    console[level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'log'](
-      `${prefix} ${message}`,
-      meta
-    );
+    const extra = meta instanceof Error
+      ? { message: meta.message, stack: meta.stack }
+      : meta;
+    process.stdout.write(`${base} ${JSON.stringify(extra)}\n`);
   } else {
-    console[level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'log'](
-      `${prefix} ${message}`
-    );
+    process.stdout.write(`${base}\n`);
   }
 }
 
 const logger = {
-  info: (message, meta) => log('info', message, meta),
-  warn: (message, meta) => log('warn', message, meta),
-  error: (message, meta) => log('error', message, meta),
+  info:  (msg, meta) => log('info',  msg, meta),
+  warn:  (msg, meta) => log('warn',  msg, meta),
+  error: (msg, meta) => log('error', msg, meta),
 };
 
 module.exports = logger;

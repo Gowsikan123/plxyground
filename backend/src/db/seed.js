@@ -1,122 +1,115 @@
 'use strict';
 
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 const pool = require('./client');
 const logger = require('../logger');
-const slugify = require('../utils/slugify');
 
-const ROUNDS = 12;
+const BCRYPT_ROUNDS = 12;
 
 async function seed() {
   logger.info('Seeding database...');
 
   // Admin
-  const adminHash = await bcrypt.hash('Admin1234!', ROUNDS);
+  const adminHash = await bcrypt.hash('Admin@plxyground1', BCRYPT_ROUNDS);
   await pool.query(
-    `INSERT INTO admins (email, passwordhash) VALUES ($1, $2) ON CONFLICT (email) DO NOTHING`,
+    'INSERT INTO admins (email, password_hash) VALUES ($1, $2) ON CONFLICT (email) DO NOTHING',
     ['admin@plxyground.com', adminHash]
   );
 
   // Creators
   const creators = [
-    { username: 'jordanhoops',  displayname: 'Jordan Hoops',   sport: 'Basketball', location: 'London, UK' },
-    { username: 'sprintqueen',  displayname: 'Sprint Queen',   sport: 'Athletics',  location: 'Manchester, UK' },
-    { username: 'boxingkid23',  displayname: 'Boxing Kid',     sport: 'Boxing',     location: 'Birmingham, UK' },
-    { username: 'tennisace',    displayname: 'Tennis Ace',     sport: 'Tennis',     location: 'Bristol, UK' },
-    { username: 'footballfocus',displayname: 'Football Focus', sport: 'Football',   location: 'Leeds, UK' },
+    { name: 'Jordan Miles',   slug: 'jordan-miles',   sport: 'basketball', bio: 'NBA content creator', followers: 24500 },
+    { name: 'Serena Blake',   slug: 'serena-blake',   sport: 'tennis',     bio: 'Tennis tips & drills', followers: 18200 },
+    { name: 'Marcus Webb',    slug: 'marcus-webb',    sport: 'football',   bio: 'Football analyst',    followers: 31000 },
+    { name: 'Priya Sharma',   slug: 'priya-sharma',   sport: 'cricket',    bio: 'Cricket highlights',  followers: 9800  },
+    { name: 'Luca Ferretti',  slug: 'luca-ferretti',  sport: 'athletics',  bio: 'Sprint & track',      followers: 7600  },
   ];
 
   for (const c of creators) {
-    const slug = await slugify(c.username, 'creators');
     const { rows } = await pool.query(
-      `INSERT INTO creators (username, slug, displayname, sport, location)
+      `INSERT INTO creators (name, slug, sport, bio, follower_count)
        VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (username) DO NOTHING
+       ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
        RETURNING id`,
-      [c.username, slug, c.displayname, c.sport, c.location]
+      [c.name, c.slug, c.sport, c.bio, c.followers]
     );
-    if (rows.length > 0) {
-      const passwordHash = await bcrypt.hash('Creator1234!', ROUNDS);
-      await pool.query(
-        `INSERT INTO creator_accounts (creatorid, email, passwordhash)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (email) DO NOTHING`,
-        [rows[0].id, `${c.username}@plxyground.com`, passwordHash]
-      );
-    }
+    const creatorId = rows[0].id;
+    const hash = await bcrypt.hash('Creator@plxy1', BCRYPT_ROUNDS);
+    await pool.query(
+      `INSERT INTO creator_accounts (creator_id, email, password_hash)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (email) DO NOTHING`,
+      [creatorId, `${c.slug}@plxyground.com`, hash]
+    );
   }
 
   // Businesses
   const businesses = [
-    { companyname: 'SportGear Co',    email: 'sportgear@plxyground.com',   industry: 'Apparel',   location: 'London, UK' },
-    { companyname: 'NutriElite',      email: 'nutrielite@plxyground.com',  industry: 'Nutrition', location: 'Manchester, UK' },
-    { companyname: 'MediaSport Ltd',  email: 'mediasport@plxyground.com',  industry: 'Media',     location: 'Birmingham, UK' },
+    { name: 'NikeX',         email: 'nikex@plxyground.com',    website: 'https://nike.com',    bio: 'Sports apparel giant' },
+    { name: 'SportRadar',    email: 'sportradar@plxyground.com', website: 'https://sportradar.com', bio: 'Sports data & analytics' },
+    { name: 'Lucozade Sport', email: 'lucozade@plxyground.com', website: 'https://lucozade.com', bio: 'Sports nutrition brand' },
   ];
 
   for (const b of businesses) {
-    const slug = await slugify(b.companyname, 'businesses');
-    const passwordHash = await bcrypt.hash('Business1234!', ROUNDS);
+    const hash = await bcrypt.hash('Business@plxy1', BCRYPT_ROUNDS);
     await pool.query(
-      `INSERT INTO businesses (email, passwordhash, companyname, slug, industry, location)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO businesses (name, email, password_hash, website, bio)
+       VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (email) DO NOTHING`,
-      [b.email, passwordHash, b.companyname, slug, b.industry, b.location]
+      [b.name, b.email, hash, b.website, b.bio]
     );
   }
 
-  // Content (10 posts for creator id 1 — seeded after creators)
-  const { rows: creatorRows } = await pool.query(`SELECT id FROM creators LIMIT 1`);
-  if (creatorRows.length > 0) {
-    const creatorId = creatorRows[0].id;
-    const posts = [
-      { title: 'My first dunk ever',        body: 'It was an incredible feeling hitting that first dunk.',   sport: 'Basketball' },
-      { title: 'Morning track session',      body: 'Hit a personal best 100m today at 10.8 seconds.',         sport: 'Athletics'  },
-      { title: 'Sparring highlights',        body: 'Three rounds of hard sparring with the team.',             sport: 'Boxing'     },
-      { title: 'Backhand technique drill',   body: 'Working on my backhand consistency this week.',            sport: 'Tennis'     },
-      { title: 'Free kick practice',         body: 'Spent an hour on set pieces — finally nailing them.',      sport: 'Football'   },
-      { title: 'Strength training day',      body: 'Squats, deadlifts, and conditioning circuits.',            sport: 'Basketball' },
-      { title: 'Speed ladder drills',        body: 'Footwork is everything. Drilled it for 45 minutes.',       sport: 'Athletics'  },
-      { title: 'Shadow boxing session',      body: 'Solo session focusing on head movement and combos.',       sport: 'Boxing'     },
-      { title: 'Serve and volley practice',  body: 'Improving my net game — coach says massive improvement.',  sport: 'Tennis'     },
-      { title: 'Pre-season fitness test',    body: 'Passed all benchmarks. Ready for the season.',             sport: 'Football'   },
-    ];
+  // Seed content (10 posts, all published)
+  const { rows: creatorRows } = await pool.query('SELECT id, slug FROM creators LIMIT 5');
+  const contentSeeds = [
+    'Top 5 crossover drills to improve your handle',
+    'Why serve placement matters more than power',
+    'Breaking down the 4-3-3 defensive shape',
+    'How I trained for my first half-marathon',
+    'Cricket batting footwork fundamentals',
+    'Building explosive speed off the blocks',
+    'Mental resilience in high-pressure games',
+    'Recovery tips every athlete needs to know',
+    'Film study: reading a defence before the snap',
+    'Nutrition timing around training sessions',
+  ];
 
-    for (const p of posts) {
-      const { rows: contentRows } = await pool.query(
-        `INSERT INTO content (creatorid, title, body, tags, status)
-         VALUES ($1, $2, $3, $4, 'published')
-         RETURNING id`,
-        [creatorId, p.title, p.body, JSON.stringify([p.sport.toLowerCase()])]
-      );
-      await pool.query(
-        `INSERT INTO moderation_queue (contenttype, contentid, status, reviewedat)
-         VALUES ('creator_content', $1, 'approved', NOW())`,
-        [contentRows[0].id]
-      );
-    }
+  for (let i = 0; i < contentSeeds.length; i++) {
+    const creator = creatorRows[i % creatorRows.length];
+    const { rows: contentRows } = await pool.query(
+      `INSERT INTO content (creator_id, title, body, status)
+       VALUES ($1, $2, $3, 'published')
+       RETURNING id`,
+      [creator.id, contentSeeds[i], `Full breakdown of: ${contentSeeds[i]}. Lorem ipsum placeholder body text.`]
+    );
+    await pool.query(
+      `INSERT INTO moderation_queue (content_type, content_id, status)
+       VALUES ('content', $1, 'approved')`,
+      [contentRows[0].id]
+    );
   }
 
   // Opportunities (5)
-  const opps = [
-    { title: 'Basketball Content Creator Wanted',  description: 'Looking for a UK-based basketball creator to produce weekly highlight reels.',   sport: 'Basketball', budget: '£500/month',  location: 'London, UK',      postedbytype: 'business' },
-    { title: 'Athletics Brand Ambassador',         description: 'Represent our new running shoe line across social media.',                         sport: 'Athletics',  budget: '£300/month',  location: 'Manchester, UK',  postedbytype: 'business' },
-    { title: 'Boxing Coaching Collab',             description: 'Join our youth boxing programme as a featured coach and content creator.',         sport: 'Boxing',     budget: '£200/session', location: 'Birmingham, UK',  postedbytype: 'business' },
-    { title: 'Tennis Reel Creator',                description: 'Create short-form tennis content for our social channels.',                        sport: 'Tennis',     budget: '£150/reel',   location: 'Bristol, UK',     postedbytype: 'business' },
-    { title: 'Football Skills Collab',             description: 'Partner with us on a skills challenge series for YouTube.',                        sport: 'Football',   budget: '£400/video',  location: 'Leeds, UK',       postedbytype: 'business' },
+  const oppSeeds = [
+    { title: 'Basketball Content Deal', desc: 'Seeking NBA-focused creators for sponsored reels.', sport: 'basketball', pay: 1500 },
+    { title: 'Tennis Academy Partner',  desc: 'Promote our academies across the UK.',             sport: 'tennis',     pay: 800  },
+    { title: 'Football Kit Review',     desc: 'Review our new kit range for 2026 season.',        sport: 'football',   pay: 600  },
+    { title: 'Sports Nutrition Brand',  desc: 'Ambassador programme for certified athletes.',     sport: null,         pay: 1200 },
+    { title: 'Athletics Sponsorship',   desc: 'Looking for track athletes with 10k+ followers.',  sport: 'athletics',  pay: 950  },
   ];
 
-  const { rows: bizRows } = await pool.query(`SELECT id FROM businesses LIMIT 1`);
-  if (bizRows.length > 0) {
-    for (const o of opps) {
-      await pool.query(
-        `INSERT INTO opportunities (postedbytype, postedbyid, title, description, sport, location, budget)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [o.postedbytype, bizRows[0].id, o.title, o.description, o.sport, o.location, o.budget]
-      );
-    }
+  const { rows: bizRows } = await pool.query('SELECT id FROM businesses LIMIT 3');
+  for (let i = 0; i < oppSeeds.length; i++) {
+    const biz = bizRows[i % bizRows.length];
+    await pool.query(
+      `INSERT INTO opportunities (posted_by, poster_id, title, description, sport, pay)
+       VALUES ('business', $1, $2, $3, $4, $5)`,
+      [biz.id, oppSeeds[i].title, oppSeeds[i].desc, oppSeeds[i].sport, oppSeeds[i].pay]
+    );
   }
 
-  logger.info('Seed complete');
+  logger.info('Seed complete.');
 }
 
 module.exports = seed;
