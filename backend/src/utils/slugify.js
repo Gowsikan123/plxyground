@@ -1,24 +1,20 @@
 'use strict';
 const pool = require('../db/client');
 
-function baseSlug(str) {
+function toSlug(str) {
   return str
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
+    .replace(/[\s-]+/g, '-');
 }
 
-async function uniqueSlug(str, table, column) {
-  const base = baseSlug(str);
-  const { rows } = await pool.query(
-    `SELECT ${column} FROM ${table} WHERE ${column} = $1`,
-    [base]
-  );
-  if (rows.length === 0) return base;
+async function uniqueSlug(base, table, column = 'slug') {
+  const slug = toSlug(base);
+  const { rows } = await pool.query(`SELECT 1 FROM ${table} WHERE ${column} = $1`, [slug]);
+  if (rows.length === 0) return slug;
   const suffix = Math.floor(1000 + Math.random() * 9000);
-  return `${base}-${suffix}`;
+  return `${slug}-${suffix}`;
 }
 
-module.exports = { baseSlug, uniqueSlug };
+module.exports = { toSlug, uniqueSlug };

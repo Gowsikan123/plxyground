@@ -6,11 +6,11 @@ const logger = require('../logger');
 const pool = new Pool({ connectionString: config.databaseUrl });
 
 pool.on('connect', () => {
-  logger.info('[db] PostgreSQL client connected');
+  logger.info('PostgreSQL pool connected.');
 });
 
 pool.on('error', (err) => {
-  logger.error('[db] Unexpected error on idle client', { message: err.message });
+  logger.error('Unexpected error on idle client', { message: err.message });
 });
 
 module.exports = pool;
