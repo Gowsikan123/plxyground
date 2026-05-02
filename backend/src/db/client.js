@@ -1,37 +1,16 @@
 'use strict';
 const { Pool } = require('pg');
-const { readEnv } = require('../config/env');
-const config = readEnv();
+const config = require('../config');
+const logger = require('../logger');
 
 const pool = new Pool({ connectionString: config.databaseUrl });
 
-// Compatibility wrapper: db.prepare(sql).get/all/run match better-sqlite3 API
-// but are now async and use $1,$2... positional params (Postgres style)
-const db = {
-  pool,
-  prepare(sql) {
-    return {
-      async get(...params) {
-        const r = await pool.query(sql, params.length ? params : undefined);
-        return r.rows[0] || null;
-      },
-      async all(...params) {
-        const r = await pool.query(sql, params.length ? params : undefined);
-        return r.rows;
-      },
-      async run(...params) {
-        const r = await pool.query(sql, params.length ? params : undefined);
-        const lastInsertRowid = r.rows[0]?.id ?? null;
-        return { lastInsertRowid, changes: r.rowCount };
-      },
-    };
-  },
-  async exec(sql) {
-    await pool.query(sql);
-  },
-  async query(sql, params) {
-    return pool.query(sql, params);
-  },
-};
+pool.on('connect', () => {
+  logger.info('[db] PostgreSQL client connected');
+});
 
-module.exports = db;
+pool.on('error', (err) => {
+  logger.error('[db] Unexpected error on idle client', { message: err.message });
+});
+
+module.exports = pool;

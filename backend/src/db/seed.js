@@ -1,120 +1,152 @@
 'use strict';
+require('dotenv').config();
 const bcrypt = require('bcryptjs');
-const db = require('./client');
+const pool = require('./client');
+const logger = require('../logger');
 
-function slugify(str) {
-  return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-}
+async function run() {
+  logger.info('[seed] Starting seed...');
 
-async function seed() {
-  const hash = (pw) => bcrypt.hashSync(pw, 12);
+  const adminHash = await bcrypt.hash('Internet2026@', 12);
+  await pool.query(
+    'INSERT INTO admins (email, password_hash) VALUES ($1, $2) ON CONFLICT (email) DO NOTHING',
+    ['admin@plxyground.local', adminHash]
+  );
 
-  // Admin
-  await db.prepare(`INSERT INTO admins (email, password_hash) VALUES ($1, $2) ON CONFLICT (email) DO NOTHING`)
-    .run('admin@plxyground.local', hash('Internet2026@'));
+  const userHash = await bcrypt.hash('Password1!', 12);
 
-  // Creators
-  const creators = [
-    { username: 'marcus_hoops', display_name: 'Marcus Hoops', sport: 'Basketball', location: 'London, UK', bio: 'Ballin since day one. NBA aspirations.', email: 'marcus@test.com' },
-    { username: 'swift_feet', display_name: 'Swift Feet', sport: 'Football', location: 'Manchester, UK', bio: 'Football content, skills & drills.', email: 'swift@test.com' },
-    { username: 'ace_tennislife', display_name: 'Ace TennisLife', sport: 'Tennis', location: 'Birmingham, UK', bio: 'Breaking down serves and volleys.', email: 'ace@test.com' },
-    { username: 'sprint_king', display_name: 'Sprint King', sport: 'Athletics', location: 'Glasgow, UK', bio: '100m personal best: 10.4s.', email: 'sprint@test.com' },
-    { username: 'knockout_clips', display_name: 'Knockout Clips', sport: 'Boxing', location: 'Liverpool, UK', bio: 'Ring life. Training content daily.', email: 'knockout@test.com' },
+  const creatorsData = [
+    { username: 'jayden_hoops', display_name: 'Jayden Hoops', sport: 'Basketball', location: 'London, UK', bio: 'Point guard turning heads in the EBL. Living for the game.' },
+    { username: 'tomfs11', display_name: 'Tom Freeman', sport: 'Football', location: 'Manchester, UK', bio: 'Semi-pro winger. FA Youth Cup alumni. Chasing the dream.' },
+    { username: 'serena_ace', display_name: 'Serena Ace', sport: 'Tennis', location: 'Birmingham, UK', bio: 'LTA-rated player. Training full-time. Racket in hand since age 6.' },
+    { username: 'sprint_king_marcus', display_name: 'Marcus Adeyemi', sport: 'Athletics', location: 'Bristol, UK', bio: '100m specialist. PB 10.41. Targeting British Championships.' },
+    { username: 'dexter_boxing', display_name: 'Dexter Cole', sport: 'Boxing', location: 'Leeds, UK', bio: 'Super-featherweight. 12-2 amateur record. Turning pro next year.' },
   ];
 
   const creatorIds = [];
-  for (const c of creators) {
-    const slug = slugify(c.username);
-    const follower_count = Math.floor(Math.random() * 5000) + 100;
-    const existing = await db.prepare('SELECT id FROM creators WHERE username = $1').get(c.username);
-    let creatorId;
-    if (!existing) {
-      const result = await db.prepare(`INSERT INTO creators (username, slug, display_name, bio, sport, location, follower_count) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`)
-        .run(c.username, slug, c.display_name, c.bio, c.sport, c.location, follower_count);
-      creatorId = result.lastInsertRowid;
-    } else {
-      creatorId = existing.id;
-    }
-    await db.prepare(`INSERT INTO creator_accounts (creator_id, email, password_hash, is_email_verified) VALUES ($1, $2, $3, 1) ON CONFLICT (email) DO NOTHING`)
-      .run(creatorId, c.email, hash('Test1234!'));
+  for (const c of creatorsData) {
+    const slug = c.username.replace(/_/g, '-');
+    const res = await pool.query(
+      `INSERT INTO creators (username, slug, display_name, bio, sport, location)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (username) DO UPDATE SET display_name = EXCLUDED.display_name
+       RETURNING id`,
+      [c.username, slug, c.display_name, c.bio, c.sport, c.location]
+    );
+    const creatorId = res.rows[0].id;
     creatorIds.push(creatorId);
+    const email = `${c.username}@plxyground.local`;
+    await pool.query(
+      `INSERT INTO creator_accounts (creator_id, email, password_hash)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (email) DO NOTHING`,
+      [creatorId, email, userHash]
+    );
   }
 
-  // Businesses
-  const businesses = [
-    { email: 'nike@test.com', company_name: 'NikeUK Partnerships', industry: 'Sportswear', website: 'https://nike.com', location: 'London, UK', bio: 'Partnering with the next generation of athletes.' },
-    { email: 'redbull@test.com', company_name: 'Red Bull Media', industry: 'Energy Drinks', website: 'https://redbull.com', location: 'London, UK', bio: 'We give wings to athletes and creators.' },
-    { email: 'gymshark@test.com', company_name: 'Gymshark', industry: 'Fitness Apparel', website: 'https://gymshark.com', location: 'Birmingham, UK', bio: 'Empowering athletes worldwide.' },
+  const businessesData = [
+    { company_name: 'ProSport Gear', email: 'hello@prosportgear.local', industry: 'Sports', location: 'London, UK', bio: 'The UK\'s fastest-growing sports equipment brand.', website: 'https://prosportgear.local' },
+    { company_name: 'Apex Apparel', email: 'hello@apexapparel.local', industry: 'Apparel', location: 'Manchester, UK', bio: 'Performance wear built for elite athletes.', website: 'https://apexapparel.local' },
+    { company_name: 'Volt Energy', email: 'hello@voltenergy.local', industry: 'Nutrition', location: 'Bristol, UK', bio: 'Clean energy drinks for serious athletes.', website: 'https://voltenergy.local' },
   ];
 
-  const bizIds = [];
-  for (const b of businesses) {
-    const slug = slugify(b.company_name);
-    const existing = await db.prepare('SELECT id FROM businesses WHERE email = $1').get(b.email);
-    let bizId;
-    if (!existing) {
-      const result = await db.prepare(`INSERT INTO businesses (email, password_hash, company_name, slug, bio, industry, website, location, is_email_verified) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1) RETURNING id`)
-        .run(b.email, hash('Test1234!'), b.company_name, slug, b.bio, b.industry, b.website, b.location);
-      bizId = result.lastInsertRowid;
-    } else {
-      bizId = existing.id;
-    }
-    bizIds.push(bizId);
+  const businessIds = [];
+  for (const b of businessesData) {
+    const slug = b.company_name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    const res = await pool.query(
+      `INSERT INTO businesses (email, password_hash, company_name, slug, bio, industry, website, location)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (email) DO UPDATE SET company_name = EXCLUDED.company_name
+       RETURNING id`,
+      [b.email, userHash, b.company_name, slug, b.bio, b.industry, b.website, b.location]
+    );
+    businessIds.push(res.rows[0].id);
   }
 
-  // Content
   const contentItems = [
-    { title: 'My top 5 dribble moves', body: 'Breaking down each move with slow-mo clips.', tags: '["basketball","skills"]', status: 'published' },
-    { title: 'Pre-season fitness routine', body: 'Full week breakdown of what I do to stay sharp.', tags: '["fitness","training"]', status: 'published' },
-    { title: 'How I got scouted', body: 'The story behind my first pro trial.', tags: '["motivation"]', status: 'published' },
-    { title: 'Best training drills for beginners', body: 'Simple drills you can do anywhere.', tags: '["drills","beginner"]', status: 'published' },
-    { title: 'Game day nutrition', body: 'What I eat on matchday and why.', tags: '["nutrition"]', status: 'published' },
-    { title: 'Interview: my coach speaks', body: 'Exclusive chat with my head coach.', tags: '["interview"]', status: 'published' },
-    { title: 'Recovery tips after a hard session', body: 'Ice baths, stretching, and sleep.', tags: '["recovery"]', status: 'published' },
-    { title: 'Mental game is everything', body: 'How I stay focused under pressure.', tags: '["mindset"]', status: 'published' },
-    { title: 'New kit reveal 2026', body: 'Unboxing my new season kit — LINK IN BIO', tags: '["gear"]', status: 'pending' },
-    { title: 'Behind the scenes at Wembley', body: 'Never seen footage from training day.', tags: '["behindthescenes"]', status: 'pending' },
+    { idx: 0, title: 'My Journey to the EBL', body: 'Three years ago I was playing street ball in Hackney. Now I suit up for the English Basketball League. Here\'s the full story.', status: 'published', tags: '["basketball","journey"]' },
+    { idx: 0, title: 'Post-Game Recovery Routine', body: 'Ice baths, stretching, and sleep. The boring stuff nobody talks about.', status: 'published', tags: '["recovery","fitness"]' },
+    { idx: 1, title: 'Surviving a Pro Trial', body: 'I had a 3-day trial at a Championship club. Here\'s what it was really like.', status: 'published', tags: '["football","trial"]' },
+    { idx: 1, title: 'Speed Work in Pre-Season', body: 'The drills that added 2km/h to my sprint. Resistance bands and sprint ladders — full session breakdown.', status: 'published', tags: '["training","speed"]' },
+    { idx: 2, title: 'Serving Under Pressure', body: 'My mental checklist before every serve. Breathe. Bounce. See the ball.', status: 'published', tags: '["tennis","mindset"]' },
+    { idx: 2, title: 'Breaking Down My Backhand', body: 'Video analysis of my backhand improvement over 12 months. Coach approved.', status: 'published', tags: '["tennis","technique"]' },
+    { idx: 3, title: 'How I Got My 100m PB', body: 'Race breakdown: start, drive phase, top speed, and the lean at the line.', status: 'published', tags: '["athletics","sprinting"]' },
+    { idx: 4, title: 'Training Camp: Week 1', body: 'Six sessions in five days. Body is broken. But I\'m grinning.', status: 'pending', tags: '["boxing","training"]' },
+    { idx: 3, title: 'Nutrition for Sprint Athletes', body: 'What I eat in a day during peak training block. High carb, high protein.', status: 'pending', tags: '["nutrition","athletics"]' },
+    { idx: 1, title: 'Injury Recovery: ACL to Comeback', body: 'Six months out. The mental battle was harder than the physical one.', status: 'pending', tags: '["football","injury"]' },
   ];
 
-  for (let i = 0; i < contentItems.length; i++) {
-    const c = contentItems[i];
-    const creatorId = creatorIds[i % creatorIds.length];
-    const result = await db.prepare(`INSERT INTO content (creator_id, title, body, tags, status) VALUES ($1, $2, $3, $4, $5) RETURNING id`)
-      .run(creatorId, c.title, c.body, c.tags, c.status);
-    await db.prepare(`INSERT INTO moderation_queue (content_type, content_id, status) VALUES ('creator_content', $1, $2)`)
-      .run(result.lastInsertRowid, c.status === 'published' ? 'approved' : 'pending');
+  for (const item of contentItems) {
+    const cId = creatorIds[item.idx];
+    const res = await pool.query(
+      `INSERT INTO content (creator_id, title, body, status, tags)
+       VALUES ($1, $2, $3, $4, $5::jsonb)
+       RETURNING id`,
+      [cId, item.title, item.body, item.status, item.tags]
+    );
+    if (item.status === 'pending') {
+      await pool.query(
+        `INSERT INTO moderation_queue (content_type, content_id) VALUES ('creator_content', $1)`,
+        [res.rows[0].id]
+      );
+    }
   }
 
-  // Business content
-  const bizContent = [
-    { title: 'Partner with NikeUK this season', body: 'We are looking for grassroots athletes.', budget_range: '£500-£2000', target_sport: 'All' },
-    { title: 'Red Bull Creator Challenge 2026', body: 'Show us your best clip and win.', budget_range: '£1000-£5000', target_sport: 'Athletics' },
-    { title: 'Gymshark ambassador programme', body: 'Apply to be part of our 2026 team.', budget_range: '£200-£800', target_sport: 'Fitness' },
+  const businessContent = [
+    { idx: 0, title: 'Seeking Basketball Creators for Product Launch', body: 'We are launching a new basketball training kit and need authentic creators to review it.', budget_range: '\u00a3500-\u00a32k', target_sport: 'Basketball', status: 'published' },
+    { idx: 1, title: 'Athletes Wanted for Spring/Summer Campaign', body: 'Apex Apparel is casting for our Spring/Summer 2026 campaign. All sports considered.', budget_range: '\u00a32k-\u00a310k', target_sport: null, status: 'published' },
+    { idx: 2, title: 'Volt Energy — Brand Ambassador Programme', body: 'We are building our ambassador roster. Looking for high-performance athletes in any discipline.', budget_range: '\u00a3500-\u00a32k', target_sport: null, status: 'pending' },
   ];
 
-  for (let i = 0; i < bizContent.length; i++) {
-    const bc = bizContent[i];
-    const bizId = bizIds[i % bizIds.length];
-    const result = await db.prepare(`INSERT INTO business_content (business_id, title, body, budget_range, target_sport, status) VALUES ($1, $2, $3, $4, $5, 'pending') RETURNING id`)
-      .run(bizId, bc.title, bc.body, bc.budget_range, bc.target_sport);
-    await db.prepare(`INSERT INTO moderation_queue (content_type, content_id, status) VALUES ('business_content', $1, 'pending')`)
-      .run(result.lastInsertRowid);
+  for (const bc of businessContent) {
+    const bId = businessIds[bc.idx];
+    const res = await pool.query(
+      `INSERT INTO business_content (business_id, title, body, budget_range, target_sport, status)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id`,
+      [bId, bc.title, bc.body, bc.budget_range, bc.target_sport, bc.status]
+    );
+    if (bc.status === 'pending') {
+      await pool.query(
+        `INSERT INTO moderation_queue (content_type, content_id) VALUES ('business_content', $1)`,
+        [res.rows[0].id]
+      );
+    }
   }
 
-  // Opportunities
   const opps = [
-    { type: 'creator', title: 'Looking for football collab', description: 'Want to film skills content with another creator in London.', sport: 'Football', location: 'London', budget: 'Unpaid/exposure' },
-    { type: 'business', title: 'Brand ambassador — NikeUK', description: 'Seeking 3 creators to rep our new collection.', sport: 'All', location: 'Remote', budget: '£1500' },
-    { type: 'creator', title: 'Tennis doubles partner for YouTube', description: 'Filming doubles match for a YouTube series.', sport: 'Tennis', location: 'Birmingham', budget: 'Revenue share' },
-    { type: 'business', title: 'Red Bull filming crew', description: 'We need a videographer for our October event.', sport: 'Athletics', location: 'Manchester', budget: '£3000' },
-    { type: 'business', title: 'Gymshark content week', description: 'Join us for a content creation week at our HQ.', sport: 'Fitness', location: 'Birmingham', budget: '£500 + kit' },
+    { type: 'business', idx: 0, title: 'Brand Ambassador — Basketball', description: 'ProSport Gear is looking for a basketball creator to become the face of our new training range. Must have 1k+ followers.', sport: 'Basketball', location: 'London, UK', budget: '\u00a3300/month', deadline: '2026-06-30' },
+    { type: 'business', idx: 1, title: 'Spring Campaign Model', description: 'Apex Apparel needs athletes for a 2-day photo shoot in Manchester. All sports welcome.', sport: null, location: 'Manchester, UK', budget: '\u00a3500 flat fee', deadline: '2026-05-15' },
+    { type: 'creator', idx: 0, title: 'Looking for Training Partner — Basketball London', description: 'Point guard looking for regular training partner. Sessions 3x per week in Hackney.', sport: 'Basketball', location: 'London, UK', budget: null, deadline: null },
+    { type: 'creator', idx: 2, title: 'Tennis Hitting Partner Wanted', description: 'LTA-rated player seeking consistent hitting partner at Edgbaston Priory or nearby club.', sport: 'Tennis', location: 'Birmingham, UK', budget: null, deadline: null },
+    { type: 'business', idx: 2, title: 'Volt Energy — Content Creator Partnership', description: 'We want authentic athletes to document their training journeys while using Volt Energy products.', sport: null, location: 'Remote/UK', budget: '\u00a3150/month + product', deadline: '2026-07-01' },
   ];
 
   for (const opp of opps) {
-    const posted_by_id = opp.type === 'creator' ? creatorIds[0] : bizIds[0];
-    await db.prepare(`INSERT INTO opportunities (posted_by_type, posted_by_id, title, description, sport, location, budget) VALUES ($1, $2, $3, $4, $5, $6, $7)`)
-      .run(opp.type, posted_by_id, opp.title, opp.description, opp.sport, opp.location, opp.budget);
+    let postedById;
+    if (opp.type === 'business') {
+      postedById = businessIds[opp.idx];
+    } else {
+      postedById = creatorIds[opp.idx];
+    }
+    await pool.query(
+      `INSERT INTO opportunities (posted_by_type, posted_by_id, title, description, sport, location, budget, deadline)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [opp.type, postedById, opp.title, opp.description, opp.sport, opp.location, opp.budget, opp.deadline]
+    );
   }
+
+  logger.info('[seed] Seed complete.');
 }
 
-module.exports = seed;
+// Allow running directly: node src/db/seed.js
+if (require.main === module) {
+  run()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      logger.error('[seed] Seed failed', { message: err.message });
+      process.exit(1);
+    });
+}
+
+module.exports = { run };
