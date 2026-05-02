@@ -21,14 +21,14 @@ router.post('/signup', authLimiter, [
     const { email, password, company_name, industry, website, location } = req.body;
     const slug = slugify(company_name);
     const hash = await bcrypt.hash(password, 12);
-    db.prepare(
-      `INSERT INTO businesses (email, password_hash, company_name, slug, industry, website, location) VALUES (?, ?, ?, ?, ?, ?, ?)`
+    await db.prepare(
+      `INSERT INTO businesses (email, password_hash, company_name, slug, industry, website, location) VALUES ($1, $2, $3, $4, $5, $6, $7)`
     ).run(email, hash, company_name, slug, industry || null, website || null, location || null);
-    const biz = db.prepare('SELECT * FROM businesses WHERE email = ?').get(email);
+    const biz = await db.prepare('SELECT * FROM businesses WHERE email = $1').get(email);
     const token = signToken({ sub: biz.id, type: 'business' });
     return res.status(201).json({ success: true, data: { token, user: biz } });
   } catch (err) {
-    if (err.message && (err.message.includes('UNIQUE') || err.message.includes('unique'))) {
+    if (err.code === '23505' || (err.message && (err.message.includes('UNIQUE') || err.message.includes('unique')))) {
       return res.status(409).json({ success: false, error: 'Email already registered' });
     }
     return res.status(500).json({ success: false, error: 'Server error' });
@@ -42,12 +42,12 @@ router.post('/login', authLimiter, [
 ], validate, async (req, res) => {
   try {
     const { email, password } = req.body;
-    const biz = db.prepare('SELECT * FROM businesses WHERE email = ?').get(email);
+    const biz = await db.prepare('SELECT * FROM businesses WHERE email = $1').get(email);
     if (!biz) return res.status(401).json({ success: false, error: 'Invalid credentials' });
     if (biz.is_suspended) return res.status(403).json({ success: false, error: 'Account suspended' });
     const match = await bcrypt.compare(password, biz.password_hash);
     if (!match) return res.status(401).json({ success: false, error: 'Invalid credentials' });
-    db.prepare('UPDATE businesses SET last_login = CURRENT_TIMESTAMP WHERE id = ?').run(biz.id);
+    await db.prepare('UPDATE businesses SET last_login = NOW() WHERE id = $1').run(biz.id);
     const token = signToken({ sub: biz.id, type: 'business' });
     const { password_hash, ...safeBiz } = biz;
     return res.json({ success: true, data: { token, user: safeBiz } });
@@ -57,9 +57,9 @@ router.post('/login', authLimiter, [
 });
 
 // GET /api/business/auth/me
-router.get('/me', requireAuth, (req, res) => {
+router.get('/me', requireAuth, async (req, res) => {
   if (req.userType !== 'business') return res.status(403).json({ success: false, error: 'Forbidden' });
-  const biz = db.prepare('SELECT id, email, company_name, slug, bio, logo_url, industry, website, location, is_suspended, is_email_verified, last_login, created_at FROM businesses WHERE id = ?').get(req.user.sub);
+  const biz = await db.prepare('SELECT id, email, company_name, slug, bio, logo_url, industry, website, location, is_suspended, is_email_verified, last_login, created_at FROM businesses WHERE id = $1').get(req.user.sub);
   if (!biz) return res.status(404).json({ success: false, error: 'Not found' });
   return res.json({ success: true, data: biz });
 });

@@ -1,11 +1,11 @@
 const express = require('express');
-const db = require('../../db/setup');
-const { verifyToken, requireAdmin } = require('../../middleware/auth');
+const db = require('../../db/client');
+const { requireAuth, requireAdmin } = require('../../middleware/auth');
 
 const router = express.Router();
-router.use(verifyToken, requireAdmin);
+router.use(requireAuth, requireAdmin);
 
-// GET /api/admin/alerts - recent activity
+// GET /api/admin/alerts
 router.get('/', async (req, res) => {
   const newContent = await db.prepare(`
     SELECT 'content' as type, title as name, created_at

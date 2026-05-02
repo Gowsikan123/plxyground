@@ -6,11 +6,11 @@ function slugify(str) {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
-function seed() {
+async function seed() {
   const hash = (pw) => bcrypt.hashSync(pw, 12);
 
   // Admin
-  db.prepare(`INSERT OR IGNORE INTO admins (email, password_hash) VALUES (?, ?)`)
+  await db.prepare(`INSERT INTO admins (email, password_hash) VALUES ($1, $2) ON CONFLICT (email) DO NOTHING`)
     .run('admin@plxyground.local', hash('Internet2026@'));
 
   // Creators
@@ -22,20 +22,22 @@ function seed() {
     { username: 'knockout_clips', display_name: 'Knockout Clips', sport: 'Boxing', location: 'Liverpool, UK', bio: 'Ring life. Training content daily.', email: 'knockout@test.com' },
   ];
 
+  const creatorIds = [];
   for (const c of creators) {
     const slug = slugify(c.username);
     const follower_count = Math.floor(Math.random() * 5000) + 100;
+    const existing = await db.prepare('SELECT id FROM creators WHERE username = $1').get(c.username);
     let creatorId;
-    const existing = db.prepare('SELECT id FROM creators WHERE username = ?').get(c.username);
     if (!existing) {
-      const result = db.prepare(`INSERT INTO creators (username, slug, display_name, bio, sport, location, follower_count) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      const result = await db.prepare(`INSERT INTO creators (username, slug, display_name, bio, sport, location, follower_count) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`)
         .run(c.username, slug, c.display_name, c.bio, c.sport, c.location, follower_count);
       creatorId = result.lastInsertRowid;
     } else {
       creatorId = existing.id;
     }
-    db.prepare(`INSERT OR IGNORE INTO creator_accounts (creator_id, email, password_hash, is_email_verified) VALUES (?, ?, ?, 1)`)
+    await db.prepare(`INSERT INTO creator_accounts (creator_id, email, password_hash, is_email_verified) VALUES ($1, $2, $3, 1) ON CONFLICT (email) DO NOTHING`)
       .run(creatorId, c.email, hash('Test1234!'));
+    creatorIds.push(creatorId);
   }
 
   // Businesses
@@ -45,14 +47,22 @@ function seed() {
     { email: 'gymshark@test.com', company_name: 'Gymshark', industry: 'Fitness Apparel', website: 'https://gymshark.com', location: 'Birmingham, UK', bio: 'Empowering athletes worldwide.' },
   ];
 
+  const bizIds = [];
   for (const b of businesses) {
     const slug = slugify(b.company_name);
-    db.prepare(`INSERT OR IGNORE INTO businesses (email, password_hash, company_name, slug, bio, industry, website, location, is_email_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`)
-      .run(b.email, hash('Test1234!'), b.company_name, slug, b.bio, b.industry, b.website, b.location);
+    const existing = await db.prepare('SELECT id FROM businesses WHERE email = $1').get(b.email);
+    let bizId;
+    if (!existing) {
+      const result = await db.prepare(`INSERT INTO businesses (email, password_hash, company_name, slug, bio, industry, website, location, is_email_verified) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1) RETURNING id`)
+        .run(b.email, hash('Test1234!'), b.company_name, slug, b.bio, b.industry, b.website, b.location);
+      bizId = result.lastInsertRowid;
+    } else {
+      bizId = existing.id;
+    }
+    bizIds.push(bizId);
   }
 
   // Content
-  const creatorRows = db.prepare('SELECT id FROM creators').all();
   const contentItems = [
     { title: 'My top 5 dribble moves', body: 'Breaking down each move with slow-mo clips.', tags: '["basketball","skills"]', status: 'published' },
     { title: 'Pre-season fitness routine', body: 'Full week breakdown of what I do to stay sharp.', tags: '["fitness","training"]', status: 'published' },
@@ -68,15 +78,14 @@ function seed() {
 
   for (let i = 0; i < contentItems.length; i++) {
     const c = contentItems[i];
-    const creator = creatorRows[i % creatorRows.length];
-    const result = db.prepare(`INSERT INTO content (creator_id, title, body, tags, status) VALUES (?, ?, ?, ?, ?)`)
-      .run(creator.id, c.title, c.body, c.tags, c.status);
-    db.prepare(`INSERT INTO moderation_queue (content_type, content_id, status) VALUES ('creator_content', ?, ?)`)
+    const creatorId = creatorIds[i % creatorIds.length];
+    const result = await db.prepare(`INSERT INTO content (creator_id, title, body, tags, status) VALUES ($1, $2, $3, $4, $5) RETURNING id`)
+      .run(creatorId, c.title, c.body, c.tags, c.status);
+    await db.prepare(`INSERT INTO moderation_queue (content_type, content_id, status) VALUES ('creator_content', $1, $2)`)
       .run(result.lastInsertRowid, c.status === 'published' ? 'approved' : 'pending');
   }
 
   // Business content
-  const bizRows = db.prepare('SELECT id FROM businesses').all();
   const bizContent = [
     { title: 'Partner with NikeUK this season', body: 'We are looking for grassroots athletes.', budget_range: '£500-£2000', target_sport: 'All' },
     { title: 'Red Bull Creator Challenge 2026', body: 'Show us your best clip and win.', budget_range: '£1000-£5000', target_sport: 'Athletics' },
@@ -85,10 +94,10 @@ function seed() {
 
   for (let i = 0; i < bizContent.length; i++) {
     const bc = bizContent[i];
-    const biz = bizRows[i % bizRows.length];
-    const result = db.prepare(`INSERT INTO business_content (business_id, title, body, budget_range, target_sport, status) VALUES (?, ?, ?, ?, ?, 'pending')`)
-      .run(biz.id, bc.title, bc.body, bc.budget_range, bc.target_sport);
-    db.prepare(`INSERT INTO moderation_queue (content_type, content_id, status) VALUES ('business_content', ?, 'pending')`)
+    const bizId = bizIds[i % bizIds.length];
+    const result = await db.prepare(`INSERT INTO business_content (business_id, title, body, budget_range, target_sport, status) VALUES ($1, $2, $3, $4, $5, 'pending') RETURNING id`)
+      .run(bizId, bc.title, bc.body, bc.budget_range, bc.target_sport);
+    await db.prepare(`INSERT INTO moderation_queue (content_type, content_id, status) VALUES ('business_content', $1, 'pending')`)
       .run(result.lastInsertRowid);
   }
 
@@ -101,13 +110,10 @@ function seed() {
     { type: 'business', title: 'Gymshark content week', description: 'Join us for a content creation week at our HQ.', sport: 'Fitness', location: 'Birmingham', budget: '£500 + kit' },
   ];
 
-  const firstCreatorId = creatorRows[0]?.id;
-  const firstBizId = bizRows[0]?.id;
-
   for (const opp of opps) {
-    const posted_by_id = opp.type === 'creator' ? firstCreatorId : firstBizId;
-    db.prepare(`INSERT INTO opportunities (posted_by_type, posted_by_id, title, description, sport, location, budget) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-      .run(opp.type === 'creator' ? 'creator' : 'business', posted_by_id, opp.title, opp.description, opp.sport, opp.location, opp.budget);
+    const posted_by_id = opp.type === 'creator' ? creatorIds[0] : bizIds[0];
+    await db.prepare(`INSERT INTO opportunities (posted_by_type, posted_by_id, title, description, sport, location, budget) VALUES ($1, $2, $3, $4, $5, $6, $7)`)
+      .run(opp.type, posted_by_id, opp.title, opp.description, opp.sport, opp.location, opp.budget);
   }
 }
 

@@ -1,11 +1,11 @@
 const express = require('express');
-const db = require('../../db/setup');
-const { verifyToken, requireAdmin } = require('../../middleware/auth');
+const db = require('../../db/client');
+const { requireAuth, requireAdmin } = require('../../middleware/auth');
 
 const router = express.Router();
-router.use(verifyToken, requireAdmin);
+router.use(requireAuth, requireAdmin);
 
-// GET /api/admin/audit - list audit log
+// GET /api/admin/audit
 router.get('/', async (req, res) => {
   const { limit = 50, offset = 0 } = req.query;
   const lim = Math.min(Math.max(parseInt(limit), 1), 2000);
@@ -14,17 +14,15 @@ router.get('/', async (req, res) => {
   const rows = await db.prepare(`
     SELECT * FROM audit_log
     ORDER BY created_at DESC
-    LIMIT ? OFFSET ?
+    LIMIT $1 OFFSET $2
   `).all(lim, off);
 
   res.json({ data: rows, limit: lim, offset: off });
 });
 
-// GET /api/admin/audit/export - export audit log as CSV
+// GET /api/admin/audit/export
 router.get('/export', async (req, res) => {
-  const rows = await db.prepare(`
-    SELECT * FROM audit_log ORDER BY created_at DESC
-  `).all();
+  const rows = await db.prepare(`SELECT * FROM audit_log ORDER BY created_at DESC`).all();
 
   const headers = ['id', 'action_type', 'actor', 'target', 'before_snapshot', 'after_snapshot', 'reason', 'metadata', 'created_at'];
 

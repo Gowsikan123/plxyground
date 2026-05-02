@@ -1,10 +1,10 @@
 const express = require('express');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const db = require('../../db/setup');
+const db = require('../../db/client');
+const { requireAuth, requireAdmin } = require('../../middleware/auth');
 
 const router = express.Router();
-const { verifyToken, requireAdmin } = require('../../middleware/auth');
 
 // POST /api/admin/auth/login
 router.post('/login', async (req, res) => {
@@ -13,12 +13,7 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'Email and password required' });
   }
 
-  const activeAdminsCount = (await db.prepare('SELECT COUNT(*) as count FROM admins WHERE is_active = 1').get()).count;
-  if (activeAdminsCount !== 1) {
-    return res.status(500).json({ error: 'Admin policy violated: exactly one active admin must exist' });
-  }
-
-  const admin = await db.prepare('SELECT * FROM admins WHERE email = ? AND is_active = 1').get(email);
+  const admin = await db.prepare('SELECT * FROM admins WHERE email = $1').get(email);
   if (!admin) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
@@ -29,45 +24,35 @@ router.post('/login', async (req, res) => {
   }
 
   const token = jwt.sign(
-    { id: admin.id, email: admin.email, role: 'ADMIN' },
+    { id: admin.id, email: admin.email, type: 'admin' },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN }
+    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
 
   res.json({
     token,
-    user: {
-      id: admin.id,
-      email: admin.email,
-      role: 'ADMIN'
-    }
+    user: { id: admin.id, email: admin.email, role: 'ADMIN' }
   });
 });
 
 // POST /api/admin/auth/change-password
-router.post('/change-password', verifyToken, requireAdmin, async (req, res) => {
+router.post('/change-password', requireAuth, requireAdmin, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
   const email = req.user.email;
   if (!email || !currentPassword || !newPassword) {
     return res.status(400).json({ error: 'email, currentPassword, and newPassword are required' });
   }
 
-  const admin = await db.prepare('SELECT * FROM admins WHERE email = ?').get(email);
-  if (!admin) {
-    return res.status(401).json({ error: 'Invalid credentials' });
-  }
+  const admin = await db.prepare('SELECT * FROM admins WHERE email = $1').get(email);
+  if (!admin) return res.status(401).json({ error: 'Invalid credentials' });
 
   const valid = await bcrypt.compare(currentPassword, admin.password_hash);
-  if (!valid) {
-    return res.status(401).json({ error: 'Current password is incorrect' });
-  }
+  if (!valid) return res.status(401).json({ error: 'Current password is incorrect' });
 
-  if (newPassword.length < 8) {
-    return res.status(400).json({ error: 'New password must be at least 8 characters' });
-  }
+  if (newPassword.length < 8) return res.status(400).json({ error: 'New password must be at least 8 characters' });
 
   const hash = await bcrypt.hash(newPassword, 10);
-  await db.prepare(`UPDATE admins SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(hash, admin.id);
+  await db.prepare(`UPDATE admins SET password_hash = $1 WHERE id = $2`).run(hash, admin.id);
 
   res.json({ message: 'Password changed successfully' });
 });

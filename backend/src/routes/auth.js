@@ -23,20 +23,20 @@ router.post('/signup', authLimiter, [
     const slug = slugify(username);
     const hash = await bcrypt.hash(password, 12);
 
-    const creatorResult = db.prepare(
-      `INSERT INTO creators (username, slug, display_name, sport, location) VALUES (?, ?, ?, ?, ?)`
+    const creatorResult = await db.prepare(
+      `INSERT INTO creators (username, slug, display_name, sport, location) VALUES ($1, $2, $3, $4, $5) RETURNING id`
     ).run(username, slug, display_name, sport || null, location || null);
 
     const creatorId = creatorResult.lastInsertRowid;
-    db.prepare(
-      `INSERT INTO creator_accounts (creator_id, email, password_hash) VALUES (?, ?, ?)`
+    await db.prepare(
+      `INSERT INTO creator_accounts (creator_id, email, password_hash) VALUES ($1, $2, $3)`
     ).run(creatorId, email, hash);
 
     const token = signToken({ sub: creatorId, type: 'creator' });
-    const creator = db.prepare('SELECT * FROM creators WHERE id = ?').get(creatorId);
+    const creator = await db.prepare('SELECT * FROM creators WHERE id = $1').get(creatorId);
     return res.status(201).json({ success: true, data: { token, user: creator } });
   } catch (err) {
-    if (err.message && (err.message.includes('UNIQUE') || err.message.includes('unique'))) {
+    if (err.code === '23505' || (err.message && (err.message.includes('UNIQUE') || err.message.includes('unique')))) {
       return res.status(409).json({ success: false, error: 'Email or username already taken' });
     }
     return res.status(500).json({ success: false, error: 'Server error' });
@@ -50,13 +50,13 @@ router.post('/login', authLimiter, [
 ], validate, async (req, res) => {
   try {
     const { email, password } = req.body;
-    const account = db.prepare('SELECT * FROM creator_accounts WHERE email = ?').get(email);
+    const account = await db.prepare('SELECT * FROM creator_accounts WHERE email = $1').get(email);
     if (!account) return res.status(401).json({ success: false, error: 'Invalid credentials' });
     if (account.is_suspended) return res.status(403).json({ success: false, error: 'Account suspended' });
     const match = await bcrypt.compare(password, account.password_hash);
     if (!match) return res.status(401).json({ success: false, error: 'Invalid credentials' });
-    db.prepare('UPDATE creator_accounts SET last_login = CURRENT_TIMESTAMP WHERE id = ?').run(account.id);
-    const creator = db.prepare('SELECT * FROM creators WHERE id = ?').get(account.creator_id);
+    await db.prepare('UPDATE creator_accounts SET last_login = NOW() WHERE id = $1').run(account.id);
+    const creator = await db.prepare('SELECT * FROM creators WHERE id = $1').get(account.creator_id);
     const token = signToken({ sub: account.creator_id, type: 'creator' });
     return res.json({ success: true, data: { token, user: creator } });
   } catch (err) {
@@ -65,9 +65,9 @@ router.post('/login', authLimiter, [
 });
 
 // GET /api/auth/me
-router.get('/me', requireAuth, (req, res) => {
+router.get('/me', requireAuth, async (req, res) => {
   if (req.userType !== 'creator') return res.status(403).json({ success: false, error: 'Forbidden' });
-  const creator = db.prepare('SELECT * FROM creators WHERE id = ?').get(req.user.sub);
+  const creator = await db.prepare('SELECT * FROM creators WHERE id = $1').get(req.user.sub);
   if (!creator) return res.status(404).json({ success: false, error: 'Not found' });
   return res.json({ success: true, data: creator });
 });
