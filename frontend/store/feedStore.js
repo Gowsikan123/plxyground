@@ -1,51 +1,80 @@
 import { create } from 'zustand';
-import { api } from '../services/api';
+import contentService from '../services/contentService';
 
-export const useFeedStore = create((set, get) => ({
-  posts: [],
-  loading: false,
-  refreshing: false,
-  page: 0,
-  hasMore: true,
-  error: null,
+const useFeedStore = create((set, get) => ({
+  // ─ State ─────────────────────────────────────────────────────
+  posts:       [],
+  meta:        { page: 1, limit: 20, total: 0, pages: 1 },
+  isLoading:   false,
+  isRefreshing:false,
+  isFetchingMore: false,
+  error:       null,
+  filters:     { sport: null, search: null },
 
-  fetchFeed: async () => {
-    if (get().loading) return;
-    set({ loading: true, error: null });
+  // ─ Actions ───────────────────────────────────────────────
+
+  /** Initial load or filter change — resets to page 1. */
+  async loadFeed(filters = {}) {
+    const mergedFilters = { ...get().filters, ...filters };
+    set({ isLoading: true, error: null, filters: mergedFilters, posts: [] });
     try {
-      const data = await api.get('/content?limit=20&offset=0');
-      set({ posts: data.data || [], page: 1, hasMore: (data.data?.length || 0) < data.total, loading: false });
+      const { data, meta } = await contentService.getFeed({ page: 1, ...mergedFilters });
+      set({ posts: data, meta, isLoading: false });
     } catch (err) {
-      set({ loading: false, error: err.message });
+      set({ error: err.message, isLoading: false });
     }
   },
 
-  refreshFeed: async () => {
-    set({ refreshing: true, error: null });
+  /** Pull-to-refresh — reloads page 1, keeps existing posts visible during load. */
+  async refreshFeed() {
+    const { filters } = get();
+    set({ isRefreshing: true, error: null });
     try {
-      const data = await api.get('/content?limit=20&offset=0');
-      set({ posts: data.data || [], page: 1, hasMore: (data.data?.length || 0) < data.total, refreshing: false });
+      const { data, meta } = await contentService.getFeed({ page: 1, ...filters });
+      set({ posts: data, meta, isRefreshing: false });
     } catch (err) {
-      set({ refreshing: false, error: err.message });
+      set({ error: err.message, isRefreshing: false });
     }
   },
 
-  loadMore: async () => {
-    const { loading, hasMore, page, posts } = get();
-    if (loading || !hasMore) return;
-    set({ loading: true });
+  /** Infinite scroll — appends next page. */
+  async fetchMore() {
+    const { meta, isFetchingMore, filters } = get();
+    if (isFetchingMore) return;
+    if (meta.page >= meta.pages) return;
+    set({ isFetchingMore: true });
     try {
-      const offset = page * 20;
-      const data = await api.get(`/content?limit=20&offset=${offset}`);
-      const newPosts = data.data || [];
-      set({
-        posts: [...posts, ...newPosts],
-        page: page + 1,
-        hasMore: posts.length + newPosts.length < data.total,
-        loading: false,
-      });
-    } catch {
-      set({ loading: false });
+      const nextPage = meta.page + 1;
+      const { data, meta: newMeta } = await contentService.getFeed({ page: nextPage, ...filters });
+      set((s) => ({
+        posts: [...s.posts, ...data],
+        meta:  newMeta,
+        isFetchingMore: false,
+      }));
+    } catch (err) {
+      set({ error: err.message, isFetchingMore: false });
     }
+  },
+
+  /** Optimistically remove a deleted post from the list. */
+  removePost(id) {
+    set((s) => ({ posts: s.posts.filter((p) => p.id !== id) }));
+  },
+
+  /** Optimistically update a post in the list. */
+  updatePost(id, patch) {
+    set((s) => ({
+      posts: s.posts.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+    }));
+  },
+
+  setFilters(filters) {
+    set({ filters: { ...get().filters, ...filters } });
+  },
+
+  clearError() {
+    set({ error: null });
   },
 }));
+
+export default useFeedStore;

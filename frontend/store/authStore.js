@@ -1,78 +1,124 @@
 import { create } from 'zustand';
-import * as SecureStore from 'expo-secure-store';
-import api from '../lib/api';
-import { ENDPOINTS } from '../constants/api';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { configureApi } from '../services/api';
+import authService from '../services/authService';
 
-export const useAuthStore = create((set, get) => ({
-  user: null,
-  token: null,
-  userType: null,
-  isLoading: true,
-  isAuthenticated: false,
+const useAuthStore = create(
+  persist(
+    (set, get) => ({
+      // ─ State ──────────────────────────────────────────────────
+      token:       null,
+      user:        null,   // creator or business profile
+      userType:    null,   // 'creator' | 'business'
+      isLoggedIn:  false,
+      isLoading:   false,
+      error:       null,
 
-  init: async () => {
-    try {
-      const token = await SecureStore.getItemAsync('auth_token');
-      const userType = await SecureStore.getItemAsync('user_type');
-      if (!token || !userType) {
-        set({ isLoading: false, isAuthenticated: false });
-        return;
-      }
-      const endpoint = userType === 'business' ? ENDPOINTS.BUSINESS_ME : ENDPOINTS.ME;
-      const { data, error } = await api.get(endpoint);
-      if (error || !data) {
-        await SecureStore.deleteItemAsync('auth_token');
-        await SecureStore.deleteItemAsync('user_type');
-        set({ isLoading: false, isAuthenticated: false, token: null, user: null, userType: null });
-        return;
-      }
-      set({ token, user: data, userType, isAuthenticated: true, isLoading: false });
-    } catch {
-      set({ isLoading: false, isAuthenticated: false });
+      // ─ Internal helpers ─────────────────────────────────────────
+      _applySession(token, user, userType) {
+        configureApi({
+          token,
+          onUnauthorised: () => get().logout(),
+        });
+        set({ token, user, userType, isLoggedIn: true, error: null });
+      },
+
+      // ─ Actions ────────────────────────────────────────────────
+      async creatorLogin(email, password) {
+        set({ isLoading: true, error: null });
+        try {
+          const { token, user } = await authService.creatorLogin({ email, password });
+          get()._applySession(token, user, 'creator');
+        } catch (err) {
+          set({ error: err.message });
+          throw err;
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      async creatorSignup(data) {
+        set({ isLoading: true, error: null });
+        try {
+          const { token, user } = await authService.creatorSignup(data);
+          get()._applySession(token, user, 'creator');
+        } catch (err) {
+          set({ error: err.message });
+          throw err;
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      async businessLogin(email, password) {
+        set({ isLoading: true, error: null });
+        try {
+          const { token, user } = await authService.businessLogin({ email, password });
+          get()._applySession(token, user, 'business');
+        } catch (err) {
+          set({ error: err.message });
+          throw err;
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      async businessSignup(data) {
+        set({ isLoading: true, error: null });
+        try {
+          const { token, user } = await authService.businessSignup(data);
+          get()._applySession(token, user, 'business');
+        } catch (err) {
+          set({ error: err.message });
+          throw err;
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      async refreshProfile() {
+        try {
+          const { userType } = get();
+          const user = userType === 'business'
+            ? await authService.businessMe()
+            : await authService.creatorMe();
+          set({ user });
+        } catch {
+          // Silent — stale profile is not fatal
+        }
+      },
+
+      logout() {
+        configureApi({ token: null, onUnauthorised: null });
+        set({ token: null, user: null, userType: null, isLoggedIn: false, error: null });
+      },
+
+      clearError() {
+        set({ error: null });
+      },
+    }),
+    {
+      name:    'plxyground-auth',
+      storage: createJSONStorage(() => AsyncStorage),
+      // Only persist the token and minimal user info; re-hydrate api on startup.
+      partialize: (state) => ({
+        token:    state.token,
+        user:     state.user,
+        userType: state.userType,
+      }),
+      onRehydrateStorage: () => (state) => {
+        if (state?.token) {
+          configureApi({
+            token: state.token,
+            onUnauthorised: () => state.logout(),
+          });
+          // Mark as logged in after rehydration
+          useAuthStore.setState({ isLoggedIn: true });
+        }
+      },
     }
-  },
+  )
+);
 
-  loginCreator: async (email, password) => {
-    const { data, error } = await api.post(ENDPOINTS.LOGIN, { email, password });
-    if (error) return { error };
-    await SecureStore.setItemAsync('auth_token', data.token);
-    await SecureStore.setItemAsync('user_type', 'creator');
-    set({ token: data.token, user: data.user, userType: 'creator', isAuthenticated: true });
-    return { error: null };
-  },
-
-  signupCreator: async (payload) => {
-    const { data, error } = await api.post(ENDPOINTS.SIGNUP, payload);
-    if (error) return { error };
-    await SecureStore.setItemAsync('auth_token', data.token);
-    await SecureStore.setItemAsync('user_type', 'creator');
-    set({ token: data.token, user: data.user, userType: 'creator', isAuthenticated: true });
-    return { error: null };
-  },
-
-  loginBusiness: async (email, password) => {
-    const { data, error } = await api.post(ENDPOINTS.BUSINESS_LOGIN, { email, password });
-    if (error) return { error };
-    await SecureStore.setItemAsync('auth_token', data.token);
-    await SecureStore.setItemAsync('user_type', 'business');
-    set({ token: data.token, user: data.user, userType: 'business', isAuthenticated: true });
-    return { error: null };
-  },
-
-  signupBusiness: async (payload) => {
-    const { data, error } = await api.post(ENDPOINTS.BUSINESS_SIGNUP, payload);
-    if (error) return { error };
-    await SecureStore.setItemAsync('auth_token', data.token);
-    await SecureStore.setItemAsync('user_type', 'business');
-    set({ token: data.token, user: data.user, userType: 'business', isAuthenticated: true });
-    return { error: null };
-  },
-
-  updateUser: (updates) => set((s) => ({ user: { ...s.user, ...updates } })),
-
-  logout: async () => {
-    await SecureStore.deleteItemAsync('auth_token');
-    await SecureStore.deleteItemAsync('user_type');
-    set({ token: null, user: null, userType: null, isAuthenticated: false });
-  },
-}));
+export default useAuthStore;
