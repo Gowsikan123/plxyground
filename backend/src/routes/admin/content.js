@@ -1,71 +1,64 @@
 'use strict';
 
-const express = require('express');
-const { param, body, query } = require('express-validator');
-const { getPool } = require('../../db/client');
+const router = require('express').Router();
+const { param, validationResult } = require('express-validator');
+const db = require('../../db/client');
 const { requireAdmin } = require('../../middleware/auth');
-const { validate } = require('../../middleware/validate');
-const { writeAudit } = require('../../utils/auditLogger');
+const audit = require('../../utils/auditLogger');
 const logger = require('../../logger');
 
-const router = express.Router();
-
-// GET /api/admin/content
-router.get(
-  '/',
-  requireAdmin,
-  [query('status').optional().isIn(['pending', 'approved', 'rejected']), query('sport').optional().trim(), query('page').optional().isInt({ min: 1 }).toInt(), query('limit').optional().isInt({ min: 1, max: 100 }).toInt()],
-  validate,
-  async (req, res) => {
-    try {
-      const page = req.query.page || 1;
-      const limit = req.query.limit || 20;
-      const offset = (page - 1) * limit;
-      const conditions = [];
-      const params = [];
-
-      if (req.query.status) { params.push(req.query.status); conditions.push(`c.status = $${params.length}`); }
-      if (req.query.sport) { params.push(req.query.sport); conditions.push(`c.sport = $${params.length}`); }
-
-      const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
-      params.push(limit, offset);
-
-      const { rows } = await getPool().query(
-        `SELECT c.id, c.title, c.body, c.sport, c.status, c.is_flagged, c.view_count, c.like_count, c.created_at,
-                cr.username, cr.display_name
-         FROM content c JOIN creators cr ON cr.id = c.creator_id
-         ${where}
-         ORDER BY c.created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
-        params,
-      );
-      return res.json({ content: rows, page, limit });
-    } catch (err) {
-      logger.error('admin list content error', { message: err.message });
-      return res.status(500).json({ error: 'Internal server error' });
-    }
-  },
-);
-
-// DELETE /api/admin/content/:id
-router.delete('/:id', requireAdmin, [param('id').isInt().toInt()], validate, async (req, res) => {
+// GET /api/admin/content — all content with filters
+router.get('/', requireAdmin, async (req, res) => {
   try {
-    await getPool().query('DELETE FROM content WHERE id = $1', [req.params.id]);
-    writeAudit({ actorId: req.admin.id, actorType: 'admin', action: 'delete_content', targetId: req.params.id, targetType: 'content', ip: req.ip });
-    return res.json({ success: true });
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const offset = parseInt(req.query.offset) || 0;
+    const status = req.query.status || null;
+    const sport = req.query.sport || null;
+    const creator_id = req.query.creator_id || null;
+
+    const conditions = [];
+    const params = [];
+
+    if (status) { params.push(status); conditions.push(`c.status = $${params.length}`); }
+    if (sport) { params.push(sport); conditions.push(`cr.sport = $${params.length}`); }
+    if (creator_id) { params.push(parseInt(creator_id)); conditions.push(`c.creator_id = $${params.length}`); }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    params.push(limit, offset);
+
+    const { rows } = await db.query(
+      `SELECT c.id, c.title, c.body, c.media_url, c.content_type, c.status,
+              c.rejection_reason, c.created_at, c.updated_at,
+              cr.id AS creator_id, cr.display_name, cr.username, cr.sport
+       FROM content c
+       JOIN creators cr ON cr.id = c.creator_id
+       ${where}
+       ORDER BY c.created_at DESC
+       LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
+    );
+
+    return res.json({ content: rows, limit, offset });
   } catch (err) {
-    logger.error('admin delete content error', { message: err.message });
+    logger.error('Admin content list error', { message: err.message });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// PATCH /api/admin/content/:id/flag
-router.patch('/:id/flag', requireAdmin, [param('id').isInt().toInt(), body('flagged').isBoolean()], validate, async (req, res) => {
+// DELETE /api/admin/content/:id — hard delete by admin
+router.delete('/:id', requireAdmin, param('id').isInt(), async (req, res) => {
+  if (!validationResult(req).isEmpty()) return res.status(422).json({ error: 'Invalid id' });
+
   try {
-    await getPool().query('UPDATE content SET is_flagged = $1, updated_at = NOW() WHERE id = $2', [req.body.flagged, req.params.id]);
-    writeAudit({ actorId: req.admin.id, actorType: 'admin', action: req.body.flagged ? 'flag_content' : 'unflag_content', targetId: req.params.id, targetType: 'content', ip: req.ip });
-    return res.json({ success: true });
+    const { rows } = await db.query('DELETE FROM content WHERE id = $1 RETURNING id, title', [req.params.id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Content not found' });
+
+    audit(req.user.sub, 'admin', 'content.hard_delete', { id: req.params.id, title: rows[0].title });
+    logger.warn('Admin hard-deleted content', { admin_id: req.user.sub, content_id: req.params.id });
+
+    return res.status(204).send();
   } catch (err) {
-    logger.error('admin flag content error', { message: err.message });
+    logger.error('Admin content delete error', { message: err.message });
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

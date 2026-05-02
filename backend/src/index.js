@@ -1,20 +1,20 @@
 'use strict';
 
-const { port } = require('./config');
-const { setup } = require('./db/setup');
-const { seed } = require('./db/seed');
-const logger = require('./logger');
 const app = require('./app');
+const { port } = require('./config');
+const { setupDatabase } = require('./db/setup');
+const logger = require('./logger');
 
 async function start() {
   try {
-    await setup();
-    await seed();
+    await setupDatabase();
+    logger.info('Database ready');
+
     app.listen(port, () => {
       logger.info(`PLXYGROUND API running on port ${port}`);
     });
   } catch (err) {
-    logger.error('Failed to start server', { message: err.message, stack: err.stack });
+    logger.error('Fatal startup error', { message: err.message, stack: err.stack });
     process.exit(1);
   }
 }

@@ -1,90 +1,177 @@
 'use strict';
 
-const express = require('express');
-const { param, body, query } = require('express-validator');
-const { getPool } = require('../../db/client');
+const router = require('express').Router();
+const { param, body, validationResult } = require('express-validator');
+const db = require('../../db/client');
 const { requireAdmin } = require('../../middleware/auth');
-const { validate } = require('../../middleware/validate');
-const { writeAudit } = require('../../utils/auditLogger');
+const audit = require('../../utils/auditLogger');
 const logger = require('../../logger');
 
-const router = express.Router();
+// GET /api/admin/users/creators — list all creators
+router.get('/creators', requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const offset = parseInt(req.query.offset) || 0;
+    const search = req.query.search || null;
 
-// GET /api/admin/users
-router.get(
-  '/',
-  requireAdmin,
-  [query('type').optional().isIn(['creator', 'business']), query('search').optional().trim(), query('page').optional().isInt({ min: 1 }).toInt(), query('limit').optional().isInt({ min: 1, max: 100 }).toInt()],
-  validate,
-  async (req, res) => {
-    try {
-      const page = req.query.page || 1;
-      const limit = req.query.limit || 20;
-      const offset = (page - 1) * limit;
-      const type = req.query.type || 'creator';
-      const search = req.query.search;
-
-      let sqlBase, params;
-      if (type === 'business') {
-        params = [];
-        let where = 'WHERE 1=1';
-        if (search) { params.push(`%${search}%`); where += ` AND (company_name ILIKE $${params.length} OR email ILIKE $${params.length})`; }
-        params.push(limit, offset);
-        sqlBase = `SELECT id, company_name, email, slug, is_verified, is_suspended, created_at FROM businesses ${where} ORDER BY created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`;
-      } else {
-        params = [];
-        let where = 'WHERE 1=1';
-        if (search) { params.push(`%${search}%`); where += ` AND (username ILIKE $${params.length} OR display_name ILIKE $${params.length} OR email ILIKE $${params.length})`; }
-        params.push(limit, offset);
-        sqlBase = `SELECT id, username, display_name, email, sport, slug, is_verified, is_suspended, follower_count, created_at FROM creators ${where} ORDER BY created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`;
-      }
-
-      const { rows } = await getPool().query(sqlBase, params);
-      return res.json({ users: rows, page, limit, type });
-    } catch (err) {
-      logger.error('admin list users error', { message: err.message });
-      return res.status(500).json({ error: 'Internal server error' });
+    const params = [];
+    let searchClause = '';
+    if (search) {
+      params.push(`%${search}%`);
+      searchClause = `WHERE username ILIKE $1 OR display_name ILIKE $1 OR email ILIKE $1`;
     }
-  },
-);
+    params.push(limit, offset);
 
-// PATCH /api/admin/users/:type/:id/suspend
-router.patch(
-  '/:type/:id/suspend',
-  requireAdmin,
-  [param('type').isIn(['creator', 'business']), param('id').isInt().toInt(), body('suspended').isBoolean()],
-  validate,
-  async (req, res) => {
-    try {
-      const table = req.params.type === 'business' ? 'businesses' : 'creators';
-      await getPool().query(`UPDATE ${table} SET is_suspended = $1, updated_at = NOW() WHERE id = $2`, [req.body.suspended, req.params.id]);
-      const action = req.body.suspended ? 'suspend_user' : 'reactivate_user';
-      writeAudit({ actorId: req.admin.id, actorType: 'admin', action, targetId: req.params.id, targetType: req.params.type, ip: req.ip });
-      return res.json({ success: true });
-    } catch (err) {
-      logger.error('suspend user error', { message: err.message });
-      return res.status(500).json({ error: 'Internal server error' });
-    }
-  },
-);
+    const { rows } = await db.query(
+      `SELECT id, username, email, display_name, sport, slug,
+              is_verified, is_suspended, follower_count, created_at
+       FROM creators
+       ${searchClause}
+       ORDER BY created_at DESC
+       LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
+    );
 
-// PATCH /api/admin/users/:type/:id/verify
-router.patch(
-  '/:type/:id/verify',
-  requireAdmin,
-  [param('type').isIn(['creator', 'business']), param('id').isInt().toInt(), body('verified').isBoolean()],
-  validate,
-  async (req, res) => {
-    try {
-      const table = req.params.type === 'business' ? 'businesses' : 'creators';
-      await getPool().query(`UPDATE ${table} SET is_verified = $1, updated_at = NOW() WHERE id = $2`, [req.body.verified, req.params.id]);
-      writeAudit({ actorId: req.admin.id, actorType: 'admin', action: 'verify_user', targetId: req.params.id, targetType: req.params.type, ip: req.ip });
-      return res.json({ success: true });
-    } catch (err) {
-      logger.error('verify user error', { message: err.message });
-      return res.status(500).json({ error: 'Internal server error' });
+    return res.json({ creators: rows, limit, offset });
+  } catch (err) {
+    logger.error('Admin users creators error', { message: err.message });
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/admin/users/businesses — list all businesses
+router.get('/businesses', requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const offset = parseInt(req.query.offset) || 0;
+    const search = req.query.search || null;
+
+    const params = [];
+    let searchClause = '';
+    if (search) {
+      params.push(`%${search}%`);
+      searchClause = `WHERE business_name ILIKE $1 OR email ILIKE $1`;
     }
-  },
-);
+    params.push(limit, offset);
+
+    const { rows } = await db.query(
+      `SELECT id, business_name, email, industry, website,
+              is_verified, is_suspended, created_at
+       FROM businesses
+       ${searchClause}
+       ORDER BY created_at DESC
+       LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
+    );
+
+    return res.json({ businesses: rows, limit, offset });
+  } catch (err) {
+    logger.error('Admin users businesses error', { message: err.message });
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/admin/users/creators/:id/suspend — suspend creator
+router.patch('/creators/:id/suspend', requireAdmin, param('id').isInt(), [
+  body('reason').optional().trim().isLength({ max: 500 }),
+], async (req, res) => {
+  if (!validationResult(req).isEmpty()) return res.status(422).json({ error: 'Invalid id' });
+
+  try {
+    const { rows } = await db.query(
+      `UPDATE creators SET is_suspended = true, updated_at = NOW()
+       WHERE id = $1 RETURNING id, username, is_suspended`,
+      [req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Creator not found' });
+
+    audit(req.user.sub, 'admin', 'creator.suspend', { creator_id: req.params.id, reason: req.body.reason });
+    logger.warn('Creator suspended', { admin_id: req.user.sub, creator_id: req.params.id });
+    return res.json({ creator: rows[0] });
+  } catch (err) {
+    logger.error('Creator suspend error', { message: err.message });
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/admin/users/creators/:id/reactivate — reactivate creator
+router.patch('/creators/:id/reactivate', requireAdmin, param('id').isInt(), async (req, res) => {
+  if (!validationResult(req).isEmpty()) return res.status(422).json({ error: 'Invalid id' });
+
+  try {
+    const { rows } = await db.query(
+      `UPDATE creators SET is_suspended = false, updated_at = NOW()
+       WHERE id = $1 RETURNING id, username, is_suspended`,
+      [req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Creator not found' });
+
+    audit(req.user.sub, 'admin', 'creator.reactivate', { creator_id: req.params.id });
+    return res.json({ creator: rows[0] });
+  } catch (err) {
+    logger.error('Creator reactivate error', { message: err.message });
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/admin/users/creators/:id/verify — verify creator
+router.patch('/creators/:id/verify', requireAdmin, param('id').isInt(), async (req, res) => {
+  if (!validationResult(req).isEmpty()) return res.status(422).json({ error: 'Invalid id' });
+
+  try {
+    const { rows } = await db.query(
+      `UPDATE creators SET is_verified = true, updated_at = NOW()
+       WHERE id = $1 RETURNING id, username, is_verified`,
+      [req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Creator not found' });
+
+    audit(req.user.sub, 'admin', 'creator.verify', { creator_id: req.params.id });
+    return res.json({ creator: rows[0] });
+  } catch (err) {
+    logger.error('Creator verify error', { message: err.message });
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/admin/users/businesses/:id/suspend — suspend business
+router.patch('/businesses/:id/suspend', requireAdmin, param('id').isInt(), async (req, res) => {
+  if (!validationResult(req).isEmpty()) return res.status(422).json({ error: 'Invalid id' });
+
+  try {
+    const { rows } = await db.query(
+      `UPDATE businesses SET is_suspended = true, updated_at = NOW()
+       WHERE id = $1 RETURNING id, business_name, is_suspended`,
+      [req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Business not found' });
+
+    audit(req.user.sub, 'admin', 'business.suspend', { business_id: req.params.id });
+    return res.json({ business: rows[0] });
+  } catch (err) {
+    logger.error('Business suspend error', { message: err.message });
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/admin/users/businesses/:id/reactivate — reactivate business
+router.patch('/businesses/:id/reactivate', requireAdmin, param('id').isInt(), async (req, res) => {
+  if (!validationResult(req).isEmpty()) return res.status(422).json({ error: 'Invalid id' });
+
+  try {
+    const { rows } = await db.query(
+      `UPDATE businesses SET is_suspended = false, updated_at = NOW()
+       WHERE id = $1 RETURNING id, business_name, is_suspended`,
+      [req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Business not found' });
+
+    audit(req.user.sub, 'admin', 'business.reactivate', { business_id: req.params.id });
+    return res.json({ business: rows[0] });
+  } catch (err) {
+    logger.error('Business reactivate error', { message: err.message });
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 module.exports = router;
