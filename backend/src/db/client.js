@@ -1,6 +1,7 @@
 'use strict';
 const { Pool } = require('pg');
-const config = require('../config/env');
+const { readEnv } = require('../config/env');
+const config = readEnv();
 
 const pool = new Pool({ connectionString: config.databaseUrl });
 
