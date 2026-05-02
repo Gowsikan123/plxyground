@@ -1,52 +1,60 @@
 'use strict';
-require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const { corsOrigins } = require('./config');
 const { globalLimiter } = require('./middleware/rateLimiter');
-const errorHandler = require('./middleware/errorHandler');
 const logger = require('./logger');
+
+const authRouter         = require('./routes/auth');
+const businessAuthRouter = require('./routes/businessAuth');
+const contentRouter      = require('./routes/content');
+const creatorsRouter     = require('./routes/creators');
+const opportunitiesRouter = require('./routes/opportunities');
+const adminAuthRouter    = require('./routes/admin/auth');
+const adminQueueRouter   = require('./routes/admin/queue');
+const adminUsersRouter   = require('./routes/admin/users');
+const adminContentRouter = require('./routes/admin/content');
+const adminAnalyticsRouter = require('./routes/admin/analytics');
+const adminAuditRouter   = require('./routes/admin/audit');
 
 const app = express();
 
 app.set('trust proxy', 1);
+
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : '*',
+  origin: corsOrigins.includes('*') ? '*' : corsOrigins,
   credentials: true,
 }));
 app.use(express.json({ limit: '2mb' }));
 app.use(globalLimiter);
 
-app.get('/health', (_req, res) => res.json({ status: 'ok', ts: Date.now() }));
+app.use((req, _res, next) => {
+  logger.debug(`${req.method} ${req.path}`, { ip: req.ip });
+  next();
+});
 
-// Core auth
-app.use('/api/auth',          require('./routes/auth'));
-app.use('/api/business/auth', require('./routes/businessAuth'));
+app.get('/healthz', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
 
-// Creator & business resources
-app.use('/api/creators',      require('./routes/creators'));
-app.use('/api/content',       require('./routes/content'));
-app.use('/api/partners',      require('./routes/partners'));
-app.use('/api/business-plan', require('./routes/business-plan'));
+app.use('/api/auth',         authRouter);
+app.use('/api/business',     businessAuthRouter);
+app.use('/api/content',      contentRouter);
+app.use('/api/creators',     creatorsRouter);
+app.use('/api/opportunities', opportunitiesRouter);
+app.use('/api/admin/auth',   adminAuthRouter);
+app.use('/api/admin/queue',  adminQueueRouter);
+app.use('/api/admin/users',  adminUsersRouter);
+app.use('/api/admin/content', adminContentRouter);
+app.use('/api/admin/analytics', adminAnalyticsRouter);
+app.use('/api/admin/audit',  adminAuditRouter);
 
-// Opportunities & applications
-app.use('/api/opportunities',  require('./routes/opportunities'));
-app.use('/api/applications',   require('./routes/applications'));
+app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
 
-// Social & messaging
-app.use('/api/follows',        require('./routes/follows'));
-app.use('/api/messages',       require('./routes/messages'));
-app.use('/api/notifications',  require('./routes/notifications'));
-
-// Admin
-app.use('/api/admin',          require('./routes/admin'));
-
-app.use(errorHandler);
-
-const PORT = process.env.PORT || 3000;
-if (require.main === module) {
-  app.listen(PORT, () => logger.info(`Plxyground API listening on port ${PORT}`));
-}
+app.use((err, _req, res, _next) => {
+  logger.error('Unhandled error', { message: err.message, stack: err.stack });
+  res.status(500).json({ error: 'Internal server error' });
+});
 
 module.exports = app;

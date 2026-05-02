@@ -1,128 +1,90 @@
 'use strict';
 
 const express = require('express');
+const { param, body, query } = require('express-validator');
 const { getPool } = require('../../db/client');
 const { requireAdmin } = require('../../middleware/auth');
-const auditLogger = require('../../utils/auditLogger');
+const { validate } = require('../../middleware/validate');
+const { writeAudit } = require('../../utils/auditLogger');
+const logger = require('../../logger');
 
 const router = express.Router();
 
-router.get('/creators', requireAdmin, async (req, res) => {
-  const pool = getPool();
-  const { search, limit = 20, offset = 0 } = req.query;
-  const safeLimit = Math.min(parseInt(limit, 10) || 20, 100);
-  const safeOffset = parseInt(offset, 10) || 0;
-  try {
-    const params = [];
-    let where = '';
-    if (search) {
-      params.push(`%${search}%`);
-      where = `WHERE (cr.username ILIKE $1 OR cr.display_name ILIKE $1 OR ca.email ILIKE $1)`;
+// GET /api/admin/users
+router.get(
+  '/',
+  requireAdmin,
+  [query('type').optional().isIn(['creator', 'business']), query('search').optional().trim(), query('page').optional().isInt({ min: 1 }).toInt(), query('limit').optional().isInt({ min: 1, max: 100 }).toInt()],
+  validate,
+  async (req, res) => {
+    try {
+      const page = req.query.page || 1;
+      const limit = req.query.limit || 20;
+      const offset = (page - 1) * limit;
+      const type = req.query.type || 'creator';
+      const search = req.query.search;
+
+      let sqlBase, params;
+      if (type === 'business') {
+        params = [];
+        let where = 'WHERE 1=1';
+        if (search) { params.push(`%${search}%`); where += ` AND (company_name ILIKE $${params.length} OR email ILIKE $${params.length})`; }
+        params.push(limit, offset);
+        sqlBase = `SELECT id, company_name, email, slug, is_verified, is_suspended, created_at FROM businesses ${where} ORDER BY created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`;
+      } else {
+        params = [];
+        let where = 'WHERE 1=1';
+        if (search) { params.push(`%${search}%`); where += ` AND (username ILIKE $${params.length} OR display_name ILIKE $${params.length} OR email ILIKE $${params.length})`; }
+        params.push(limit, offset);
+        sqlBase = `SELECT id, username, display_name, email, sport, slug, is_verified, is_suspended, follower_count, created_at FROM creators ${where} ORDER BY created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`;
+      }
+
+      const { rows } = await getPool().query(sqlBase, params);
+      return res.json({ users: rows, page, limit, type });
+    } catch (err) {
+      logger.error('admin list users error', { message: err.message });
+      return res.status(500).json({ error: 'Internal server error' });
     }
-    params.push(safeLimit);
-    params.push(safeOffset);
-    const idx = params.length;
-    const { rows } = await pool.query(
-      `SELECT cr.id, cr.username, cr.display_name, cr.sport, cr.avatar_url, cr.is_verified, cr.created_at,
-              ca.email, ca.is_suspended, ca.last_login
-       FROM creators cr
-       LEFT JOIN creator_accounts ca ON ca.creator_id = cr.id
-       ${where}
-       ORDER BY cr.created_at DESC
-       LIMIT $${idx - 1} OFFSET $${idx}`,
-      params
-    );
-    return res.json({ data: rows });
-  } catch (err) {
-    throw err;
-  }
-});
+  },
+);
 
-router.get('/businesses', requireAdmin, async (req, res) => {
-  const pool = getPool();
-  const { search, limit = 20, offset = 0 } = req.query;
-  const safeLimit = Math.min(parseInt(limit, 10) || 20, 100);
-  const safeOffset = parseInt(offset, 10) || 0;
-  try {
-    const params = [];
-    let where = '';
-    if (search) {
-      params.push(`%${search}%`);
-      where = `WHERE (company_name ILIKE $1 OR email ILIKE $1)`;
+// PATCH /api/admin/users/:type/:id/suspend
+router.patch(
+  '/:type/:id/suspend',
+  requireAdmin,
+  [param('type').isIn(['creator', 'business']), param('id').isInt().toInt(), body('suspended').isBoolean()],
+  validate,
+  async (req, res) => {
+    try {
+      const table = req.params.type === 'business' ? 'businesses' : 'creators';
+      await getPool().query(`UPDATE ${table} SET is_suspended = $1, updated_at = NOW() WHERE id = $2`, [req.body.suspended, req.params.id]);
+      const action = req.body.suspended ? 'suspend_user' : 'reactivate_user';
+      writeAudit({ actorId: req.admin.id, actorType: 'admin', action, targetId: req.params.id, targetType: req.params.type, ip: req.ip });
+      return res.json({ success: true });
+    } catch (err) {
+      logger.error('suspend user error', { message: err.message });
+      return res.status(500).json({ error: 'Internal server error' });
     }
-    params.push(safeLimit);
-    params.push(safeOffset);
-    const idx = params.length;
-    const { rows } = await pool.query(
-      `SELECT id, company_name, slug, industry, logo_url, email, is_suspended, last_login, created_at FROM businesses ${where} ORDER BY created_at DESC LIMIT $${idx - 1} OFFSET $${idx}`,
-      params
-    );
-    return res.json({ data: rows });
-  } catch (err) {
-    throw err;
-  }
-});
+  },
+);
 
-router.post('/creators/:id/suspend', requireAdmin, async (req, res) => {
-  const pool = getPool();
-  const { id } = req.params;
-  const { reason } = req.body;
-  try {
-    await pool.query(`UPDATE creator_accounts SET is_suspended = true WHERE creator_id = $1`, [id]);
-    auditLogger.log({ actor_type: 'admin', actor_id: req.user.id, action: 'CREATOR_SUSPENDED', target_type: 'creator', target_id: parseInt(id, 10), ip_address: req.ip, meta: { reason } });
-    return res.json({ success: true });
-  } catch (err) {
-    throw err;
-  }
-});
-
-router.post('/creators/:id/reactivate', requireAdmin, async (req, res) => {
-  const pool = getPool();
-  const { id } = req.params;
-  try {
-    await pool.query(`UPDATE creator_accounts SET is_suspended = false WHERE creator_id = $1`, [id]);
-    auditLogger.log({ actor_type: 'admin', actor_id: req.user.id, action: 'CREATOR_REACTIVATED', target_type: 'creator', target_id: parseInt(id, 10), ip_address: req.ip });
-    return res.json({ success: true });
-  } catch (err) {
-    throw err;
-  }
-});
-
-router.post('/businesses/:id/suspend', requireAdmin, async (req, res) => {
-  const pool = getPool();
-  const { id } = req.params;
-  const { reason } = req.body;
-  try {
-    await pool.query(`UPDATE businesses SET is_suspended = true WHERE id = $1`, [id]);
-    auditLogger.log({ actor_type: 'admin', actor_id: req.user.id, action: 'BUSINESS_SUSPENDED', target_type: 'business', target_id: parseInt(id, 10), ip_address: req.ip, meta: { reason } });
-    return res.json({ success: true });
-  } catch (err) {
-    throw err;
-  }
-});
-
-router.post('/businesses/:id/reactivate', requireAdmin, async (req, res) => {
-  const pool = getPool();
-  const { id } = req.params;
-  try {
-    await pool.query(`UPDATE businesses SET is_suspended = false WHERE id = $1`, [id]);
-    auditLogger.log({ actor_type: 'admin', actor_id: req.user.id, action: 'BUSINESS_REACTIVATED', target_type: 'business', target_id: parseInt(id, 10), ip_address: req.ip });
-    return res.json({ success: true });
-  } catch (err) {
-    throw err;
-  }
-});
-
-router.post('/creators/:id/verify', requireAdmin, async (req, res) => {
-  const pool = getPool();
-  const { id } = req.params;
-  try {
-    await pool.query(`UPDATE creators SET is_verified = true WHERE id = $1`, [id]);
-    auditLogger.log({ actor_type: 'admin', actor_id: req.user.id, action: 'CREATOR_VERIFIED', target_type: 'creator', target_id: parseInt(id, 10), ip_address: req.ip });
-    return res.json({ success: true });
-  } catch (err) {
-    throw err;
-  }
-});
+// PATCH /api/admin/users/:type/:id/verify
+router.patch(
+  '/:type/:id/verify',
+  requireAdmin,
+  [param('type').isIn(['creator', 'business']), param('id').isInt().toInt(), body('verified').isBoolean()],
+  validate,
+  async (req, res) => {
+    try {
+      const table = req.params.type === 'business' ? 'businesses' : 'creators';
+      await getPool().query(`UPDATE ${table} SET is_verified = $1, updated_at = NOW() WHERE id = $2`, [req.body.verified, req.params.id]);
+      writeAudit({ actorId: req.admin.id, actorType: 'admin', action: 'verify_user', targetId: req.params.id, targetType: req.params.type, ip: req.ip });
+      return res.json({ success: true });
+    } catch (err) {
+      logger.error('verify user error', { message: err.message });
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+);
 
 module.exports = router;

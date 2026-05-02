@@ -1,134 +1,106 @@
 'use strict';
 
 const express = require('express');
+const { param, body, query } = require('express-validator');
 const { getPool } = require('../../db/client');
 const { requireAdmin } = require('../../middleware/auth');
-const auditLogger = require('../../utils/auditLogger');
+const { validate } = require('../../middleware/validate');
+const { writeAudit } = require('../../utils/auditLogger');
+const logger = require('../../logger');
 
 const router = express.Router();
 
-async function getQueueItem(pool, item) {
-  let content = null;
-  if (item.content_type === 'creator_content') {
-    const { rows } = await pool.query(
-      `SELECT c.*, cr.display_name, cr.username, cr.slug AS creator_slug
-       FROM content c
-       JOIN creators cr ON cr.id = c.creator_id
-       WHERE c.id = $1`,
-      [item.content_id]
-    );
-    if (rows.length > 0) content = { ...rows[0], type: 'creator_content' };
-  } else if (item.content_type === 'business_content') {
-    const { rows } = await pool.query(
-      `SELECT bc.*, b.company_name, b.slug AS business_slug
-       FROM business_content bc
-       JOIN businesses b ON b.id = bc.business_id
-       WHERE bc.id = $1`,
-      [item.content_id]
-    );
-    if (rows.length > 0) content = { ...rows[0], type: 'business_content' };
-  }
-  return { ...item, content };
-}
-
-router.get('/', requireAdmin, async (req, res) => {
-  const pool = getPool();
-  const { limit = 20, offset = 0 } = req.query;
-  const safeLimit = Math.min(parseInt(limit, 10) || 20, 100);
-  const safeOffset = parseInt(offset, 10) || 0;
-  try {
-    const countRes = await pool.query(`SELECT COUNT(*) FROM moderation_queue WHERE status = 'pending'`);
-    const total = parseInt(countRes.rows[0].count, 10);
-    const { rows } = await pool.query(
-      `SELECT * FROM moderation_queue WHERE status = 'pending' ORDER BY submitted_at ASC LIMIT $1 OFFSET $2`,
-      [safeLimit, safeOffset]
-    );
-    const enriched = await Promise.all(rows.map((r) => getQueueItem(pool, r)));
-    return res.json({ data: enriched, total, limit: safeLimit, offset: safeOffset });
-  } catch (err) {
-    throw err;
-  }
-});
-
-router.post('/:id/approve', requireAdmin, async (req, res) => {
-  const pool = getPool();
-  const { id } = req.params;
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const { rows } = await client.query(`SELECT * FROM moderation_queue WHERE id = $1`, [id]);
-    if (rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Queue item not found' }); }
-    const item = rows[0];
-    if (item.status !== 'pending') { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Item is not pending' }); }
-    const table = item.content_type === 'creator_content' ? 'content' : 'business_content';
-    await client.query(`UPDATE ${table} SET status = 'published', updated_at = NOW() WHERE id = $1`, [item.content_id]);
-    await client.query(`UPDATE moderation_queue SET status = 'approved', reviewed_by = $1, reviewed_at = NOW() WHERE id = $2`, [req.user.id, id]);
-    await client.query('COMMIT');
-    auditLogger.log({ actor_type: 'admin', actor_id: req.user.id, action: 'QUEUE_ITEM_APPROVED', target_type: 'moderation_queue', target_id: parseInt(id, 10), ip_address: req.ip });
-    return res.json({ success: true });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
-});
-
-router.post('/:id/reject', requireAdmin, async (req, res) => {
-  const pool = getPool();
-  const { id } = req.params;
-  const { reason } = req.body;
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const { rows } = await client.query(`SELECT * FROM moderation_queue WHERE id = $1`, [id]);
-    if (rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Queue item not found' }); }
-    const item = rows[0];
-    if (item.status !== 'pending') { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Item is not pending' }); }
-    const table = item.content_type === 'creator_content' ? 'content' : 'business_content';
-    await client.query(`UPDATE ${table} SET status = 'rejected', updated_at = NOW() WHERE id = $1`, [item.content_id]);
-    await client.query(`UPDATE moderation_queue SET status = 'rejected', rejection_reason = $1, reviewed_by = $2, reviewed_at = NOW() WHERE id = $3`, [reason || null, req.user.id, id]);
-    await client.query('COMMIT');
-    auditLogger.log({ actor_type: 'admin', actor_id: req.user.id, action: 'QUEUE_ITEM_REJECTED', target_type: 'moderation_queue', target_id: parseInt(id, 10), ip_address: req.ip, meta: { reason } });
-    return res.json({ success: true });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
-});
-
-router.post('/bulk', requireAdmin, async (req, res) => {
-  const pool = getPool();
-  const { ids, action } = req.body;
-  if (!Array.isArray(ids) || !['approve', 'reject'].includes(action)) {
-    return res.status(400).json({ error: 'ids array and action (approve/reject) required' });
-  }
-  const { reason } = req.body;
-  const results = { success: [], failed: [] };
-  for (const id of ids) {
-    const client = await pool.connect();
+// GET /api/admin/queue
+router.get(
+  '/',
+  requireAdmin,
+  [query('status').optional().isIn(['pending', 'approved', 'rejected']), query('page').optional().isInt({ min: 1 }).toInt(), query('limit').optional().isInt({ min: 1, max: 100 }).toInt()],
+  validate,
+  async (req, res) => {
     try {
-      await client.query('BEGIN');
-      const { rows } = await client.query(`SELECT * FROM moderation_queue WHERE id = $1`, [id]);
-      if (rows.length === 0 || rows[0].status !== 'pending') { await client.query('ROLLBACK'); results.failed.push(id); continue; }
-      const item = rows[0];
-      const table = item.content_type === 'creator_content' ? 'content' : 'business_content';
-      const newStatus = action === 'approve' ? 'published' : 'rejected';
-      await client.query(`UPDATE ${table} SET status = $1, updated_at = NOW() WHERE id = $2`, [newStatus, item.content_id]);
-      await client.query(`UPDATE moderation_queue SET status = $1, rejection_reason = $2, reviewed_by = $3, reviewed_at = NOW() WHERE id = $4`, [action === 'approve' ? 'approved' : 'rejected', reason || null, req.user.id, id]);
-      await client.query('COMMIT');
-      results.success.push(id);
-      auditLogger.log({ actor_type: 'admin', actor_id: req.user.id, action: action === 'approve' ? 'QUEUE_ITEM_APPROVED' : 'QUEUE_ITEM_REJECTED', target_type: 'moderation_queue', target_id: id, ip_address: req.ip });
+      const page = req.query.page || 1;
+      const limit = req.query.limit || 20;
+      const offset = (page - 1) * limit;
+      const status = req.query.status || 'pending';
+
+      const { rows } = await getPool().query(
+        `SELECT mq.id, mq.content_id, mq.reason, mq.status, mq.created_at,
+                c.title, c.body, c.media_url, c.sport, c.tags,
+                cr.username, cr.display_name, cr.avatar_url
+         FROM moderation_queue mq
+         JOIN content c ON c.id = mq.content_id
+         JOIN creators cr ON cr.id = c.creator_id
+         WHERE mq.status = $1
+         ORDER BY mq.created_at ASC
+         LIMIT $2 OFFSET $3`,
+        [status, limit, offset],
+      );
+      return res.json({ queue: rows, page, limit });
     } catch (err) {
-      await client.query('ROLLBACK');
-      results.failed.push(id);
-    } finally {
-      client.release();
+      logger.error('get queue error', { message: err.message });
+      return res.status(500).json({ error: 'Internal server error' });
     }
-  }
-  return res.json({ results });
-});
+  },
+);
+
+// PATCH /api/admin/queue/:id — approve or reject
+router.patch(
+  '/:id',
+  requireAdmin,
+  [param('id').isInt().toInt(), body('action').isIn(['approve', 'reject']), body('reason').optional().trim()],
+  validate,
+  async (req, res) => {
+    try {
+      const { action, reason } = req.body;
+      const newStatus = action === 'approve' ? 'approved' : 'rejected';
+      const contentStatus = action === 'approve' ? 'approved' : 'rejected';
+
+      const { rows: qRows } = await getPool().query('SELECT content_id FROM moderation_queue WHERE id = $1', [req.params.id]);
+      if (!qRows.length) return res.status(404).json({ error: 'Queue item not found' });
+
+      await getPool().query(
+        `UPDATE moderation_queue SET status = $1, reviewed_by = $2, reviewed_at = NOW() WHERE id = $3`,
+        [newStatus, req.admin.id, req.params.id],
+      );
+      await getPool().query(`UPDATE content SET status = $1, updated_at = NOW() WHERE id = $2`, [contentStatus, qRows[0].content_id]);
+
+      writeAudit({ actorId: req.admin.id, actorType: 'admin', action: `queue_${action}`, targetId: qRows[0].content_id, targetType: 'content', metadata: { reason }, ip: req.ip });
+      return res.json({ success: true });
+    } catch (err) {
+      logger.error('moderate queue error', { message: err.message });
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+);
+
+// POST /api/admin/queue/bulk — bulk approve/reject
+router.post(
+  '/bulk',
+  requireAdmin,
+  [body('ids').isArray({ min: 1 }), body('action').isIn(['approve', 'reject'])],
+  validate,
+  async (req, res) => {
+    try {
+      const { ids, action } = req.body;
+      const newStatus = action === 'approve' ? 'approved' : 'rejected';
+
+      const { rows: qRows } = await getPool().query(
+        `SELECT id, content_id FROM moderation_queue WHERE id = ANY($1::int[]) AND status = 'pending'`,
+        [ids],
+      );
+      if (!qRows.length) return res.status(404).json({ error: 'No pending items found for given IDs' });
+
+      const contentIds = qRows.map((r) => r.content_id);
+      await getPool().query(`UPDATE moderation_queue SET status = $1, reviewed_by = $2, reviewed_at = NOW() WHERE id = ANY($3::int[])`, [newStatus, req.admin.id, ids]);
+      await getPool().query(`UPDATE content SET status = $1, updated_at = NOW() WHERE id = ANY($2::int[])`, [newStatus, contentIds]);
+
+      writeAudit({ actorId: req.admin.id, actorType: 'admin', action: `bulk_${action}`, metadata: { count: qRows.length }, ip: req.ip });
+      return res.json({ success: true, processed: qRows.length });
+    } catch (err) {
+      logger.error('bulk moderate error', { message: err.message });
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+);
 
 module.exports = router;

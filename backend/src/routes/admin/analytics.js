@@ -3,65 +3,51 @@
 const express = require('express');
 const { getPool } = require('../../db/client');
 const { requireAdmin } = require('../../middleware/auth');
+const logger = require('../../logger');
 
 const router = express.Router();
 
-router.get('/overview', requireAdmin, async (req, res) => {
-  const pool = getPool();
+// GET /api/admin/analytics
+router.get('/', requireAdmin, async (req, res) => {
   try {
-    const [creatorsRes, businessesRes, contentRes, pendingRes, oppsRes] = await Promise.all([
-      pool.query(`SELECT COUNT(*) FROM creators`),
-      pool.query(`SELECT COUNT(*) FROM businesses`),
-      pool.query(`SELECT COUNT(*) FROM content WHERE status = 'published'`),
+    const pool = getPool();
+    const [creators, businesses, content, opportunities, pendingQueue, flagged] = await Promise.all([
+      pool.query('SELECT COUNT(*) FROM creators WHERE is_suspended = FALSE'),
+      pool.query('SELECT COUNT(*) FROM businesses WHERE is_suspended = FALSE'),
+      pool.query(`SELECT COUNT(*) FILTER (WHERE status = 'approved') as approved, COUNT(*) FILTER (WHERE status = 'pending') as pending, COUNT(*) FILTER (WHERE status = 'rejected') as rejected FROM content`),
+      pool.query(`SELECT COUNT(*) FILTER (WHERE status = 'open') as open, COUNT(*) as total FROM opportunities`),
       pool.query(`SELECT COUNT(*) FROM moderation_queue WHERE status = 'pending'`),
-      pool.query(`SELECT COUNT(*) FROM opportunities WHERE status = 'published'`),
+      pool.query(`SELECT COUNT(*) FROM content WHERE is_flagged = TRUE AND status = 'approved'`),
     ]);
+
+    const sports = await pool.query(
+      `SELECT sport, COUNT(*) as count FROM content WHERE sport IS NOT NULL AND status = 'approved' GROUP BY sport ORDER BY count DESC LIMIT 10`,
+    );
+
+    const signupTrend = await pool.query(
+      `SELECT DATE_TRUNC('day', created_at) as day, COUNT(*) as count FROM creators WHERE created_at > NOW() - INTERVAL '30 days' GROUP BY day ORDER BY day ASC`,
+    );
+
     return res.json({
-      total_creators: parseInt(creatorsRes.rows[0].count, 10),
-      total_businesses: parseInt(businessesRes.rows[0].count, 10),
-      published_content: parseInt(contentRes.rows[0].count, 10),
-      pending_moderation: parseInt(pendingRes.rows[0].count, 10),
-      active_opportunities: parseInt(oppsRes.rows[0].count, 10),
+      creators: parseInt(creators.rows[0].count, 10),
+      businesses: parseInt(businesses.rows[0].count, 10),
+      content: {
+        approved: parseInt(content.rows[0].approved, 10),
+        pending: parseInt(content.rows[0].pending, 10),
+        rejected: parseInt(content.rows[0].rejected, 10),
+      },
+      opportunities: {
+        open: parseInt(opportunities.rows[0].open, 10),
+        total: parseInt(opportunities.rows[0].total, 10),
+      },
+      pendingQueue: parseInt(pendingQueue.rows[0].count, 10),
+      flaggedContent: parseInt(flagged.rows[0].count, 10),
+      topSports: sports.rows,
+      signupTrend: signupTrend.rows,
     });
   } catch (err) {
-    throw err;
-  }
-});
-
-router.get('/signups', requireAdmin, async (req, res) => {
-  const pool = getPool();
-  const { days = 30 } = req.query;
-  const safeDays = Math.min(parseInt(days, 10) || 30, 365);
-  try {
-    const [creatorsRes, businessesRes] = await Promise.all([
-      pool.query(
-        `SELECT DATE(created_at) AS date, COUNT(*) AS count FROM creators WHERE created_at >= NOW() - INTERVAL '${safeDays} days' GROUP BY DATE(created_at) ORDER BY date ASC`
-      ),
-      pool.query(
-        `SELECT DATE(created_at) AS date, COUNT(*) AS count FROM businesses WHERE created_at >= NOW() - INTERVAL '${safeDays} days' GROUP BY DATE(created_at) ORDER BY date ASC`
-      ),
-    ]);
-    return res.json({
-      creators: creatorsRes.rows,
-      businesses: businessesRes.rows,
-    });
-  } catch (err) {
-    throw err;
-  }
-});
-
-router.get('/content-stats', requireAdmin, async (req, res) => {
-  const pool = getPool();
-  try {
-    const { rows } = await pool.query(
-      `SELECT status, COUNT(*) AS count FROM content GROUP BY status ORDER BY count DESC`
-    );
-    const { rows: topContent } = await pool.query(
-      `SELECT c.id, c.title, c.view_count, cr.display_name, cr.username FROM content c JOIN creators cr ON cr.id = c.creator_id WHERE c.status = 'published' ORDER BY c.view_count DESC LIMIT 10`
-    );
-    return res.json({ by_status: rows, top_content: topContent });
-  } catch (err) {
-    throw err;
+    logger.error('admin analytics error', { message: err.message });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
