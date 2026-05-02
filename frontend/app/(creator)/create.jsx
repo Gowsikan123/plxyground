@@ -1,106 +1,65 @@
-import { View, Text, StyleSheet, Pressable, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
-import { useState } from 'react';
-import { router } from 'expo-router';
-import { COLORS } from '../../constants/colors';
-import { TYPOGRAPHY } from '../../constants/typography';
-import { SPACING } from '../../constants/spacing';
-import Input from '../../components/ui/Input';
-import { contentService } from '../../services/contentService';
-import { useAuth } from '../../hooks/useAuth';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { Header } from '../../components/layout/Header';
+import { Input } from '../../components/ui/Input';
+import { Button } from '../../components/ui/Button';
+import { Toast } from '../../components/ui/Toast';
+import { createPost } from '../../services/contentService';
+import { Colors } from '../../constants/colors';
+import { Typography } from '../../constants/typography';
+import { Spacing, Radius } from '../../constants/spacing';
 
-const CONTENT_TYPES = ['video', 'image', 'article', 'highlight'];
-const SPORT_TAGS = ['basketball', 'football', 'cricket', 'tennis', 'mma', 'fitness', 'athletics', 'swimming', 'rugby', 'boxing'];
-
-export default function CreateScreen() {
-  const { token } = useAuth();
-  const [form, setForm] = useState({ title: '', description: '', content_type: 'video', media_url: '', sport_tags: [] });
+export default function Create() {
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [tagsRaw, setTagsRaw] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'error' });
+  const [errors, setErrors] = useState({});
 
-  const set = (key) => (val) => setForm((f) => ({ ...f, [key]: val }));
-
-  const toggleTag = (tag) => {
-    setForm((f) => ({
-      ...f,
-      sport_tags: f.sport_tags.includes(tag) ? f.sport_tags.filter((t) => t !== tag) : [...f.sport_tags, tag],
-    }));
+  const validate = () => {
+    const e = {};
+    if (!title.trim()) e.title = 'Title is required.';
+    setErrors(e);
+    return Object.keys(e).length === 0;
   };
 
   const handleSubmit = async () => {
-    setError('');
-    if (!form.title.trim() || !form.description.trim()) { setError('Title and description are required'); return; }
+    if (!validate()) return;
     setLoading(true);
-    const { error: err } = await contentService.create({ ...form, sport_tags: form.sport_tags.join(',') }, token);
+    const tags = tagsRaw.split(',').map((t) => t.trim()).filter(Boolean);
+    const { error } = await createPost({ title: title.trim(), body: body.trim(), tags, media_type: 'none' });
     setLoading(false);
-    if (err) { setError(err); return; }
-    setSuccess(true);
-    setTimeout(() => { setSuccess(false); router.push('/(creator)/feed'); }, 1500);
+    if (error) {
+      setToast({ visible: true, message: error, type: 'error' });
+      return;
+    }
+    setTitle('');
+    setBody('');
+    setTagsRaw('');
+    setErrors({});
+    setToast({ visible: true, message: 'Post submitted for review!', type: 'success' });
   };
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
-        <Text style={styles.heading}>New Post</Text>
-        <Text style={styles.sub}>Share your sports content with the community</Text>
-
-        <View style={styles.form}>
-          <Input label="Title *" value={form.title} onChangeText={set('title')} placeholder="What's this about?" />
-          <Input label="Description *" value={form.description} onChangeText={set('description')} multiline numberOfLines={4} placeholder="Tell your story..." />
-          <Input label="Media URL" value={form.media_url} onChangeText={set('media_url')} keyboardType="url" autoCapitalize="none" placeholder="https://..." />
-
-          <Text style={styles.sectionLabel}>Content Type</Text>
-          <View style={styles.chipRow}>
-            {CONTENT_TYPES.map((type) => (
-              <Pressable
-                key={type}
-                style={[styles.chip, form.content_type === type && styles.chipActive]}
-                onPress={() => set('content_type')(type)}
-              >
-                <Text style={[styles.chipText, form.content_type === type && styles.chipTextActive]}>{type}</Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <Text style={styles.sectionLabel}>Sport Tags</Text>
-          <View style={styles.chipRow}>
-            {SPORT_TAGS.map((tag) => (
-              <Pressable
-                key={tag}
-                style={[styles.chip, form.sport_tags.includes(tag) && styles.chipActive]}
-                onPress={() => toggleTag(tag)}
-              >
-                <Text style={[styles.chipText, form.sport_tags.includes(tag) && styles.chipTextActive]}>#{tag}</Text>
-              </Pressable>
-            ))}
-          </View>
-
-          {!!error && <Text style={styles.errorText}>{error}</Text>}
-          {success && <Text style={styles.successText}>✓ Post published!</Text>}
-
-          <Pressable style={({ pressed }) => [styles.btnSubmit, pressed && { opacity: 0.8 }]} onPress={handleSubmit} disabled={loading}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Publish Post</Text>}
-          </Pressable>
-        </View>
+    <View style={styles.page}>
+      <Header title="Create Post" />
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <Input label="Title *" value={title} onChangeText={setTitle} error={errors.title} />
+        <Input label="Body" value={body} onChangeText={setBody} multiline numberOfLines={6} style={styles.textarea} />
+        <Input label="Tags (comma separated)" value={tagsRaw} onChangeText={setTagsRaw} autoCapitalize="none" />
+        <Text style={styles.hint}>Posts are reviewed before publishing.</Text>
+        <Button title="Submit for Review" onPress={handleSubmit} loading={loading} style={styles.btn} />
       </ScrollView>
-    </KeyboardAvoidingView>
+      <Toast message={toast.message} visible={toast.visible} type={toast.type} onHide={() => setToast({ visible: false, message: '', type: 'error' })} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  inner: { flexGrow: 1, padding: SPACING[6], paddingTop: SPACING[14] },
-  heading: { ...TYPOGRAPHY.displaySm, color: COLORS.text, marginBottom: SPACING[1] },
-  sub: { ...TYPOGRAPHY.bodyMd, color: COLORS.textMuted, marginBottom: SPACING[6] },
-  form: { gap: SPACING[4] },
-  sectionLabel: { ...TYPOGRAPHY.labelMd, color: COLORS.textMuted, marginTop: SPACING[2] },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING[2] },
-  chip: { paddingHorizontal: SPACING[3], paddingVertical: SPACING[2], borderRadius: SPACING[5], borderWidth: 1, borderColor: COLORS.border },
-  chipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  chipText: { ...TYPOGRAPHY.labelSm, color: COLORS.textMuted },
-  chipTextActive: { color: '#fff' },
-  errorText: { ...TYPOGRAPHY.bodySm, color: COLORS.error },
-  successText: { ...TYPOGRAPHY.bodySm, color: COLORS.success },
-  btnSubmit: { backgroundColor: COLORS.primary, borderRadius: 14, paddingVertical: SPACING[4], alignItems: 'center', marginTop: SPACING[4] },
-  btnText: { ...TYPOGRAPHY.labelLg, color: '#fff' },
+  page: { flex: 1, backgroundColor: Colors.bg },
+  content: { padding: Spacing[5], gap: Spacing[4] },
+  textarea: { minHeight: 120 },
+  hint: { fontFamily: Typography.fontBody, fontSize: Typography.sizes.xs, color: Colors.textFaint },
+  btn: { marginTop: Spacing[2] },
 });

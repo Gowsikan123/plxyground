@@ -7,7 +7,7 @@ import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { Spacing, Radius } from '../../constants/spacing';
 
-export default function Settings() {
+export default function BusinessSettings() {
   const router = useRouter();
   const signOut = useAuthStore((s) => s.signOut);
 

@@ -1,54 +1,80 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
-import { useLocalSearchParams, Stack } from 'expo-router';
-import { api } from '../../services/api';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
+import { getCreatorProfile } from '../../services/creatorService';
+import { Header } from '../../components/layout/Header';
+import { Avatar } from '../../components/ui/Avatar';
+import { Badge } from '../../components/ui/Badge';
+import { PostCard } from '../../components/feed/PostCard';
+import { SkeletonCard } from '../../components/ui/Skeleton';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { Colors } from '../../constants/colors';
+import { Typography } from '../../constants/typography';
+import { Spacing } from '../../constants/spacing';
 
-export default function CreatorProfileScreen() {
+export default function CreatorProfile() {
   const { id } = useLocalSearchParams();
-  const [creator, setCreator] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    async function load() {
-      try {
-        const data = await api.get(`/creators/${id}`);
-        setCreator(data);
-      } catch {
-        setCreator(null);
-      } finally {
-        setLoading(false);
-      }
-    }
-    if (id) load();
+    (async () => {
+      const { data, error: err } = await getCreatorProfile(id);
+      if (err) setError(err);
+      else setProfile(data.data);
+      setLoading(false);
+    })();
   }, [id]);
 
-  if (loading) {
-    return <View style={styles.center}><ActivityIndicator color="#7c3aed" size="large" /></View>;
-  }
+  if (loading) return (
+    <View style={styles.page}>
+      <Header title="Creator" showBack />
+      {[1, 2, 3].map((k) => <SkeletonCard key={k} />)}
+    </View>
+  );
 
-  if (!creator) {
-    return <View style={styles.center}><Text style={styles.notFound}>Creator not found.</Text></View>;
-  }
+  if (error || !profile) return (
+    <View style={styles.page}>
+      <Header title="Creator" showBack />
+      <EmptyState title="Creator not found" message={error || ''} />
+    </View>
+  );
 
   return (
-    <ScrollView style={styles.container}>
-      <Stack.Screen options={{ title: `@${creator.username}`, headerStyle: { backgroundColor: '#0a0a0a' }, headerTintColor: '#fff' }} />
-      <View style={styles.header}>
-        <View style={styles.avatar}><Text style={styles.avatarText}>{creator.username?.[0]?.toUpperCase() || '?'}</Text></View>
-        <Text style={styles.username}>@{creator.username}</Text>
-        {creator.bio && <Text style={styles.bio}>{creator.bio}</Text>}
-      </View>
-    </ScrollView>
+    <View style={styles.page}>
+      <Header title={profile.display_name} showBack />
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.profileHeader}>
+          <Avatar uri={profile.avatar_url} name={profile.display_name} size={72} />
+          <View style={styles.info}>
+            <Text style={styles.name}>{profile.display_name}</Text>
+            <Text style={styles.handle}>@{profile.username}</Text>
+            {profile.is_verified ? <Badge label="✓ Verified" /> : null}
+          </View>
+        </View>
+        {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
+        <View style={styles.stats}>
+          {profile.sport ? <Text style={styles.stat}>🏆 {profile.sport}</Text> : null}
+          {profile.location ? <Text style={styles.stat}>📍 {profile.location}</Text> : null}
+          <Text style={styles.stat}>👥 {profile.follower_count} followers</Text>
+        </View>
+        <Text style={styles.sectionTitle}>Posts</Text>
+        {(profile.posts || []).map((p) => <PostCard key={p.id} post={{ ...p, display_name: profile.display_name, username: profile.username, creator_slug: profile.slug, avatar_url: profile.avatar_url, is_verified: profile.is_verified }} />)}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0a' },
-  center: { flex: 1, backgroundColor: '#0a0a0a', justifyContent: 'center', alignItems: 'center' },
-  header: { alignItems: 'center', padding: 40 },
-  avatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#7c3aed', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  avatarText: { color: '#fff', fontSize: 28, fontWeight: '800' },
-  username: { color: '#fff', fontSize: 20, fontWeight: '700' },
-  bio: { color: '#888', fontSize: 14, marginTop: 8, textAlign: 'center', maxWidth: 280 },
-  notFound: { color: '#888', fontSize: 16 },
+  page: { flex: 1, backgroundColor: Colors.bg },
+  content: { padding: Spacing[5], gap: Spacing[4] },
+  profileHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing[4] },
+  info: { flex: 1, gap: Spacing[1] },
+  name: { fontFamily: Typography.fontDisplay, fontSize: Typography.sizes.xl, color: Colors.text },
+  handle: { fontFamily: Typography.fontBody, fontSize: Typography.sizes.sm, color: Colors.textMuted },
+  bio: { fontFamily: Typography.fontBody, fontSize: Typography.sizes.base, color: Colors.textMuted },
+  stats: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing[3] },
+  stat: { fontFamily: Typography.fontBody, fontSize: Typography.sizes.sm, color: Colors.textMuted },
+  sectionTitle: { fontFamily: Typography.fontDisplay, fontSize: Typography.sizes.lg, color: Colors.text },
 });

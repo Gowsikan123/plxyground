@@ -1,75 +1,69 @@
-import { View, Text, StyleSheet, Pressable, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
-import { useState } from 'react';
-import { router } from 'expo-router';
-import { COLORS } from '../../constants/colors';
-import { TYPOGRAPHY } from '../../constants/typography';
-import { SPACING } from '../../constants/spacing';
-import Input from '../../components/ui/Input';
-import { useAuth } from '../../hooks/useAuth';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Input } from '../../components/ui/Input';
+import { Button } from '../../components/ui/Button';
+import { Toast } from '../../components/ui/Toast';
+import { creatorSignup } from '../../services/authService';
+import { useAuthStore } from '../../store/authStore';
+import { Colors } from '../../constants/colors';
+import { Typography } from '../../constants/typography';
+import { Spacing } from '../../constants/spacing';
 
-export default function SignupScreen() {
-  const { register, loading } = useAuth();
-  const [form, setForm] = useState({ username: '', displayName: '', email: '', password: '', confirmPassword: '', bio: '', sportsNiche: '' });
-  const [error, setError] = useState('');
+export default function Signup() {
+  const router = useRouter();
+  const signIn = useAuthStore((s) => s.signIn);
+  const [form, setForm] = useState({ email: '', password: '', username: '', display_name: '', sport: '', location: '' });
+  const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState({ visible: false, message: '' });
+  const [errors, setErrors] = useState({});
 
   const set = (key) => (val) => setForm((f) => ({ ...f, [key]: val }));
 
+  const validate = () => {
+    const e = {};
+    if (!form.email.trim()) e.email = 'Email is required.';
+    if (form.password.length < 8) e.password = 'Password must be at least 8 characters.';
+    if (!form.username.trim() || form.username.length < 3) e.username = 'Username must be at least 3 characters.';
+    if (!form.display_name.trim()) e.display_name = 'Display name is required.';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
   const handleSignup = async () => {
-    setError('');
-    const { username, displayName, email, password, confirmPassword } = form;
-    if (!username || !displayName || !email || !password) { setError('Please fill in all required fields'); return; }
-    if (password !== confirmPassword) { setError('Passwords do not match'); return; }
-    if (password.length < 8) { setError('Password must be at least 8 characters'); return; }
-    const { error: err } = await register({ username: username.trim().toLowerCase(), display_name: displayName.trim(), email: email.trim().toLowerCase(), password, bio: form.bio, sports_niche: form.sportsNiche });
-    if (err) setError(err);
+    if (!validate()) return;
+    setLoading(true);
+    const { data, error } = await creatorSignup({ ...form, email: form.email.trim() });
+    setLoading(false);
+    if (error) { setToast({ visible: true, message: error }); return; }
+    await signIn(data.token, data.creator, 'creator');
+    router.replace('/(creator)/feed');
   };
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
-        <Pressable style={styles.back} onPress={() => router.back()}>
-          <Text style={styles.backText}>← Back</Text>
-        </Pressable>
-        <Text style={styles.heading}>Create account</Text>
-        <Text style={styles.sub}>Join the creator community</Text>
-        <View style={styles.form}>
-          <Input label="Username *" value={form.username} onChangeText={set('username')} autoCapitalize="none" />
-          <Input label="Display Name *" value={form.displayName} onChangeText={set('displayName')} />
-          <Input label="Email *" value={form.email} onChangeText={set('email')} keyboardType="email-address" autoCapitalize="none" />
-          <Input label="Sports Niche" value={form.sportsNiche} onChangeText={set('sportsNiche')} placeholder="e.g. Basketball, Football, MMA" />
-          <Input label="Bio" value={form.bio} onChangeText={set('bio')} multiline numberOfLines={3} />
-          <Input label="Password *" value={form.password} onChangeText={set('password')} secureTextEntry />
-          <Input label="Confirm Password *" value={form.confirmPassword} onChangeText={set('confirmPassword')} secureTextEntry />
-          {!!error && <Text style={styles.errorText}>{error}</Text>}
-          <Pressable
-            style={({ pressed }) => [styles.btnPrimary, pressed && { opacity: 0.8 }]}
-            onPress={handleSignup}
-            disabled={loading}
-          >
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Create Account</Text>}
-          </Pressable>
-          <View style={styles.switchRow}>
-            <Text style={styles.switchHint}>Already have an account? </Text>
-            <Pressable onPress={() => router.push('/(auth)/login')}><Text style={styles.switchLink}>Sign in</Text></Pressable>
-          </View>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    <ScrollView style={styles.page} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <Text style={styles.brand}>PLXYGROUND</Text>
+      <Text style={styles.heading}>Create Creator Account</Text>
+      <Input label="Display Name" value={form.display_name} onChangeText={set('display_name')} error={errors.display_name} />
+      <Input label="Username" value={form.username} onChangeText={set('username')} autoCapitalize="none" error={errors.username} />
+      <Input label="Email" value={form.email} onChangeText={set('email')} keyboardType="email-address" autoCapitalize="none" error={errors.email} />
+      <Input label="Password" value={form.password} onChangeText={set('password')} secureTextEntry error={errors.password} />
+      <Input label="Sport (optional)" value={form.sport} onChangeText={set('sport')} />
+      <Input label="Location (optional)" value={form.location} onChangeText={set('location')} />
+      <Button title="Sign Up" onPress={handleSignup} loading={loading} style={styles.btn} />
+      <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
+        <Text style={styles.link}>Already have an account? Log in</Text>
+      </TouchableOpacity>
+      <Toast message={toast.message} visible={toast.visible} type="error" onHide={() => setToast({ visible: false, message: '' })} />
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  inner: { flexGrow: 1, padding: SPACING[6], paddingTop: SPACING[12] },
-  back: { marginBottom: SPACING[8] },
-  backText: { ...TYPOGRAPHY.bodySm, color: COLORS.primary },
-  heading: { ...TYPOGRAPHY.displaySm, color: COLORS.text, marginBottom: SPACING[1] },
-  sub: { ...TYPOGRAPHY.bodyMd, color: COLORS.textMuted, marginBottom: SPACING[8] },
-  form: { gap: SPACING[4] },
-  errorText: { ...TYPOGRAPHY.bodySm, color: COLORS.error },
-  btnPrimary: { backgroundColor: COLORS.primary, borderRadius: 14, paddingVertical: SPACING[4], alignItems: 'center', marginTop: SPACING[2] },
-  btnText: { ...TYPOGRAPHY.labelLg, color: '#fff' },
-  switchRow: { flexDirection: 'row', justifyContent: 'center' },
-  switchHint: { ...TYPOGRAPHY.bodySm, color: COLORS.textMuted },
-  switchLink: { ...TYPOGRAPHY.bodySm, color: COLORS.primary, fontWeight: '600' },
+  page: { flex: 1, backgroundColor: Colors.bg },
+  content: { padding: Spacing[6], gap: Spacing[3] },
+  brand: { fontFamily: Typography.fontDisplay, fontSize: Typography.sizes['2xl'], color: Colors.accent, textAlign: 'center' },
+  heading: { fontFamily: Typography.fontDisplay, fontSize: Typography.sizes.xl, color: Colors.text, marginBottom: Spacing[2] },
+  btn: { marginTop: Spacing[2] },
+  link: { fontFamily: Typography.fontBody, fontSize: Typography.sizes.sm, color: Colors.accent, textAlign: 'center' },
 });

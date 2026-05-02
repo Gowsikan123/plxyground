@@ -1,70 +1,85 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, TextInput, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
-import { api } from '../../services/api';
-import { debounce } from '../../utils/debounce';
+import React, { useEffect, useState } from 'react';
+import { View, TextInput, StyleSheet } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
+import { Header } from '../../components/layout/Header';
+import { Avatar } from '../../components/ui/Avatar';
+import { Badge } from '../../components/ui/Badge';
+import { Card } from '../../components/ui/Card';
+import { Text, TouchableOpacity } from 'react-native';
+import { SkeletonCard } from '../../components/ui/Skeleton';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { getCreators } from '../../services/creatorService';
+import { useRouter } from 'expo-router';
+import { Colors } from '../../constants/colors';
+import { Typography } from '../../constants/typography';
+import { Spacing, Radius } from '../../constants/spacing';
 
-export default function SearchCreatorsScreen() {
+export default function SearchCreators() {
+  const router = useRouter();
+  const [q, setQ] = useState('');
   const [creators, setCreators] = useState([]);
-  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
 
-  async function load(q = '') {
-    try {
-      const data = await api.get(`/creators?search=${encodeURIComponent(q)}`);
-      setCreators(data.data || []);
-    } catch {
-      setCreators([]);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }
+  const search = async (query) => {
+    setLoading(true);
+    setError(null);
+    const { data, error: err } = await getCreators({ q: query, limit: 30 });
+    if (err) setError(err);
+    else setCreators(data.data);
+    setLoading(false);
+  };
 
-  const debouncedLoad = useCallback(debounce(load, 400), []);
+  useEffect(() => { search(''); }, []);
 
-  useEffect(() => { load(); }, []);
-  useEffect(() => { debouncedLoad(search); }, [search]);
-
-  if (loading) {
-    return <View style={styles.center}><ActivityIndicator color="#7c3aed" size="large" /></View>;
-  }
+  if (loading) return (
+    <View style={styles.page}>
+      <Header title="Find Creators" />
+      <View style={{ padding: Spacing[4] }}>{[1, 2, 3].map((k) => <SkeletonCard key={k} />)}</View>
+    </View>
+  );
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.heading}>Find Creators</Text>
-      <TextInput style={styles.search} value={search} onChangeText={setSearch}
-        placeholder="Search by name or niche..." placeholderTextColor="#555" />
-      <FlatList
-        data={creators}
-        keyExtractor={(item) => String(item.id)}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(search); }} tintColor="#7c3aed" />}
-        ListEmptyComponent={<View style={styles.empty}><Text style={styles.emptyText}>No creators found</Text></View>}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={styles.avatar}><Text style={styles.avatarText}>{item.username?.[0]?.toUpperCase() || '?'}</Text></View>
-            <View style={styles.info}>
-              <Text style={styles.username}>@{item.username}</Text>
-              {item.bio && <Text style={styles.bio} numberOfLines={2}>{item.bio}</Text>}
-            </View>
-          </View>
-        )}
-      />
+    <View style={styles.page}>
+      <Header title="Find Creators" />
+      <View style={styles.searchBar}>
+        <TextInput
+          value={q}
+          onChangeText={(v) => { setQ(v); search(v); }}
+          placeholder="Search by name or username..."
+          placeholderTextColor={Colors.textFaint}
+          style={styles.input}
+        />
+      </View>
+      {creators.length === 0 ? (
+        <EmptyState title="No creators found" message="Try a different search." />
+      ) : (
+        <FlashList
+          data={creators}
+          keyExtractor={(c) => String(c.id)}
+          estimatedItemSize={80}
+          contentContainerStyle={{ padding: Spacing[4] }}
+          renderItem={({ item }) => (
+            <TouchableOpacity onPress={() => router.push(`/creator/${item.slug}`)} style={styles.row}>
+              <Avatar uri={item.avatar_url} name={item.display_name} size={44} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.name}>{item.display_name}</Text>
+                <Text style={styles.handle}>@{item.username}</Text>
+              </View>
+              {item.sport ? <Badge label={item.sport} /> : null}
+            </TouchableOpacity>
+          )}
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0a', paddingHorizontal: 16, paddingTop: 24 },
-  center: { flex: 1, backgroundColor: '#0a0a0a', justifyContent: 'center', alignItems: 'center' },
-  heading: { color: '#fff', fontSize: 22, fontWeight: '800', marginBottom: 12 },
-  search: { backgroundColor: '#111', color: '#fff', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, borderWidth: 1, borderColor: '#1e1e1e', marginBottom: 16 },
-  card: { flexDirection: 'row', backgroundColor: '#111', borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#1e1e1e', alignItems: 'center', gap: 12 },
-  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#2d1b6b', justifyContent: 'center', alignItems: 'center' },
-  avatarText: { color: '#c4b5fd', fontSize: 18, fontWeight: '700' },
-  info: { flex: 1 },
-  username: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  bio: { color: '#888', fontSize: 13, marginTop: 2 },
-  empty: { paddingTop: 60, alignItems: 'center' },
-  emptyText: { color: '#666', fontSize: 16 },
+  page: { flex: 1, backgroundColor: Colors.bg },
+  searchBar: { padding: Spacing[4] },
+  input: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md, paddingVertical: Spacing[3], paddingHorizontal: Spacing[4], fontSize: Typography.sizes.base, color: Colors.text },
+  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing[3], backgroundColor: Colors.surface, borderRadius: Radius.md, padding: Spacing[3], marginBottom: Spacing[2], borderWidth: 1, borderColor: Colors.border },
+  name: { fontFamily: Typography.fontBodyMedium, fontSize: Typography.sizes.base, color: Colors.text },
+  handle: { fontFamily: Typography.fontBody, fontSize: Typography.sizes.sm, color: Colors.textMuted },
 });

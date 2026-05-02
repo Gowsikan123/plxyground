@@ -1,51 +1,53 @@
-import { View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
-import { router } from 'expo-router';
-import { COLORS } from '../../constants/colors';
-import { TYPOGRAPHY } from '../../constants/typography';
-import { SPACING } from '../../constants/spacing';
+import React, { useEffect } from 'react';
+import { View, StyleSheet } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
+import { Header } from '../../components/layout/Header';
+import { OpportunityCard } from '../../components/opportunities/OpportunityCard';
+import { SkeletonCard } from '../../components/ui/Skeleton';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { useOpportunities } from '../../hooks/useOpportunities';
-import OpportunityCard from '../../components/layout/OpportunityCard';
-import EmptyState from '../../components/ui/EmptyState';
-import Header from '../../components/layout/Header';
+import { Colors } from '../../constants/colors';
+import { Spacing } from '../../constants/spacing';
 
-export default function OpportunitiesScreen() {
-  const { opportunities, loading, refreshing, refresh, loadMore, hasMore } = useOpportunities();
+export default function Opportunities() {
+  const { items, isLoading, isRefreshing, error, hasMore, load } = useOpportunities();
 
-  if (loading && opportunities.length === 0) {
-    return (
-      <View style={[styles.container, styles.center]}>
-        <ActivityIndicator color={COLORS.primary} size="large" />
-      </View>
-    );
-  }
+  useEffect(() => { load(true); }, []);
+
+  if (isLoading && items.length === 0) return (
+    <View style={styles.page}>
+      <Header title="Opportunities" />
+      <View style={{ padding: Spacing[4] }}>{[1, 2, 3].map((k) => <SkeletonCard key={k} />)}</View>
+    </View>
+  );
+
+  if (error && items.length === 0) return (
+    <View style={styles.page}>
+      <Header title="Opportunities" />
+      <EmptyState title="Could not load opportunities" message={error} actionLabel="Retry" onAction={() => load(true)} />
+    </View>
+  );
 
   return (
-    <View style={styles.container}>
+    <View style={styles.page}>
       <Header title="Opportunities" />
-      <FlatList
-        data={opportunities}
-        keyExtractor={(item) => String(item.id)}
-        renderItem={({ item }) => (
-          <Pressable onPress={() => router.push(`/opportunity/${item.id}`)}>
-            <OpportunityCard opportunity={item} />
-          </Pressable>
-        )}
-        contentContainerStyle={styles.list}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={COLORS.primary} />}
-        onEndReached={hasMore ? loadMore : null}
-        onEndReachedThreshold={0.3}
-        ListEmptyComponent={<EmptyState icon="briefcase-outline" title="No opportunities yet" message="Check back soon — businesses are adding new deals" />}
-        ListFooterComponent={hasMore && !refreshing ? <ActivityIndicator color={COLORS.primary} style={styles.footerLoader} /> : null}
-      />
+      {items.length === 0 && !isLoading ? (
+        <EmptyState title="No opportunities yet" message="Check back soon." />
+      ) : (
+        <FlashList
+          data={items}
+          keyExtractor={(i) => String(i.id)}
+          renderItem={({ item }) => <OpportunityCard item={item} />}
+          estimatedItemSize={140}
+          contentContainerStyle={{ padding: Spacing[4] }}
+          onRefresh={() => load(true)}
+          refreshing={isRefreshing}
+          onEndReached={hasMore ? () => load(false) : undefined}
+          onEndReachedThreshold={0.5}
+        />
+      )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  center: { justifyContent: 'center', alignItems: 'center' },
-  list: { padding: SPACING[4], paddingBottom: SPACING[12] },
-  separator: { height: SPACING[3] },
-  footerLoader: { marginVertical: SPACING[4] },
-});
+const styles = StyleSheet.create({ page: { flex: 1, backgroundColor: Colors.bg } });
