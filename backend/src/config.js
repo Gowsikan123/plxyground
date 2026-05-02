@@ -1,9 +1,8 @@
 'use strict';
 
-const REQUIRED = [
-  'DATABASE_URL',
-  'JWT_SECRET',
-];
+require('dotenv').config();
+
+const REQUIRED = ['DATABASE_URL', 'JWT_SECRET'];
 
 for (const key of REQUIRED) {
   if (!process.env[key]) {
@@ -12,7 +11,7 @@ for (const key of REQUIRED) {
 }
 
 if (process.env.JWT_SECRET.length < 32) {
-  throw new Error('[config] JWT_SECRET must be at least 32 characters');
+  throw new Error('[config] JWT_SECRET must be at least 32 characters long');
 }
 
 const config = {

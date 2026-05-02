@@ -2,24 +2,25 @@
 
 const LEVELS = { info: 'INFO', warn: 'WARN', error: 'ERROR' };
 
-function log(level, message, meta) {
+function format(level, message, meta) {
   const ts = new Date().toISOString();
-  const label = LEVELS[level] || 'INFO';
-  const base = `[${ts}] [${label}] ${message}`;
-  if (meta !== undefined) {
-    const extra = meta instanceof Error
-      ? { message: meta.message, stack: meta.stack }
-      : meta;
-    process.stdout.write(`${base} ${JSON.stringify(extra)}\n`);
-  } else {
-    process.stdout.write(`${base}\n`);
+  const base = `[${ts}] [${level}] ${message}`;
+  if (meta && Object.keys(meta).length > 0) {
+    return `${base} ${JSON.stringify(meta)}`;
   }
+  return base;
 }
 
 const logger = {
-  info:  (msg, meta) => log('info',  msg, meta),
-  warn:  (msg, meta) => log('warn',  msg, meta),
-  error: (msg, meta) => log('error', msg, meta),
+  info(message, meta = {}) {
+    process.stdout.write(format(LEVELS.info, message, meta) + '\n');
+  },
+  warn(message, meta = {}) {
+    process.stdout.write(format(LEVELS.warn, message, meta) + '\n');
+  },
+  error(message, meta = {}) {
+    process.stderr.write(format(LEVELS.error, message, meta) + '\n');
+  },
 };
 
 module.exports = logger;

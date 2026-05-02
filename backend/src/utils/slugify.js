@@ -1,42 +1,40 @@
 'use strict';
 
-const pool = require('../db/client');
+const { getPool } = require('../db/client');
 
-/**
- * Converts a string to a URL-safe slug.
- * e.g. "Jordan Miles" => "jordan-miles"
- * @param {string} text
- * @returns {string}
- */
-function toSlug(text) {
-  return text
+function toSlug(str) {
+  return str
     .toLowerCase()
     .trim()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/[\s_]+/g, '-')
-    .replace(/--+/g, '-')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/[\s-]+/g, '-')
     .replace(/^-+|-+$/g, '');
 }
 
-/**
- * Generates a unique slug for a creator, appending a numeric suffix on collision.
- * @param {string} name
- * @returns {Promise<string>}
- */
-async function uniqueCreatorSlug(name) {
-  const base = toSlug(name);
-  let slug = base;
-  let suffix = 1;
+async function generateUniqueSlug(base, table, column = 'slug') {
+  const pool = getPool();
+  const slug = toSlug(base);
 
-  while (true) {
-    const { rows } = await pool.query(
-      'SELECT id FROM creators WHERE slug = $1',
-      [slug]
-    );
-    if (rows.length === 0) return slug;
-    slug = `${base}-${suffix}`;
-    suffix += 1;
-  }
+  const { rows } = await pool.query(
+    `SELECT $3 FROM $1 WHERE $2 = $3 LIMIT 1`,
+    [table, column, slug]
+  );
+
+  if (rows.length === 0) return slug;
+
+  // Collision — append a random 4-digit suffix
+  const suffix = Math.floor(1000 + Math.random() * 9000);
+  const candidate = `${slug}-${suffix}`;
+
+  const { rows: rows2 } = await pool.query(
+    `SELECT $2 FROM ${table} WHERE ${column} = $1 LIMIT 1`,
+    [candidate, column]
+  );
+
+  if (rows2.length === 0) return candidate;
+
+  // Extremely unlikely second collision — append timestamp ms
+  return `${slug}-${Date.now()}`;
 }
 
-module.exports = { toSlug, uniqueCreatorSlug };
+module.exports = { toSlug, generateUniqueSlug };
