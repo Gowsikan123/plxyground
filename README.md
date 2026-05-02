@@ -9,18 +9,52 @@ A platform connecting sports creators with businesses and opportunities.
 | Backend API | Node.js 20 + Express 4 |
 | Database | PostgreSQL 16 |
 | Mobile App | Expo / React Native |
-| Admin Panel | React (Vite) |
+| Admin Panel | HTML + Node.js serve |
 
 ## Quick Start
 
-### Backend
+### Option A — Start Everything at Once (Windows)
+
+Open PowerShell and run:
+
+```powershell
+.\start-all.ps1
+```
+
+This opens three separate terminal windows for the backend, admin panel, and frontend.
+
+Or use the batch file alternative:
+
+```bat
+start-all.bat
+```
+
+### Option B — Start Each Service Manually
+
+#### Backend
 
 ```bash
 cd backend
 npm install
 cp .env.example .env   # fill in your DATABASE_URL and JWT_SECRET
 node src/db/migrate.js # run migrations
-npm run dev            # start dev server
+npm run dev            # starts on http://localhost:3011
+```
+
+#### Admin Panel
+
+```bash
+cd admin-panel
+npm install
+npm run start          # starts on http://localhost:3012
+```
+
+#### Frontend (Expo)
+
+```bash
+cd frontend
+npm install
+npm run start          # opens Expo DevTools → http://localhost:19006
 ```
 
 ### Tests
@@ -28,6 +62,12 @@ npm run dev            # start dev server
 ```bash
 cd backend
 npm test
+```
+
+To run the full integration smoke suite (requires the backend to be running):
+
+```bash
+node backend/scripts/smoke.js
 ```
 
 ## API Endpoints
@@ -54,7 +94,7 @@ npm test
 
 ## CI
 
-GitHub Actions runs smoke tests on every push to `main` or `develop` that touches `backend/`. Tests run against a real PostgreSQL 16 instance.
+GitHub Actions CI is not yet configured. The smoke suite in `backend/scripts/smoke.js` can be run manually against a local environment (see Tests above).
 
 ## Environment Variables
 
