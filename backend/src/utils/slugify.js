@@ -3,32 +3,40 @@
 const pool = require('../db/client');
 
 /**
- * Generate a URL-safe slug from a string.
- * Appends a numeric suffix if the slug already exists in the given table.
- * @param {string} input
- * @param {'creators'|'businesses'} table
- * @returns {Promise<string>}
+ * Converts a string to a URL-safe slug.
+ * e.g. "Jordan Miles" => "jordan-miles"
+ * @param {string} text
+ * @returns {string}
  */
-async function slugify(input, table) {
-  const base = input
+function toSlug(text) {
+  return text
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/--+/g, '-')
     .replace(/^-+|-+$/g, '');
-
-  const { rows } = await pool.query(
-    `SELECT slug FROM ${table} WHERE slug LIKE $1 ORDER BY slug`,
-    [`${base}%`]
-  );
-
-  if (rows.length === 0) return base;
-
-  const existing = new Set(rows.map((r) => r.slug));
-  if (!existing.has(base)) return base;
-
-  let i = 2;
-  while (existing.has(`${base}-${i}`)) i++;
-  return `${base}-${i}`;
 }
 
-module.exports = slugify;
+/**
+ * Generates a unique slug for a creator, appending a numeric suffix on collision.
+ * @param {string} name
+ * @returns {Promise<string>}
+ */
+async function uniqueCreatorSlug(name) {
+  const base = toSlug(name);
+  let slug = base;
+  let suffix = 1;
+
+  while (true) {
+    const { rows } = await pool.query(
+      'SELECT id FROM creators WHERE slug = $1',
+      [slug]
+    );
+    if (rows.length === 0) return slug;
+    slug = `${base}-${suffix}`;
+    suffix += 1;
+  }
+}
+
+module.exports = { toSlug, uniqueCreatorSlug };

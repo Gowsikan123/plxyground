@@ -2,6 +2,10 @@
 
 const { validationResult } = require('express-validator');
 
+/**
+ * Express middleware that reads express-validator results.
+ * Returns 422 with an errors array if any validations failed.
+ */
 function validate(req, res, next) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
