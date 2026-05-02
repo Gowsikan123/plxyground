@@ -1,4 +1,5 @@
 'use strict';
+
 const rateLimit = require('express-rate-limit');
 
 const globalLimiter = rateLimit({
@@ -6,7 +7,7 @@ const globalLimiter = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many requests, please try again later.' },
+  message: { error: 'Too many requests. Please try again later.' },
 });
 
 const authLimiter = rateLimit({
@@ -14,7 +15,7 @@ const authLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many auth attempts, please try again later.' },
+  message: { error: 'Too many auth attempts. Please try again later.' },
 });
 
 module.exports = { globalLimiter, authLimiter };

@@ -1,4 +1,5 @@
 'use strict';
+
 const { validationResult } = require('express-validator');
 
 function validate(req, res, next) {
@@ -7,7 +8,7 @@ function validate(req, res, next) {
     const formatted = errors.array().map((e) => ({ field: e.path, message: e.msg }));
     return res.status(400).json({ errors: formatted });
   }
-  next();
+  return next();
 }
 
 module.exports = { validate };
