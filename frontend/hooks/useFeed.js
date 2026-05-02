@@ -2,28 +2,31 @@ import { useEffect, useCallback } from 'react';
 import { useFeedStore } from '../store/feedStore';
 
 export function useFeed() {
-  const {
-    posts, total, hasMore,
-    isLoading, isRefreshing, error,
-    filters, setFilter,
-    refresh, loadMore, reset,
-  } = useFeedStore();
+  const store = useFeedStore();
 
   useEffect(() => {
-    refresh();
-    return () => reset();
+    if (store.posts.length === 0 && !store.isLoading) {
+      store.fetchFeed(true);
+    }
   }, []);
 
+  const loadMore = useCallback(() => {
+    if (!store.isLoading && store.hasMore) store.fetchFeed();
+  }, [store.isLoading, store.hasMore, store.fetchFeed]);
+
+  const refresh = useCallback(() => store.refresh(), [store.refresh]);
+
   return {
-    posts,
-    total,
-    hasMore,
-    isLoading,
-    isRefreshing,
-    error,
-    filters,
-    setFilter: useCallback(setFilter, []),
-    refresh:   useCallback(refresh, []),
-    loadMore:  useCallback(loadMore, []),
+    posts:        store.posts,
+    total:        store.total,
+    hasMore:      store.hasMore,
+    isLoading:    store.isLoading,
+    isRefreshing: store.isRefreshing,
+    error:        store.error,
+    filters:      store.filters,
+    loadMore,
+    refresh,
+    setFilters:   store.setFilters,
+    clearError:   store.clearError,
   };
 }

@@ -1,35 +1,43 @@
-import { api, safeCall } from './api';
+import api from './api';
+
+async function safeCall(fn) {
+  try {
+    const res = await fn();
+    return { data: res.data, error: null };
+  } catch (err) {
+    return { data: null, error: err.message || 'Request failed' };
+  }
+}
 
 export const contentService = {
-  getFeed: ({ search = '', sport = '', tags = '', limit = 20, offset = 0 } = {}) => {
-    const params = {};
+  getFeed: ({ limit = 20, offset = 0, search = '', sport = '' } = {}) => {
+    const params = { limit, offset };
     if (search) params.search = search;
     if (sport)  params.sport  = sport;
-    if (tags)   params.tags   = tags;
-    params.limit  = limit;
-    params.offset = offset;
-    return safeCall(api.get('/api/content', { params }));
+    return safeCall(() => api.get('/api/content', { params }));
   },
 
   getPost: (id) =>
-    safeCall(api.get(`/api/content/${id}`)),
+    safeCall(() => api.get(`/api/content/${id}`)),
 
-  createPost: (payload) =>
-    safeCall(api.post('/api/content', payload)),
+  createPost: (fields) =>
+    safeCall(() => api.post('/api/content', fields)),
 
-  updatePost: (id, payload) =>
-    safeCall(api.put(`/api/content/${id}`, payload)),
+  updatePost: (id, fields) =>
+    safeCall(() => api.put(`/api/content/${id}`, fields)),
 
   deletePost: (id) =>
-    safeCall(api.delete(`/api/content/${id}`)),
+    safeCall(() => api.delete(`/api/content/${id}`)),
 
-  // Business content
-  createBusinessContent: (payload) =>
-    safeCall(api.post('/api/business-auth/content', payload)),
+  getMyContent: ({ limit = 20, offset = 0 } = {}) =>
+    safeCall(() => api.get('/api/content/mine', { params: { limit, offset } })),
 
-  getMyBusinessContent: () =>
-    safeCall(api.get('/api/business-auth/content/mine')),
+  getBusinessContent: ({ limit = 20, offset = 0 } = {}) =>
+    safeCall(() => api.get('/api/business-auth/content/mine', { params: { limit, offset } })),
 
-  updateBusinessContent: (id, payload) =>
-    safeCall(api.put(`/api/business-auth/content/${id}`, payload)),
+  createBusinessContent: (fields) =>
+    safeCall(() => api.post('/api/business-auth/content', fields)),
+
+  updateBusinessContent: (id, fields) =>
+    safeCall(() => api.put(`/api/business-auth/content/${id}`, fields)),
 };

@@ -1,23 +1,23 @@
 import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
-import { colors } from '../../constants/colors';
-import { radius } from '../../constants/spacing';
-import { fontSize, fontFamily } from '../../constants/typography';
+import { colors }   from '../../constants/colors';
+import { fontSize } from '../../constants/typography';
+import { borderRadius } from '../../constants/spacing';
 
-const SIZE_MAP = { sm: 32, md: 44, lg: 56, xl: 72 };
+const SIZE_MAP = { xs: 24, sm: 32, md: 40, lg: 56, xl: 72 };
 
-export function Avatar({ uri, name, size = 'md', style }) {
-  const dim     = SIZE_MAP[size] || SIZE_MAP.md;
+export const Avatar = React.memo(function Avatar({ uri, name, size = 'md', style }) {
+  const dim = SIZE_MAP[size] || SIZE_MAP.md;
   const initials = name
-    ? name.trim().split(' ').slice(0, 2).map(w => w[0].toUpperCase()).join('')
+    ? name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
     : '?';
 
   return (
-    <View style={[styles.container, { width: dim, height: dim, borderRadius: radius.full }, style]}>
+    <View style={[styles.base, { width: dim, height: dim, borderRadius: dim / 2 }, style]}>
       {uri ? (
         <Image
           source={{ uri }}
-          style={[styles.image, { width: dim, height: dim, borderRadius: radius.full }]}
+          style={{ width: dim, height: dim, borderRadius: dim / 2 }}
           resizeMode="cover"
         />
       ) : (
@@ -25,19 +25,19 @@ export function Avatar({ uri, name, size = 'md', style }) {
       )}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
-  container: {
+  base: {
     backgroundColor: colors.surfaceElevated,
-    alignItems:     'center',
-    justifyContent: 'center',
-    overflow:       'hidden',
+    alignItems:      'center',
+    justifyContent:  'center',
+    overflow:        'hidden',
+    borderWidth:     1,
+    borderColor:     colors.border,
   },
-  image:    { position: 'absolute', inset: 0 },
   initials: {
     color:      colors.textSecondary,
-    fontFamily: fontFamily.syne.bold,
-    fontWeight: '700',
+    fontFamily: 'Syne_700Bold',
   },
 });

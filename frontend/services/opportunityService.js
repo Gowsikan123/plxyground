@@ -1,25 +1,31 @@
-import { api, safeCall } from './api';
+import api from './api';
+
+async function safeCall(fn) {
+  try {
+    const res = await fn();
+    return { data: res.data, error: null };
+  } catch (err) {
+    return { data: null, error: err.message || 'Request failed' };
+  }
+}
 
 export const opportunityService = {
-  listOpportunities: ({ search = '', sport = '', type = '', limit = 20, offset = 0 } = {}) => {
-    const params = {};
+  getAll: ({ search = '', sport = '', limit = 20, offset = 0 } = {}) => {
+    const params = { limit, offset };
     if (search) params.search = search;
     if (sport)  params.sport  = sport;
-    if (type)   params.type   = type;
-    params.limit  = limit;
-    params.offset = offset;
-    return safeCall(api.get('/api/opportunities', { params }));
+    return safeCall(() => api.get('/api/opportunities', { params }));
   },
 
-  getOpportunity: (id) =>
-    safeCall(api.get(`/api/opportunities/${id}`)),
+  getOne: (id) =>
+    safeCall(() => api.get(`/api/opportunities/${id}`)),
 
-  createOpportunity: (payload) =>
-    safeCall(api.post('/api/opportunities', payload)),
+  create: (fields) =>
+    safeCall(() => api.post('/api/opportunities', fields)),
 
-  updateOpportunity: (id, payload) =>
-    safeCall(api.put(`/api/opportunities/${id}`, payload)),
+  update: (id, fields) =>
+    safeCall(() => api.put(`/api/opportunities/${id}`, fields)),
 
-  deleteOpportunity: (id) =>
-    safeCall(api.delete(`/api/opportunities/${id}`)),
+  remove: (id) =>
+    safeCall(() => api.delete(`/api/opportunities/${id}`)),
 };

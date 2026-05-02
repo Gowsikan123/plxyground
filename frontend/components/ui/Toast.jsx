@@ -1,77 +1,57 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../../constants/colors';
-import { spacing, radius } from '../../constants/spacing';
-import { fontSize, fontFamily } from '../../constants/typography';
+import { colors }      from '../../constants/colors';
+import { fontSize }    from '../../constants/typography';
+import { spacing, borderRadius } from '../../constants/spacing';
 
-const TYPE_COLORS = {
-  success: colors.success,
-  error:   colors.error,
-  info:    colors.textSecondary,
-  warning: colors.warning,
-};
-
-export function Toast({ message, type = 'info', onDismiss }) {
-  const insets   = useSafeAreaInsets();
-  const slideAnim = useRef(new Animated.Value(100)).current;
-  const opacAnim  = useRef(new Animated.Value(0)).current;
+export function Toast({ message, type = 'info', visible, onHide, duration = 3000 }) {
+  const insets = useSafeAreaInsets();
+  const anim   = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
-      Animated.timing(opacAnim,  { toValue: 1, duration: 300, useNativeDriver: true }),
-    ]).start();
+    if (visible) {
+      Animated.spring(anim, { toValue: 1, useNativeDriver: true, tension: 60, friction: 10 }).start();
+      const timer = setTimeout(() => {
+        Animated.timing(anim, { toValue: 0, duration: 250, useNativeDriver: true }).start(onHide);
+      }, duration);
+      return () => clearTimeout(timer);
+    } else {
+      anim.setValue(0);
+    }
+  }, [visible]);
 
-    const timer = setTimeout(() => {
-      Animated.parallel([
-        Animated.timing(slideAnim, { toValue: 100, duration: 250, useNativeDriver: true }),
-        Animated.timing(opacAnim,  { toValue: 0,   duration: 250, useNativeDriver: true }),
-      ]).start(() => onDismiss?.());
-    }, 3000);
-
-    return () => clearTimeout(timer);
-  }, []);
+  const bg = type === 'success' ? colors.success
+           : type === 'error'   ? colors.error
+           : '#333';
 
   return (
     <Animated.View
+      pointerEvents="none"
       style={[
         styles.container,
-        { bottom: insets.bottom + spacing[4], transform: [{ translateY: slideAnim }], opacity: opacAnim },
+        { bottom: insets.bottom + spacing[4], opacity: anim,
+          transform: [{ translateY: anim.interpolate({ inputRange: [0,1], outputRange: [20, 0] }) }] },
       ]}
     >
-      <View style={[styles.dot, { backgroundColor: TYPE_COLORS[type] }]} />
-      <Text style={styles.text}>{message}</Text>
+      <TouchableOpacity activeOpacity={0.85} onPress={onHide} style={[styles.pill, { backgroundColor: bg }]}>
+        <Text style={styles.text}>{message}</Text>
+      </TouchableOpacity>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    position:        'absolute',
-    left:            spacing[4],
-    right:           spacing[4],
-    backgroundColor: colors.surfaceElevated,
-    borderRadius:    radius.md,
-    paddingVertical:   spacing[3],
-    paddingHorizontal: spacing[4],
-    flexDirection:   'row',
-    alignItems:      'center',
-    gap:             spacing[2],
-    zIndex:          9999,
-    shadowColor:     '#000',
-    shadowOffset:    { width: 0, height: 4 },
-    shadowOpacity:   0.4,
-    shadowRadius:    8,
-    elevation:       8,
+    position: 'absolute', left: spacing[4], right: spacing[4],
+    alignItems: 'center', zIndex: 9999,
   },
-  dot: {
-    width: 8, height: 8, borderRadius: radius.full,
+  pill: {
+    paddingHorizontal: spacing[5], paddingVertical: spacing[3],
+    borderRadius: borderRadius.full, maxWidth: 320,
   },
   text: {
-    flex:       1,
-    color:      colors.textPrimary,
-    fontSize:   fontSize.sm,
-    fontFamily: fontFamily.dmSans.regular,
+    color: colors.white, fontSize: fontSize.sm,
+    fontFamily: 'DMSans_500Medium', textAlign: 'center',
   },
 });

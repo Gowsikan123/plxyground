@@ -2,8 +2,7 @@ import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import { authService } from '../services/authService';
 
-const TOKEN_KEY = 'plxyground_token';
-const USER_KEY  = 'plxyground_user';
+const TOKEN_KEY = 'plxyground_auth_token';
 const TYPE_KEY  = 'plxyground_user_type';
 
 export const useAuthStore = create((set, get) => ({
@@ -13,92 +12,72 @@ export const useAuthStore = create((set, get) => ({
   isLoading: true,
   error:    null,
 
-  // Rehydrate from SecureStore on app start
-  rehydrate: async () => {
+  init: async () => {
     try {
-      const [token, userRaw, userType] = await Promise.all([
-        SecureStore.getItemAsync(TOKEN_KEY),
-        SecureStore.getItemAsync(USER_KEY),
-        SecureStore.getItemAsync(TYPE_KEY),
-      ]);
-      if (token && userRaw) {
-        const user = JSON.parse(userRaw);
-        set({ token, user, userType, isLoading: false });
+      const token    = await SecureStore.getItemAsync(TOKEN_KEY);
+      const userType = await SecureStore.getItemAsync(TYPE_KEY);
+      if (!token || !userType) { set({ isLoading: false }); return; }
+      set({ token, userType });
+      const { data, error } = await authService.me(token, userType);
+      if (error || !data) {
+        await SecureStore.deleteItemAsync(TOKEN_KEY);
+        await SecureStore.deleteItemAsync(TYPE_KEY);
+        set({ token: null, user: null, userType: null, isLoading: false });
       } else {
-        set({ isLoading: false });
+        set({ user: data, isLoading: false });
       }
     } catch {
       set({ isLoading: false });
     }
   },
 
-  // Creator login
-  creatorLogin: async (email, password) => {
+  loginCreator: async (email, password) => {
     set({ error: null });
     const { data, error } = await authService.creatorLogin(email, password);
     if (error) { set({ error }); return { error }; }
-    await get()._persist(data.token, data.user, 'creator');
+    await SecureStore.setItemAsync(TOKEN_KEY, data.token);
+    await SecureStore.setItemAsync(TYPE_KEY, 'creator');
+    set({ token: data.token, user: data, userType: 'creator', error: null });
     return { data };
   },
 
-  // Creator signup
-  creatorSignup: async (payload) => {
+  signupCreator: async (fields) => {
     set({ error: null });
-    const { data, error } = await authService.creatorSignup(payload);
+    const { data, error } = await authService.creatorSignup(fields);
     if (error) { set({ error }); return { error }; }
-    await get()._persist(data.token, data.user, 'creator');
+    await SecureStore.setItemAsync(TOKEN_KEY, data.token);
+    await SecureStore.setItemAsync(TYPE_KEY, 'creator');
+    set({ token: data.token, user: data, userType: 'creator', error: null });
     return { data };
   },
 
-  // Business login
-  businessLogin: async (email, password) => {
+  loginBusiness: async (email, password) => {
     set({ error: null });
     const { data, error } = await authService.businessLogin(email, password);
     if (error) { set({ error }); return { error }; }
-    await get()._persist(data.token, data.user, 'business');
+    await SecureStore.setItemAsync(TOKEN_KEY, data.token);
+    await SecureStore.setItemAsync(TYPE_KEY, 'business');
+    set({ token: data.token, user: data, userType: 'business', error: null });
     return { data };
   },
 
-  // Business signup
-  businessSignup: async (payload) => {
+  signupBusiness: async (fields) => {
     set({ error: null });
-    const { data, error } = await authService.businessSignup(payload);
+    const { data, error } = await authService.businessSignup(fields);
     if (error) { set({ error }); return { error }; }
-    await get()._persist(data.token, data.user, 'business');
+    await SecureStore.setItemAsync(TOKEN_KEY, data.token);
+    await SecureStore.setItemAsync(TYPE_KEY, 'business');
+    set({ token: data.token, user: data, userType: 'business', error: null });
     return { data };
   },
 
-  // Refresh /me
-  refreshUser: async () => {
-    const { token, userType } = get();
-    if (!token) return;
-    const { data, error } = userType === 'business'
-      ? await authService.businessMe(token)
-      : await authService.creatorMe(token);
-    if (!error && data) {
-      set({ user: data });
-      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(data));
-    }
-  },
+  updateUser: (updates) => set(s => ({ user: { ...s.user, ...updates } })),
 
   logout: async () => {
-    await Promise.all([
-      SecureStore.deleteItemAsync(TOKEN_KEY),
-      SecureStore.deleteItemAsync(USER_KEY),
-      SecureStore.deleteItemAsync(TYPE_KEY),
-    ]);
+    await SecureStore.deleteItemAsync(TOKEN_KEY);
+    await SecureStore.deleteItemAsync(TYPE_KEY);
     set({ token: null, user: null, userType: null, error: null });
   },
 
   clearError: () => set({ error: null }),
-
-  // Internal: persist to SecureStore and state
-  _persist: async (token, user, userType) => {
-    await Promise.all([
-      SecureStore.setItemAsync(TOKEN_KEY, token),
-      SecureStore.setItemAsync(USER_KEY, JSON.stringify(user)),
-      SecureStore.setItemAsync(TYPE_KEY, userType),
-    ]);
-    set({ token, user, userType });
-  },
 }));

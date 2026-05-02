@@ -11,40 +11,51 @@ export function useOpportunities() {
   const [error,         setError]         = useState(null);
   const LIMIT = 20;
 
-  const refresh = useCallback(async (filters = {}) => {
-    setIsRefreshing(true); setError(null);
-    const { data, error: err } = await opportunityService.listOpportunities({ ...filters, limit: LIMIT, offset: 0 });
-    setIsRefreshing(false);
-    if (err) { setError(err); return; }
-    setOpportunities(data.data || []);
-    setTotal(data.meta?.total || 0);
-    setPage(1);
-    setHasMore((data.data || []).length === LIMIT);
-  }, []);
-
-  const loadMore = useCallback(async (filters = {}) => {
-    if (isLoading || !hasMore) return;
+  const fetch = useCallback(async ({ reset = false, search = '', sport = '' } = {}) => {
+    if (isLoading) return;
+    const nextPage = reset ? 0 : page;
     setIsLoading(true);
-    const { data, error: err } = await opportunityService.listOpportunities({ ...filters, limit: LIMIT, offset: page * LIMIT });
+    setError(null);
+    const { data, error: err } = await opportunityService.getAll({
+      limit:  LIMIT,
+      offset: nextPage * LIMIT,
+      search,
+      sport,
+    });
+    if (err) { setError(err); setIsLoading(false); return; }
+    const rows = data.data || [];
+    setOpportunities(prev => reset ? rows : [...prev, ...rows]);
+    setTotal(data.total || 0);
+    setPage(nextPage + 1);
+    setHasMore(rows.length === LIMIT);
     setIsLoading(false);
-    if (err) { setError(err); return; }
-    const fresh = data.data || [];
-    setOpportunities(prev => [...prev, ...fresh]);
-    setPage(p => p + 1);
-    setHasMore(fresh.length === LIMIT);
-  }, [isLoading, hasMore, page]);
+  }, [isLoading, page]);
 
-  const create = useCallback(async (payload) => {
-    const { data, error: err } = await opportunityService.createOpportunity(payload);
-    if (!err) { setOpportunities(prev => [data, ...prev]); }
+  const refresh = useCallback(async (filters = {}) => {
+    setIsRefreshing(true);
+    setOpportunities([]);
+    setPage(0);
+    setHasMore(true);
+    await fetch({ reset: true, ...filters });
+    setIsRefreshing(false);
+  }, [fetch]);
+
+  const create = useCallback(async (fields) => {
+    const { data, error: err } = await opportunityService.create(fields);
+    if (!err && data) setOpportunities(prev => [data, ...prev]);
     return { data, error: err };
   }, []);
 
   const remove = useCallback(async (id) => {
-    const { error: err } = await opportunityService.deleteOpportunity(id);
+    const { error: err } = await opportunityService.remove(id);
     if (!err) setOpportunities(prev => prev.filter(o => o.id !== id));
     return { error: err };
   }, []);
 
-  return { opportunities, total, hasMore, isLoading, isRefreshing, error, refresh, loadMore, create, remove };
+  return {
+    opportunities, total, hasMore,
+    isLoading, isRefreshing, error,
+    fetch, refresh, create, remove,
+    clearError: () => setError(null),
+  };
 }

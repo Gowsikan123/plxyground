@@ -1,63 +1,82 @@
 import React from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
-import { colors } from '../../constants/colors';
-import { spacing, radius } from '../../constants/spacing';
-import { fontSize, fontFamily } from '../../constants/typography';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { colors }      from '../../constants/colors';
+import { fontSize }    from '../../constants/typography';
+import { spacing, borderRadius } from '../../constants/spacing';
 
-const VARIANTS = {
-  primary:  { bg: colors.primary,         text: colors.white,         activeBg: colors.primaryDark },
-  secondary:{ bg: colors.surfaceElevated, text: colors.textPrimary,   activeBg: colors.border },
-  outline:  { bg: 'transparent',          text: colors.primary,       activeBg: 'rgba(255,60,60,0.08)', border: colors.primary },
-  ghost:    { bg: 'transparent',          text: colors.textSecondary,  activeBg: 'rgba(255,255,255,0.06)' },
-  danger:   { bg: 'rgba(255,60,60,0.12)', text: colors.error,         activeBg: 'rgba(255,60,60,0.22)', border: 'rgba(255,60,60,0.3)' },
-};
-
-const SIZES = {
-  sm: { paddingVertical: spacing[2], paddingHorizontal: spacing[3], fontSize: fontSize.xs },
-  md: { paddingVertical: spacing[3], paddingHorizontal: spacing[5], fontSize: fontSize.sm },
-  lg: { paddingVertical: spacing[4], paddingHorizontal: spacing[6], fontSize: fontSize.base },
-};
-
-export function Button({
-  children, onPress, variant = 'primary', size = 'md',
-  disabled = false, loading = false, fullWidth = false, style,
+export const Button = React.memo(function Button({
+  title,
+  onPress,
+  variant   = 'primary', // 'primary' | 'secondary' | 'ghost' | 'danger'
+  size      = 'md',      // 'sm' | 'md' | 'lg'
+  disabled  = false,
+  loading   = false,
+  fullWidth = false,
+  leftIcon,
+  style,
+  textStyle,
 }) {
-  const v = VARIANTS[variant] || VARIANTS.primary;
-  const s = SIZES[size]       || SIZES.md;
+  const vs = variantStyles[variant] || variantStyles.primary;
+  const ss = sizeStyles[size]       || sizeStyles.md;
 
   return (
-    <Pressable
+    <TouchableOpacity
       onPress={onPress}
       disabled={disabled || loading}
-      style={({ pressed }) => [
+      activeOpacity={0.75}
+      style={[
         styles.base,
-        { backgroundColor: pressed ? v.activeBg : v.bg, borderColor: v.border || 'transparent' },
-        { paddingVertical: s.paddingVertical, paddingHorizontal: s.paddingHorizontal },
-        v.border && styles.bordered,
+        ss.container,
+        vs.container,
         fullWidth && styles.fullWidth,
         (disabled || loading) && styles.disabled,
         style,
       ]}
     >
       {loading ? (
-        <ActivityIndicator size="small" color={v.text} />
+        <ActivityIndicator color={vs.textColor} size="small" />
       ) : (
-        <Text style={[styles.label, { color: v.text, fontSize: s.fontSize }]}>
-          {children}
-        </Text>
+        <View style={styles.row}>
+          {leftIcon && <View style={styles.icon}>{leftIcon}</View>}
+          <Text style={[styles.text, ss.text, { color: vs.textColor }, textStyle]}>
+            {title}
+          </Text>
+        </View>
       )}
-    </Pressable>
+    </TouchableOpacity>
   );
-}
+});
+
+const variantStyles = {
+  primary: {
+    container: { backgroundColor: colors.primary },
+    textColor: colors.white,
+  },
+  secondary: {
+    container: { backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border },
+    textColor: colors.textPrimary,
+  },
+  ghost: {
+    container: { backgroundColor: colors.transparent },
+    textColor: colors.textSecondary,
+  },
+  danger: {
+    container: { backgroundColor: 'rgba(255,60,60,0.12)', borderWidth: 1, borderColor: 'rgba(255,60,60,0.3)' },
+    textColor: colors.error,
+  },
+};
+
+const sizeStyles = {
+  sm: { container: { paddingHorizontal: spacing[3], paddingVertical: spacing[1.5], borderRadius: borderRadius.md },  text: { fontSize: fontSize.xs } },
+  md: { container: { paddingHorizontal: spacing[5], paddingVertical: spacing[3],   borderRadius: borderRadius.lg },  text: { fontSize: fontSize.sm } },
+  lg: { container: { paddingHorizontal: spacing[6], paddingVertical: spacing[4],   borderRadius: borderRadius.xl },  text: { fontSize: fontSize.base } },
+};
 
 const styles = StyleSheet.create({
-  base:      { borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: spacing[2] },
-  bordered:  { borderWidth: 1 },
-  fullWidth: { width: '100%' },
-  disabled:  { opacity: 0.4 },
-  label: {
-    fontFamily:  fontFamily.dmSans.semiBold,
-    fontWeight:  '600',
-    letterSpacing: 0.2,
-  },
+  base:      { alignSelf: 'flex-start', alignItems: 'center', justifyContent: 'center' },
+  fullWidth: { alignSelf: 'stretch' },
+  disabled:  { opacity: 0.45 },
+  row:       { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  icon:      { marginRight: spacing[1] },
+  text:      { fontFamily: 'DMSans_600SemiBold', letterSpacing: 0.2 },
 });

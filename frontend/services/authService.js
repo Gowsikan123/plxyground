@@ -1,23 +1,36 @@
-import { api, safeCall } from './api';
+import api from './api';
+import axios from 'axios';
+
+const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+
+async function safeCall(fn) {
+  try {
+    const res = await fn();
+    return { data: res.data, error: null };
+  } catch (err) {
+    return { data: null, error: err.message || 'Request failed' };
+  }
+}
 
 export const authService = {
-  // Creator
-  creatorSignup: (payload) =>
-    safeCall(api.post('/api/auth/signup', payload)),
+  creatorSignup: (fields) =>
+    safeCall(() => api.post('/api/auth/signup', fields)),
 
   creatorLogin: (email, password) =>
-    safeCall(api.post('/api/auth/login', { email, password })),
+    safeCall(() => api.post('/api/auth/login', { email, password })),
 
-  creatorMe: () =>
-    safeCall(api.get('/api/auth/me')),
-
-  // Business
-  businessSignup: (payload) =>
-    safeCall(api.post('/api/business-auth/signup', payload)),
+  businessSignup: (fields) =>
+    safeCall(() => api.post('/api/business-auth/signup', fields)),
 
   businessLogin: (email, password) =>
-    safeCall(api.post('/api/business-auth/login', { email, password })),
+    safeCall(() => api.post('/api/business-auth/login', { email, password })),
 
-  businessMe: () =>
-    safeCall(api.get('/api/business-auth/me')),
+  me: async (token, userType) => {
+    const endpoint = userType === 'business' ? '/api/business-auth/me' : '/api/auth/me';
+    return safeCall(() =>
+      axios.get(`${BASE_URL}${endpoint}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+    );
+  },
 };

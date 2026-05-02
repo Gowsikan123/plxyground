@@ -1,39 +1,46 @@
-import { useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useAuthStore } from '../store/authStore';
 
 export function useAuth() {
-  const {
-    token, user, userType,
-    isLoading, error,
-    rehydrate,
-    creatorLogin, creatorSignup,
-    businessLogin, businessSignup,
-    refreshUser, logout, clearError,
-  } = useAuthStore();
+  const store = useAuthStore();
 
-  useEffect(() => {
-    rehydrate();
-  }, []);
+  const loginCreator = useCallback(
+    (email, password) => store.loginCreator(email, password),
+    [store.loginCreator]
+  );
 
-  const isAuthenticated = Boolean(token && user);
-  const isCreator  = isAuthenticated && userType === 'creator';
-  const isBusiness = isAuthenticated && userType === 'business';
+  const signupCreator = useCallback(
+    (fields) => store.signupCreator(fields),
+    [store.signupCreator]
+  );
+
+  const loginBusiness = useCallback(
+    (email, password) => store.loginBusiness(email, password),
+    [store.loginBusiness]
+  );
+
+  const signupBusiness = useCallback(
+    (fields) => store.signupBusiness(fields),
+    [store.signupBusiness]
+  );
+
+  const logout = useCallback(() => store.logout(), [store.logout]);
 
   return {
-    token,
-    user,
-    userType,
-    isLoading,
-    error,
-    isAuthenticated,
-    isCreator,
-    isBusiness,
-    creatorLogin: useCallback(creatorLogin, []),
-    creatorSignup: useCallback(creatorSignup, []),
-    businessLogin: useCallback(businessLogin, []),
-    businessSignup: useCallback(businessSignup, []),
-    refreshUser: useCallback(refreshUser, []),
-    logout: useCallback(logout, []),
-    clearError: useCallback(clearError, []),
+    user:         store.user,
+    token:        store.token,
+    userType:     store.userType,
+    isLoading:    store.isLoading,
+    error:        store.error,
+    isAuthenticated: !!store.token,
+    isCreator:    store.userType === 'creator',
+    isBusiness:   store.userType === 'business',
+    loginCreator,
+    signupCreator,
+    loginBusiness,
+    signupBusiness,
+    logout,
+    clearError:   store.clearError,
+    updateUser:   store.updateUser,
   };
 }

@@ -1,49 +1,55 @@
-import React, { memo } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback } from 'react';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Card } from '../ui/Card';
-import { Avatar } from '../ui/Avatar';
-import { Badge } from '../ui/Badge';
-import { colors } from '../../constants/colors';
-import { spacing, radius } from '../../constants/spacing';
-import { fontSize, fontFamily } from '../../constants/typography';
+import { colors }      from '../../constants/colors';
+import { fontSize }    from '../../constants/typography';
+import { spacing, borderRadius } from '../../constants/spacing';
+import { Avatar }  from '../ui/Avatar';
+import { Badge }   from '../ui/Badge';
+import { Card }    from '../ui/Card';
 
 function timeAgo(dateStr) {
-  const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
-  if (diff < 60)   return 'just now';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1)  return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
 }
 
-export const PostCard = memo(function PostCard({ post }) {
+export const PostCard = React.memo(function PostCard({ post }) {
   const router = useRouter();
-  const tags   = Array.isArray(post.tags) ? post.tags.slice(0, 2) : [];
+
+  const onPress = useCallback(() => {
+    router.push(`/post/${post.id}`);
+  }, [post.id]);
+
+  const tags = Array.isArray(post.tags) ? post.tags.slice(0, 2) : [];
 
   return (
-    <Card
-      onPress={() => router.push(`/post/${post.id}`)}
-      style={styles.card}
-    >
+    <Card onPress={onPress} style={styles.card}>
       {/* Creator row */}
-      <View style={styles.creatorRow}>
+      <View style={styles.header}>
         <Avatar uri={post.avatar_url} name={post.display_name} size="sm" />
-        <View style={styles.creatorInfo}>
-          <Text style={styles.creatorName} numberOfLines={1}>{post.display_name || 'Unknown'}</Text>
-          <Text style={styles.meta}>{post.sport || ''} · {timeAgo(post.created_at)}</Text>
+        <View style={styles.headerText}>
+          <Text style={styles.creatorName} numberOfLines={1}>{post.display_name || 'Creator'}</Text>
+          <Text style={styles.meta}>{post.sport ? `${post.sport} · ` : ''}{timeAgo(post.created_at)}</Text>
         </View>
+        {post.sport && <Badge label={post.sport} variant="default" />}
       </View>
 
       {/* Title */}
       <Text style={styles.title} numberOfLines={2}>{post.title}</Text>
 
       {/* Body preview */}
-      {post.body && (
+      {!!post.body && (
         <Text style={styles.body} numberOfLines={3}>{post.body}</Text>
       )}
 
       {/* Media thumbnail */}
-      {post.media_url && (
+      {!!post.media_url && (
         <Image
           source={{ uri: post.media_url }}
           style={styles.media}
@@ -53,14 +59,14 @@ export const PostCard = memo(function PostCard({ post }) {
 
       {/* Footer */}
       <View style={styles.footer}>
-        <View style={styles.stats}>
+        <View style={styles.footerLeft}>
+          {tags.map((tag, i) => (
+            <Badge key={i} label={`#${tag}`} variant="default" style={styles.tag} />
+          ))}
+        </View>
+        <View style={styles.footerRight}>
           <Text style={styles.statText}>👁 {post.view_count ?? 0}</Text>
           <Text style={styles.statText}>❤️ {post.like_count ?? 0}</Text>
-        </View>
-        <View style={styles.tags}>
-          {tags.map(tag => (
-            <Badge key={tag} label={tag} variant="default" />
-          ))}
         </View>
       </View>
     </Card>
@@ -68,16 +74,17 @@ export const PostCard = memo(function PostCard({ post }) {
 });
 
 const styles = StyleSheet.create({
-  card:        { marginBottom: spacing[3] },
-  creatorRow:  { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginBottom: spacing[3] },
-  creatorInfo: { flex: 1 },
-  creatorName: { color: colors.textPrimary, fontSize: fontSize.sm, fontFamily: fontFamily.syne.bold, fontWeight: '700' },
-  meta:        { color: colors.textMuted,  fontSize: fontSize.xs, fontFamily: fontFamily.dmSans.regular, marginTop: 1 },
-  title:       { color: colors.textPrimary, fontSize: fontSize.md, fontFamily: fontFamily.syne.bold, fontWeight: '700', marginBottom: spacing[2], lineHeight: 24 },
-  body:        { color: colors.textSecondary, fontSize: fontSize.sm, fontFamily: fontFamily.dmSans.regular, lineHeight: 20, marginBottom: spacing[3] },
-  media:       { width: '100%', height: 180, borderRadius: radius.md, marginBottom: spacing[3] },
+  card:        { marginHorizontal: spacing[4], marginBottom: spacing[3] },
+  header:      { flexDirection: 'row', alignItems: 'center', marginBottom: spacing[3], gap: spacing[2] },
+  headerText:  { flex: 1 },
+  creatorName: { color: colors.textPrimary, fontSize: fontSize.sm, fontFamily: 'Syne_700Bold' },
+  meta:        { color: colors.textMuted, fontSize: fontSize.xs, fontFamily: 'DMSans_400Regular', marginTop: 2 },
+  title:       { color: colors.textPrimary, fontSize: fontSize.md, fontFamily: 'Syne_700Bold', marginBottom: spacing[2], lineHeight: 24 },
+  body:        { color: colors.textSecondary, fontSize: fontSize.sm, fontFamily: 'DMSans_400Regular', lineHeight: 20, marginBottom: spacing[3] },
+  media:       { width: '100%', aspectRatio: 16 / 9, borderRadius: borderRadius.lg, marginBottom: spacing[3], backgroundColor: colors.surfaceElevated },
   footer:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[1] },
-  stats:       { flexDirection: 'row', gap: spacing[3] },
-  statText:    { color: colors.textMuted, fontSize: fontSize.xs, fontFamily: fontFamily.dmSans.regular },
-  tags:        { flexDirection: 'row', gap: spacing[1] },
+  footerLeft:  { flexDirection: 'row', gap: spacing[2], flexWrap: 'wrap', flex: 1 },
+  footerRight: { flexDirection: 'row', gap: spacing[3] },
+  tag:         {},
+  statText:    { color: colors.textMuted, fontSize: fontSize.xs, fontFamily: 'DMSans_400Regular' },
 });

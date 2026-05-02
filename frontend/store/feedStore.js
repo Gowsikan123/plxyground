@@ -10,41 +10,53 @@ export const useFeedStore = create((set, get) => ({
   isLoading:  false,
   isRefreshing: false,
   error:      null,
-  filters:    { search: '', sport: '', tags: '' },
+  filters:    { search: '', sport: '' },
 
-  setFilter: (key, value) => {
-    set(s => ({ filters: { ...s.filters, [key]: value } }));
-    get().refresh();
+  setFilters: (filters) => {
+    set({ filters: { ...get().filters, ...filters }, posts: [], page: 0, hasMore: true });
+    get().fetchFeed(true);
   },
 
-  refresh: async () => {
-    const { limit, filters } = get();
-    set({ isRefreshing: true, error: null, page: 0, hasMore: true });
-    const { data, error } = await contentService.getFeed({ ...filters, limit, offset: 0 });
-    if (error) { set({ isRefreshing: false, error }); return; }
-    set({
-      posts:       data.data || [],
-      total:       data.total || 0,
-      page:        1,
-      hasMore:     (data.data || []).length === limit,
-      isRefreshing: false,
+  fetchFeed: async (reset = false) => {
+    const s = get();
+    if (s.isLoading) return;
+    const page = reset ? 0 : s.page;
+    set({ isLoading: true, error: null });
+    const { data, error } = await contentService.getFeed({
+      limit:  s.limit,
+      offset: page * s.limit,
+      search: s.filters.search,
+      sport:  s.filters.sport,
     });
-  },
-
-  loadMore: async () => {
-    const { isLoading, hasMore, page, limit, filters, posts } = get();
-    if (isLoading || !hasMore) return;
-    set({ isLoading: true });
-    const { data, error } = await contentService.getFeed({ ...filters, limit, offset: page * limit });
-    if (error) { set({ isLoading: false, error }); return; }
-    const newPosts = data.data || [];
+    if (error) {
+      set({ isLoading: false, error });
+      return;
+    }
     set({
-      posts:    [...posts, ...newPosts],
-      page:     page + 1,
-      hasMore:  newPosts.length === limit,
+      posts:   reset ? (data.data || []) : [...s.posts, ...(data.data || [])],
+      total:   data.total || 0,
+      page:    page + 1,
+      hasMore: (data.data || []).length === s.limit,
       isLoading: false,
     });
   },
 
-  reset: () => set({ posts: [], total: 0, page: 0, hasMore: true, isLoading: false, isRefreshing: false, error: null }),
+  refresh: async () => {
+    set({ isRefreshing: true, posts: [], page: 0, hasMore: true });
+    await get().fetchFeed(true);
+    set({ isRefreshing: false });
+  },
+
+  prependPost: (post) => set(s => ({ posts: [post, ...s.posts], total: s.total + 1 })),
+
+  updatePost: (id, updates) => set(s => ({
+    posts: s.posts.map(p => p.id === id ? { ...p, ...updates } : p),
+  })),
+
+  removePost: (id) => set(s => ({
+    posts:  s.posts.filter(p => p.id !== id),
+    total:  Math.max(0, s.total - 1),
+  })),
+
+  clearError: () => set({ error: null }),
 }));
