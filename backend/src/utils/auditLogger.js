@@ -18,7 +18,7 @@ async function log({ actor_type, actor_id, action, target_type, target_id, metad
       ]
     );
   } catch (err) {
-    logger.error('[auditLogger] Failed to write audit log', { message: err.message });
+    logger.error('Audit log write failed', err.message);
   }
 }
 

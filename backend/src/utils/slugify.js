@@ -7,18 +7,19 @@ function baseSlug(str) {
     .trim()
     .replace(/[^a-z0-9\s-]/g, '')
     .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
 }
 
-async function uniqueSlug(str, table, column) {
-  const base = baseSlug(str);
-  const { rows } = await pool.query(
-    `SELECT ${column} FROM ${table} WHERE ${column} = $1`,
-    [base]
+async function generateUniqueSlug(str, table, column = 'slug') {
+  const slug = baseSlug(str);
+  const result = await pool.query(
+    `SELECT COUNT(*) FROM ${table} WHERE ${column} = $1`,
+    [slug]
   );
-  if (rows.length === 0) return base;
+  if (parseInt(result.rows[0].count, 10) === 0) return slug;
   const suffix = Math.floor(1000 + Math.random() * 9000);
-  return `${base}-${suffix}`;
+  return `${slug}-${suffix}`;
 }
 
-module.exports = { baseSlug, uniqueSlug };
+module.exports = { baseSlug, generateUniqueSlug };
