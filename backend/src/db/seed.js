@@ -1,122 +1,110 @@
 'use strict';
-
 const bcrypt = require('bcrypt');
 const db = require('./client');
 const logger = require('../logger');
 const config = require('../config');
+const { slugify } = require('../utils/slugify');
 
-const ADMIN = {
-  username: 'admin',
-  email: 'admin@plxyground.com',
-  password: 'Admin@Plxy2025!',
-  display_name: 'PLXYGROUND Admin',
-  role: 'admin',
-  slug: 'admin',
-};
-
-const CREATORS = [
-  { username: 'jamal_baller',   email: 'jamal@plxy.dev',   password: 'Creator1!', display_name: 'Jamal Baller',    sport: 'basketball', position: 'PG', location: 'London' },
-  { username: 'zara_scores',    email: 'zara@plxy.dev',    password: 'Creator2!', display_name: 'Zara Scores',     sport: 'football',   position: 'ST', location: 'Manchester' },
-  { username: 'kai_runnit',     email: 'kai@plxy.dev',     password: 'Creator3!', display_name: 'Kai Runnit',      sport: 'athletics',  position: '100m', location: 'Birmingham' },
-  { username: 'priya_net',      email: 'priya@plxy.dev',   password: 'Creator4!', display_name: 'Priya Net',       sport: 'tennis',     position: 'Baseline', location: 'Leeds' },
-  { username: 'dev_hoops',      email: 'dev@plxy.dev',     password: 'Creator5!', display_name: 'Dev Hoops',       sport: 'basketball', position: 'SG', location: 'Bristol' },
-];
-
-const BUSINESSES = [
-  { email: 'nike@brands.dev',   password: 'Brand1!', company_name: 'Nike UK',      industry: 'Sportswear' },
-  { email: 'puma@brands.dev',   password: 'Brand2!', company_name: 'Puma Europe',   industry: 'Footwear' },
-  { email: 'redbull@brands.dev',password: 'Brand3!', company_name: 'Red Bull Media', industry: 'Media' },
-];
-
-async function seedDatabase() {
-  const { rows } = await db.query('SELECT COUNT(*) AS cnt FROM users');
-  if (parseInt(rows[0].cnt, 10) > 0) {
-    logger.info('seed: users already exist — skipping seed');
+async function seed() {
+  const adminCount = await db.query('SELECT COUNT(*) FROM admins');
+  if (parseInt(adminCount.rows[0].count, 10) > 0) {
+    logger.info('Seed skipped — data already exists');
     return;
   }
 
-  logger.info('seed: starting database seed...');
+  logger.info('Seeding database…');
   const rounds = config.bcrypt.rounds;
 
-  const adminHash = await bcrypt.hash(ADMIN.password, rounds);
+  // ── Admins ──────────────────────────────────────────────────────────────────
+  const adminHash = await bcrypt.hash('Admin@plxyground1', rounds);
   await db.query(
-    `INSERT INTO users (username, email, password_hash, display_name, role, slug, is_verified)
-     VALUES ($1, $2, $3, $4, $5, $6, TRUE)`,
-    [ADMIN.username, ADMIN.email, adminHash, ADMIN.display_name, ADMIN.role, ADMIN.slug]
+    `INSERT INTO admins (username, email, password_hash, role)
+     VALUES ($1, $2, $3, $4)`,
+    ['superadmin', 'admin@plxyground.com', adminHash, 'superadmin'],
   );
-  logger.info('seed: admin created');
 
-  const creatorIds = [];
-  for (const c of CREATORS) {
-    const hash = await bcrypt.hash(c.password, rounds);
-    const slug = c.username.replace(/_/g, '-');
-    const { rows: r } = await db.query(
-      `INSERT INTO users (username, email, password_hash, display_name, sport, position, location, slug, role, is_verified)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'creator', TRUE)
-       RETURNING id`,
-      [c.username, c.email, hash, c.display_name, c.sport, c.position, c.location, slug]
-    );
-    creatorIds.push(r[0].id);
-  }
-  logger.info('seed: creators created', { count: CREATORS.length });
-
-  const bizIds = [];
-  for (const b of BUSINESSES) {
-    const hash = await bcrypt.hash(b.password, rounds);
-    const { rows: r } = await db.query(
-      `INSERT INTO businesses (email, password_hash, company_name, industry, is_verified)
-       VALUES ($1, $2, $3, $4, TRUE)
-       RETURNING id`,
-      [b.email, hash, b.company_name, b.industry]
-    );
-    bizIds.push(r[0].id);
-  }
-  logger.info('seed: businesses created', { count: BUSINESSES.length });
-
-  const contentSamples = [
-    { title: 'First Day Back',          body: 'Hit the court early today — grind never stops.',      sport: 'basketball', tags: ['training','grind'] },
-    { title: 'Match Day Highlights',    body: 'Scored twice in today\'s five-a-side. Buzzing.',       sport: 'football',   tags: ['matchday','goals'] },
-    { title: 'PB at 100m',              body: 'New personal best: 10.8 seconds. Onwards.',            sport: 'athletics',  tags: ['pb','sprint'] },
-    { title: 'Serving Up Heat',         body: 'Aced 12 in a row during practice today.',              sport: 'tennis',     tags: ['serve','practice'] },
-    { title: 'Gym Session Complete',    body: 'Leg day is not a suggestion. It\'s a lifestyle.',      sport: 'basketball', tags: ['gym','legs'] },
-    { title: 'Pre-Season Begins',       body: 'Camp starts tomorrow — team is looking sharp.',        sport: 'football',   tags: ['preseason','team'] },
-    { title: 'Recovery Day',            body: 'Ice bath, stretch, sleep. The unsexy side of sport.', sport: 'athletics',  tags: ['recovery'] },
-    { title: 'Doubles Practice',        body: 'Working the net game with a new partner.',             sport: 'tennis',     tags: ['doubles','net'] },
-    { title: 'Breakdown Film Session',  body: 'Watched back last week\'s game — lots to fix.',       sport: 'basketball', tags: ['film','analysis'] },
-    { title: 'End of Week Check-In',    body: '5 sessions done, nutrition on point. Ready.',          sport: 'football',   tags: ['weekly','fitness'] },
+  // ── Creators ────────────────────────────────────────────────────────────────
+  const creators = [
+    { username: 'jordan_hoops',  email: 'jordan@demo.com',  display_name: 'Jordan Hoops',   sport: 'basketball' },
+    { username: 'serena_tennis', email: 'serena@demo.com',  display_name: 'Serena Tennis',   sport: 'tennis'     },
+    { username: 'kai_football',  email: 'kai@demo.com',     display_name: 'Kai FC',          sport: 'football'   },
+    { username: 'mia_track',     email: 'mia@demo.com',     display_name: 'Mia Track Star',  sport: 'athletics'  },
+    { username: 'dev_swimmer',   email: 'dev@demo.com',     display_name: 'Dev Swims',       sport: 'swimming'   },
   ];
 
-  for (let i = 0; i < contentSamples.length; i++) {
-    const c = contentSamples[i];
-    const userId = creatorIds[i % creatorIds.length];
+  const creatorHash = await bcrypt.hash('Creator@demo123', rounds);
+  for (const c of creators) {
+    const slug = slugify(c.display_name);
     await db.query(
-      `INSERT INTO content (user_id, title, body, sport, tags, status, media_type)
-       VALUES ($1, $2, $3, $4, $5, 'approved', 'none')`,
-      [userId, c.title, c.body, c.sport, c.tags]
+      `INSERT INTO users (username, email, password_hash, display_name, sport, slug)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [c.username, c.email, creatorHash, c.display_name, c.sport, slug],
     );
   }
-  logger.info('seed: content created', { count: contentSamples.length });
 
-  const oppSamples = [
-    { title: 'Basketball Brand Ambassador',  description: 'Seeking UK basketball creators for year-long brand deal.',  sport: 'basketball', budget_min: 500,  budget_max: 2000  },
-    { title: 'Footwear Launch Campaign',     description: 'Looking for 3 creators to front our new running shoe.',      sport: 'athletics',  budget_min: 800,  budget_max: 3000  },
-    { title: 'Match Day Content Series',     description: 'Weekly football content for our social channels.',           sport: 'football',   budget_min: 200,  budget_max: 800   },
-    { title: 'Energy Drink Partnership',     description: 'Multi-sport ambassadors wanted for 6-month campaign.',       sport: null,         budget_min: 1000, budget_max: 5000  },
-    { title: 'Tennis Academy Promo',         description: 'Promote our summer tennis camps to your audience.',          sport: 'tennis',     budget_min: 300,  budget_max: 1200  },
+  // ── Businesses ──────────────────────────────────────────────────────────────
+  const businesses = [
+    { name: 'NexGen Sports',   email: 'hi@nexgen.com',    industry: 'sportswear'   },
+    { name: 'Hydro Energy Co', email: 'hi@hydroenergy.com', industry: 'nutrition'  },
+    { name: 'ProKit Gear',     email: 'hi@prokit.com',    industry: 'equipment'    },
   ];
 
-  for (let i = 0; i < oppSamples.length; i++) {
-    const o = oppSamples[i];
-    const bizId = bizIds[i % bizIds.length];
+  const bizHash = await bcrypt.hash('Business@demo123', rounds);
+  for (const b of businesses) {
+    const slug = slugify(b.name);
     await db.query(
-      `INSERT INTO opportunities (business_id, title, description, sport, budget_min, budget_max, currency, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'GBP', 'open')`,
-      [bizId, o.title, o.description, o.sport, o.budget_min, o.budget_max]
+      `INSERT INTO businesses (name, email, password_hash, industry, slug)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [b.name, b.email, bizHash, b.industry, slug],
     );
   }
-  logger.info('seed: opportunities created', { count: oppSamples.length });
 
-  logger.info('seed: database seed complete ✓');
+  // ── Content ─────────────────────────────────────────────────────────────────
+  const userRows = await db.query('SELECT id, sport FROM users LIMIT 5');
+  const contentItems = [
+    { title: 'My first dunk compilation', sport: 'basketball', status: 'approved'  },
+    { title: 'Morning serve session',      sport: 'tennis',     status: 'approved'  },
+    { title: 'Free kick tutorial',         sport: 'football',   status: 'approved'  },
+    { title: '100m sprint breakdown',      sport: 'athletics',  status: 'approved'  },
+    { title: 'Butterfly stroke technique', sport: 'swimming',   status: 'approved'  },
+    { title: 'Crossover drills',           sport: 'basketball', status: 'pending'   },
+    { title: 'Backhand slice masterclass', sport: 'tennis',     status: 'pending'   },
+    { title: 'Corner kick analysis',       sport: 'football',   status: 'pending'   },
+    { title: 'Long jump warm-up routine',  sport: 'athletics',  status: 'flagged'   },
+    { title: 'Open water training vlog',   sport: 'swimming',   status: 'approved'  },
+  ];
+
+  for (let i = 0; i < contentItems.length; i++) {
+    const user = userRows.rows[i % userRows.rows.length];
+    const item = contentItems[i];
+    await db.query(
+      `INSERT INTO content (user_id, title, sport, tags, status)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [user.id, item.title, item.sport, [item.sport, 'demo'], item.status],
+    );
+  }
+
+  // ── Opportunities ───────────────────────────────────────────────────────────
+  const bizRows = await db.query('SELECT id FROM businesses LIMIT 3');
+  const opps = [
+    { title: 'Basketball Brand Ambassador',  sport: 'basketball', type: 'ambassador', min: 500,  max: 2000  },
+    { title: 'Tennis Gear Collab',           sport: 'tennis',     type: 'collab',     min: 200,  max: 800   },
+    { title: 'Football Content Sponsorship', sport: 'football',   type: 'sponsorship',min: 1000, max: 5000  },
+    { title: 'Athletics Appearance Fee',     sport: 'athletics',  type: 'appearance', min: 300,  max: 1200  },
+    { title: 'Swim Brand Partnership',       sport: 'swimming',   type: 'sponsorship',min: 750,  max: 3000  },
+  ];
+
+  for (let i = 0; i < opps.length; i++) {
+    const biz = bizRows.rows[i % bizRows.rows.length];
+    const o = opps[i];
+    await db.query(
+      `INSERT INTO opportunities (business_id, title, description, sport, type, budget_min, budget_max, remote_ok, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [biz.id, o.title, `Exciting opportunity for a ${o.sport} creator.`, o.sport, o.type, o.min, o.max, true, 'open'],
+    );
+  }
+
+  logger.info('Seed complete');
 }
 
-module.exports = { seedDatabase };
+module.exports = { seed };

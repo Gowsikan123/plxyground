@@ -1,15 +1,16 @@
 'use strict';
 require('dotenv').config();
 
-const required = [
+const REQUIRED = [
   'DATABASE_URL',
   'JWT_SECRET',
-  'JWT_REFRESH_SECRET',
+  'JWT_EXPIRES_IN',
+  'ADMIN_JWT_SECRET',
 ];
 
-const missing = required.filter((k) => !process.env[k]);
+const missing = REQUIRED.filter((k) => !process.env[k]);
 if (missing.length) {
-  throw new Error(`[config] Missing required environment variables: ${missing.join(', ')}`);
+  throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
 }
 
 module.exports = {
@@ -17,38 +18,45 @@ module.exports = {
   port: parseInt(process.env.PORT || '3001', 10),
 
   db: {
-    connectionString: process.env.DATABASE_URL,
+    url: process.env.DATABASE_URL,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
     max: parseInt(process.env.DB_POOL_MAX || '10', 10),
-    idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 5_000,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
   },
 
   jwt: {
     secret: process.env.JWT_SECRET,
-    refreshSecret: process.env.JWT_REFRESH_SECRET,
-    accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
-    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  },
+
+  adminJwt: {
+    secret: process.env.ADMIN_JWT_SECRET,
+    expiresIn: process.env.ADMIN_JWT_EXPIRES_IN || '8h',
   },
 
   bcrypt: {
     rounds: parseInt(process.env.BCRYPT_ROUNDS || '12', 10),
   },
 
+  rateLimits: {
+    global: {
+      windowMs: 15 * 60 * 1000,
+      max: parseInt(process.env.RATE_LIMIT_GLOBAL || '100', 10),
+    },
+    auth: {
+      windowMs: 15 * 60 * 1000,
+      max: parseInt(process.env.RATE_LIMIT_AUTH || '10', 10),
+    },
+  },
+
   cors: {
-    origins: (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:3012')
+    origins: (process.env.ALLOWED_ORIGINS || 'http://localhost:3012,http://localhost:8081')
       .split(',')
       .map((o) => o.trim()),
   },
 
-  rateLimit: {
-    globalWindowMs: 15 * 60 * 1000,
-    globalMax: parseInt(process.env.RATE_LIMIT_GLOBAL || '100', 10),
-    authWindowMs: 15 * 60 * 1000,
-    authMax: parseInt(process.env.RATE_LIMIT_AUTH || '10', 10),
-  },
-
-  adminPanel: {
-    port: parseInt(process.env.ADMIN_PORT || '3012', 10),
+  seed: {
+    autoRun: process.env.AUTO_SEED === 'true',
   },
 };

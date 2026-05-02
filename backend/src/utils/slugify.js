@@ -1,43 +1,48 @@
 'use strict';
-
 const db = require('../db/client');
 
 /**
  * Convert a string to a URL-safe slug.
- * e.g. "Jamal Baller 🏀" → "jamal-baller"
+ * e.g. "Jordan Hoops 🏀" → "jordan-hoops"
  */
-function toSlug(str) {
+function slugify(str) {
   return str
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9\s-]/g, '')
     .trim()
-    .replace(/[\s-]+/g, '-');
+    .replace(/[\s]+/g, '-')
+    .replace(/-{2,}/g, '-');
 }
 
 /**
- * Generate a unique slug for a users row.
- * If the base slug is taken, append -2, -3, etc.
+ * Generate a unique slug for a given table + column, appending
+ * a numeric suffix if the base slug already exists.
  *
- * @param {string} base - raw display name or username
- * @param {string|null} [excludeId] - existing user id to exclude from uniqueness check
- * @returns {Promise<string>}
+ * @param {string} base      - already-slugified string
+ * @param {string} table     - table name (users | businesses)
+ * @param {number} [excludeId] - row id to ignore (for updates)
  */
-async function uniqueUserSlug(base, excludeId = null) {
-  const baseSlug = toSlug(base);
-  let candidate = baseSlug;
-  let suffix = 2;
+async function uniqueSlug(base, table, excludeId = null) {
+  const ALLOWED_TABLES = ['users', 'businesses'];
+  if (!ALLOWED_TABLES.includes(table)) throw new Error(`uniqueSlug: disallowed table '${table}'`);
+
+  let candidate = base;
+  let suffix = 1;
 
   while (true) {
-    const { rows } = await db.query(
-      `SELECT id FROM users WHERE slug = $1 AND ($2::uuid IS NULL OR id <> $2)`,
-      [candidate, excludeId]
-    );
-    if (rows.length === 0) return candidate;
-    candidate = `${baseSlug}-${suffix}`;
+    const params = [candidate];
+    let sql = `SELECT id FROM ${table} WHERE slug = $1`;
+    if (excludeId) {
+      sql += ` AND id != $2`;
+      params.push(excludeId);
+    }
+    const res = await db.query(sql, params);
+    if (res.rows.length === 0) return candidate;
+    candidate = `${base}-${suffix}`;
     suffix++;
   }
 }
 
-module.exports = { toSlug, uniqueUserSlug };
+module.exports = { slugify, uniqueSlug };
