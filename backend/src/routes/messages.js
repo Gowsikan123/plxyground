@@ -3,7 +3,7 @@ const express = require('express');
 const { body } = require('express-validator');
 const pool = require('../db/client');
 const { requireAuth } = require('../middleware/auth');
-const { handleValidation } = require('../middleware/validate');
+const { validate } = require('../middleware/validate');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -31,7 +31,7 @@ router.get('/threads', requireAuth, async (req, res) => {
 router.post('/threads', requireAuth, [
   body('recipient_type').isIn(['creator', 'business']).withMessage('Invalid recipient type.'),
   body('recipient_id').isInt().withMessage('Recipient ID must be integer.'),
-], handleValidation, async (req, res) => {
+], validate, async (req, res) => {
   try {
     const { recipient_type, recipient_id } = req.body;
     const senderType = req.userType;
@@ -84,7 +84,7 @@ router.get('/threads/:threadId', requireAuth, async (req, res) => {
 
 router.post('/threads/:threadId', requireAuth, [
   body('body').trim().notEmpty().withMessage('Message body required.'),
-], handleValidation, async (req, res) => {
+], validate, async (req, res) => {
   try {
     const type = req.userType;
     const id = type === 'creator' ? req.user.creator_id : req.user.id;

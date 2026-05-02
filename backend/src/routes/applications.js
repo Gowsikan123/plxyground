@@ -3,7 +3,7 @@ const express = require('express');
 const { body } = require('express-validator');
 const pool = require('../db/client');
 const { requireAuth } = require('../middleware/auth');
-const { handleValidation } = require('../middleware/validate');
+const { validate } = require('../middleware/validate');
 const logger = require('../logger');
 
 const router = express.Router();
@@ -11,7 +11,7 @@ const router = express.Router();
 router.post('/', requireAuth, [
   body('opportunity_id').isInt().withMessage('Opportunity ID must be an integer.'),
   body('message').optional().trim().isLength({ max: 2000 }).withMessage('Message must be under 2000 chars.'),
-], handleValidation, async (req, res) => {
+], validate, async (req, res) => {
   if (req.userType !== 'creator') return res.status(403).json({ error: 'Creators only.' });
   try {
     const { opportunity_id, message } = req.body;
@@ -71,7 +71,7 @@ router.get('/opportunity/:id', requireAuth, async (req, res) => {
 
 router.put('/:id/status', requireAuth, [
   body('status').isIn(['accepted', 'rejected']).withMessage('Status must be accepted or rejected.'),
-], handleValidation, async (req, res) => {
+], validate, async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM applications WHERE id = $1', [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Not found.' });

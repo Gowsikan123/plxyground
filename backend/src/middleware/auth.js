@@ -50,7 +50,7 @@ async function requireAdmin(req, res, next) {
   try {
     const payload = verifyToken(token);
     if (payload.type !== 'admin') return res.status(403).json({ error: 'Admin access required' });
-    const result = await pool.query('SELECT * FROM admins WHERE id = $1', [payload.sub]);
+    const result = await pool.query('SELECT * FROM admin_users WHERE id = $1', [payload.sub]);
     if (!result.rows.length) return res.status(403).json({ error: 'Admin not found' });
     req.admin = result.rows[0];
     next();
