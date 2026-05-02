@@ -2,18 +2,12 @@
 
 function slugify(text) {
   return text
+    .toString()
     .toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/--+/g, '-');
 }
 
-function ensureUniqueSlug(db, table, slug) {
-  const existing = db.prepare(`SELECT id FROM ${table} WHERE slug = ?`).get(slug);
-  if (!existing) return slug;
-  const suffix = Math.floor(1000 + Math.random() * 9000);
-  return `${slug}-${suffix}`;
-}
-
-module.exports = { slugify, ensureUniqueSlug };
+module.exports = { slugify };

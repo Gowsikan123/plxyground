@@ -2,12 +2,16 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config');
 
-function signToken({ sub, type }) {
-  return jwt.sign({ sub, type }, config.JWT_SECRET, { expiresIn: config.JWT_EXPIRES_IN });
+function signToken(payload) {
+  return jwt.sign(payload, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
 }
 
 function verifyToken(token) {
-  return jwt.verify(token, config.JWT_SECRET);
+  try {
+    return jwt.verify(token, config.jwtSecret);
+  } catch {
+    return null;
+  }
 }
 
 module.exports = { signToken, verifyToken };
