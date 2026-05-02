@@ -311,11 +311,3 @@ cd backend && npm test
 | Mobile | Expo EAS → App Store + Google Play (`com.basketballnxtion.plxyground`) |
 
 Set `EXPO_PUBLIC_API_BASE_URL` to your deployed backend URL before building for production.
-
----
-
-<div align="center">
-
-Built with 🏀 by [Basketball Nxtion](https://github.com/Gowsikan123)
-
-</div>
