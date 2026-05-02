@@ -1,1435 +1,1245 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PLXYGROUND Admin</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PLXYGROUND Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+/* ── Reset & Tokens ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
 
-    :root {
-      --bg: #0a0a0a;
-      --sidebar: #111111;
-      --surface: #1a1a1a;
-      --surface-2: #222222;
-      --border: #2a2a2a;
-      --primary: #ff3c3c;
-      --primary-dark: #cc1f1f;
-      --success: #00c853;
-      --warning: #ffb300;
-      --error: #ff3c3c;
-      --text: #ffffff;
-      --text-muted: #8a8a8a;
-      --text-faint: #555555;
-      --radius: 8px;
-      --radius-sm: 4px;
-      --transition: 160ms ease;
-    }
+:root {
+  --bg:        #0d0d0f;
+  --surface:   #131316;
+  --surface-2: #18181c;
+  --surface-3: #1f1f24;
+  --border:    #2a2a30;
+  --border-2:  #33333a;
+  --text:      #e8e8ed;
+  --text-muted:#8e8e99;
+  --text-faint:#4a4a55;
+  --accent:    #6c63ff;
+  --accent-h:  #8078ff;
+  --accent-dim:#6c63ff22;
+  --green:     #22c55e;
+  --green-dim: #22c55e22;
+  --red:       #ef4444;
+  --red-dim:   #ef444422;
+  --yellow:    #f59e0b;
+  --yellow-dim:#f59e0b22;
+  --orange:    #f97316;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius:    6px;
+  --radius-lg: 10px;
+  --trans:     160ms cubic-bezier(0.16,1,0.3,1);
+  --sidebar-w: 220px;
+}
 
-    html, body {
-      height: 100%;
-      background: var(--bg);
-      color: var(--text);
-      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-      font-size: 14px;
-      line-height: 1.5;
-      -webkit-font-smoothing: antialiased;
-    }
+body {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  min-height: 100dvh;
+  line-height: 1.6;
+}
 
-    /* ── Layout ── */
-    #app { display: flex; height: 100vh; overflow: hidden; }
+button { cursor: pointer; border: none; background: none; font: inherit; color: inherit; }
+a { color: inherit; text-decoration: none; }
+img { display: block; max-width: 100%; }
+input, textarea, select { font: inherit; color: inherit; }
 
-    /* ── Sidebar ── */
-    #sidebar {
-      width: 220px;
-      min-width: 220px;
-      background: var(--sidebar);
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      padding: 0;
-    }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius); }
 
-    .sidebar-logo {
-      padding: 20px 20px 16px;
-      border-bottom: 1px solid var(--border);
-    }
-    .sidebar-logo .logo-mark {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .sidebar-logo svg { flex-shrink: 0; }
-    .sidebar-logo .logo-text {
-      font-size: 15px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      color: var(--text);
-    }
-    .sidebar-logo .logo-sub {
-      font-size: 10px;
-      color: var(--text-faint);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      margin-top: 2px;
-    }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
 
-    .sidebar-nav {
-      flex: 1;
-      padding: 12px 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      overflow-y: auto;
-    }
+/* ── Auth Screen ────────────────────────────────────────────── */
+#auth-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  background: radial-gradient(ellipse 80% 60% at 50% 0%, #6c63ff14 0%, transparent 70%), var(--bg);
+}
 
-    .nav-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 9px 12px;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      color: var(--text-muted);
-      font-size: 13px;
-      font-weight: 500;
-      transition: background var(--transition), color var(--transition);
-      border: none;
-      background: none;
-      width: 100%;
-      text-align: left;
-    }
-    .nav-item:hover { background: var(--surface); color: var(--text); }
-    .nav-item.active { background: rgba(255,60,60,0.12); color: var(--primary); }
-    .nav-item .nav-badge {
-      margin-left: auto;
-      background: var(--primary);
-      color: #fff;
-      font-size: 10px;
-      font-weight: 700;
-      padding: 1px 6px;
-      border-radius: 99px;
-      min-width: 18px;
-      text-align: center;
-    }
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 40px 36px;
+}
 
-    .sidebar-footer {
-      padding: 12px 10px;
-      border-top: 1px solid var(--border);
-    }
-    .btn-logout {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      width: 100%;
-      padding: 9px 12px;
-      border-radius: var(--radius-sm);
-      background: none;
-      border: 1px solid var(--border);
-      color: var(--text-muted);
-      font-size: 13px;
-      cursor: pointer;
-      transition: all var(--transition);
-    }
-    .btn-logout:hover { border-color: var(--primary); color: var(--primary); }
+.auth-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 32px;
+}
 
-    /* ── Main ── */
-    #main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      background: var(--bg);
-    }
+.auth-logo svg { color: var(--accent); }
 
-    .topbar {
-      height: 56px;
-      min-height: 56px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      padding: 0 24px;
-      gap: 16px;
-      background: var(--sidebar);
-    }
-    .topbar-title { font-size: 16px; font-weight: 600; flex: 1; }
-    .topbar-admin { font-size: 12px; color: var(--text-muted); }
+.auth-logo span {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
 
-    .content-area {
-      flex: 1;
-      overflow-y: auto;
-      padding: 24px;
-    }
+.auth-card h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+.auth-card p  { font-size: 13px; color: var(--text-muted); margin-bottom: 28px; }
 
-    /* ── Section ── */
-    .section { display: none; }
-    .section.active { display: block; }
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
 
-    .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 20px;
-    }
-    .section-title { font-size: 20px; font-weight: 700; }
-    .section-subtitle { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+.form-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 14px;
+  color: var(--text);
+  transition: border-color var(--trans);
+}
+.form-input:focus { outline: none; border-color: var(--accent); }
+.form-input::placeholder { color: var(--text-faint); }
 
-    /* ── KPI Cards ── */
-    .kpi-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-    .kpi-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px 18px;
-    }
-    .kpi-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
-    .kpi-value { font-size: 28px; font-weight: 700; line-height: 1; }
-    .kpi-value.red { color: var(--primary); }
-    .kpi-value.green { color: var(--success); }
-    .kpi-value.yellow { color: var(--warning); }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background var(--trans), color var(--trans), border-color var(--trans), opacity var(--trans);
+  white-space: nowrap;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* ── Chart ── */
-    .chart-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px;
-      margin-bottom: 24px;
-    }
-    .chart-title { font-size: 13px; font-weight: 600; margin-bottom: 16px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
-    .bar-chart { display: flex; align-items: flex-end; gap: 6px; height: 80px; }
-    .bar-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
-    .bar { width: 100%; background: var(--primary); border-radius: 3px 3px 0 0; opacity: 0.8; min-height: 2px; transition: opacity var(--transition); }
-    .bar:hover { opacity: 1; }
-    .bar-label { font-size: 9px; color: var(--text-faint); }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--accent-h); }
 
-    /* ── Alerts ── */
-    .alerts-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px;
-    }
-    .alert-row {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      padding: 10px 0;
-      border-bottom: 1px solid var(--border);
-      font-size: 12px;
-    }
-    .alert-row:last-child { border-bottom: none; }
-    .alert-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); margin-top: 5px; flex-shrink: 0; }
-    .alert-action { font-weight: 600; color: var(--text); }
-    .alert-meta { color: var(--text-muted); margin-top: 2px; }
+.btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--surface-3); color: var(--text); border-color: var(--border-2); }
 
-    /* ── Tables ── */
-    .table-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-    }
-    .table-toolbar {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 14px 16px;
-      border-bottom: 1px solid var(--border);
-      flex-wrap: wrap;
-    }
-    .table-toolbar input, .table-toolbar select {
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 7px 10px;
-      border-radius: var(--radius-sm);
-      font-size: 12px;
-      outline: none;
-      transition: border-color var(--transition);
-    }
-    .table-toolbar input:focus, .table-toolbar select:focus { border-color: var(--primary); }
-    .table-toolbar input { min-width: 200px; }
-    .table-toolbar .spacer { flex: 1; }
+.btn-danger { background: var(--red-dim); color: var(--red); border: 1px solid transparent; }
+.btn-danger:hover { background: var(--red); color: #fff; }
 
-    table { width: 100%; border-collapse: collapse; }
-    thead th {
-      padding: 10px 14px;
-      text-align: left;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      border-bottom: 1px solid var(--border);
-      white-space: nowrap;
-    }
-    thead th.check-col { width: 40px; }
-    tbody tr {
-      border-bottom: 1px solid var(--border);
-      transition: background var(--transition);
-    }
-    tbody tr:last-child { border-bottom: none; }
-    tbody tr:hover { background: rgba(255,255,255,0.03); }
-    tbody tr.selected { background: rgba(255,60,60,0.06); }
-    tbody td {
-      padding: 11px 14px;
-      font-size: 12px;
-      color: var(--text);
-      vertical-align: middle;
-    }
-    tbody td.muted { color: var(--text-muted); }
+.btn-success { background: var(--green-dim); color: var(--green); border: 1px solid transparent; }
+.btn-success:hover { background: var(--green); color: #fff; }
 
-    .cell-truncate { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn-full { width: 100%; }
+.btn-sm { padding: 5px 11px; font-size: 12px; }
 
-    .empty-state {
-      text-align: center;
-      padding: 48px 20px;
-      color: var(--text-muted);
-    }
-    .empty-state-icon { font-size: 32px; margin-bottom: 12px; }
-    .empty-state-text { font-size: 13px; }
+.auth-error {
+  font-size: 12px;
+  color: var(--red);
+  background: var(--red-dim);
+  border: 1px solid #ef444433;
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  margin-bottom: 14px;
+  display: none;
+}
+.auth-error.show { display: block; }
 
-    /* ── Badges ── */
-    .badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 99px;
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-    .badge-pending { background: rgba(255,179,0,0.15); color: var(--warning); }
-    .badge-published, .badge-approved, .badge-active { background: rgba(0,200,83,0.15); color: var(--success); }
-    .badge-rejected, .badge-deleted, .badge-suspended { background: rgba(255,60,60,0.15); color: var(--primary); }
-    .badge-creator { background: rgba(100,120,255,0.15); color: #7c8fff; }
-    .badge-business { background: rgba(255,140,0,0.15); color: #ffab40; }
-    .badge-admin { background: rgba(200,100,255,0.15); color: #cc66ff; }
+/* ── App Shell ──────────────────────────────────────────────── */
+#app {
+  display: none;
+  min-height: 100dvh;
+}
+#app.active { display: flex; }
 
-    /* ── Buttons ── */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 7px 14px;
-      border-radius: var(--radius-sm);
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      border: none;
-      transition: all var(--transition);
-      white-space: nowrap;
-    }
-    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .btn-primary { background: var(--primary); color: #fff; }
-    .btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
-    .btn-success { background: rgba(0,200,83,0.15); color: var(--success); border: 1px solid rgba(0,200,83,0.3); }
-    .btn-success:hover:not(:disabled) { background: rgba(0,200,83,0.25); }
-    .btn-danger { background: rgba(255,60,60,0.15); color: var(--primary); border: 1px solid rgba(255,60,60,0.3); }
-    .btn-danger:hover:not(:disabled) { background: rgba(255,60,60,0.25); }
-    .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
-    .btn-ghost:hover:not(:disabled) { color: var(--text); border-color: var(--text-muted); }
-    .btn-sm { padding: 5px 10px; font-size: 11px; }
-    .btn-warning { background: rgba(255,179,0,0.15); color: var(--warning); border: 1px solid rgba(255,179,0,0.3); }
-    .btn-warning:hover:not(:disabled) { background: rgba(255,179,0,0.25); }
+/* ── Sidebar ────────────────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  overflow-y: auto;
+}
 
-    /* ── Bulk bar ── */
-    .bulk-bar {
-      display: none;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 16px;
-      background: rgba(255,60,60,0.08);
-      border-bottom: 1px solid rgba(255,60,60,0.2);
-      font-size: 12px;
-    }
-    .bulk-bar.visible { display: flex; }
-    .bulk-count { color: var(--primary); font-weight: 600; }
-    .bulk-note input {
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 5px 8px;
-      border-radius: var(--radius-sm);
-      font-size: 11px;
-      outline: none;
-      width: 220px;
-    }
+.sidebar-header {
+  padding: 20px 16px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.sidebar-header svg { color: var(--accent); flex-shrink: 0; }
+.sidebar-header .brand { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
+.sidebar-header .badge { font-size: 10px; background: var(--accent-dim); color: var(--accent); border-radius: 4px; padding: 1px 6px; font-weight: 600; }
 
-    /* ── Pagination ── */
-    .pagination {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 16px;
-      border-top: 1px solid var(--border);
-      font-size: 12px;
-      color: var(--text-muted);
-    }
-    .pagination-btns { display: flex; gap: 6px; }
+.sidebar-nav { flex: 1; padding: 12px 8px; }
 
-    /* ── Forms ── */
-    .form-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 24px;
-      max-width: 480px;
-    }
-    .form-group { margin-bottom: 18px; }
-    .form-label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
-    .form-input {
-      width: 100%;
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 9px 12px;
-      border-radius: var(--radius-sm);
-      font-size: 13px;
-      outline: none;
-      transition: border-color var(--transition);
-    }
-    .form-input:focus { border-color: var(--primary); }
-    .form-error { font-size: 11px; color: var(--primary); margin-top: 4px; display: none; }
-    .form-error.visible { display: block; }
+.nav-section { font-size: 10px; font-weight: 600; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.08em; padding: 12px 8px 6px; }
 
-    /* ── Login Modal ── */
-    #login-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.85);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      backdrop-filter: blur(4px);
-    }
-    .login-modal {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 36px;
-      width: 360px;
-    }
-    .login-modal .modal-logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 28px;
-    }
-    .login-modal h2 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
-    .login-modal p { font-size: 12px; color: var(--text-muted); margin-bottom: 24px; }
-    .login-error {
-      background: rgba(255,60,60,0.1);
-      border: 1px solid rgba(255,60,60,0.3);
-      color: var(--primary);
-      padding: 8px 12px;
-      border-radius: var(--radius-sm);
-      font-size: 12px;
-      margin-bottom: 16px;
-      display: none;
-    }
-    .login-error.visible { display: block; }
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--trans), color var(--trans);
+  user-select: none;
+  margin-bottom: 1px;
+}
+.nav-item:hover { background: var(--surface-3); color: var(--text); }
+.nav-item.active { background: var(--accent-dim); color: var(--accent); }
+.nav-item svg { flex-shrink: 0; opacity: 0.8; }
+.nav-item.active svg { opacity: 1; }
+.nav-badge { margin-left: auto; font-size: 11px; background: var(--red); color: #fff; border-radius: 10px; padding: 1px 7px; font-weight: 600; min-width: 20px; text-align: center; }
 
-    /* ── Confirm Dialog ── */
-    #confirm-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.7);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 900;
-    }
-    #confirm-overlay.visible { display: flex; }
-    .confirm-modal {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 28px;
-      width: 360px;
-    }
-    .confirm-modal h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
-    .confirm-modal p { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
-    .confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.sidebar-footer {
+  padding: 12px 8px;
+  border-top: 1px solid var(--border);
+}
+.admin-info {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+}
+.admin-avatar {
+  width: 30px; height: 30px;
+  background: var(--accent-dim);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: var(--accent);
+  flex-shrink: 0;
+}
+.admin-name { font-size: 13px; font-weight: 500; }
+.admin-role { font-size: 11px; color: var(--text-muted); }
+.logout-btn { margin-left: auto; color: var(--text-faint); }
+.logout-btn:hover { color: var(--red); }
 
-    /* ── Toast ── */
-    #toast-container {
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      z-index: 9999;
-    }
-    .toast {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 12px 16px;
-      border-radius: var(--radius);
-      font-size: 13px;
-      font-weight: 500;
-      color: #fff;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-      animation: slideIn 0.2s ease;
-      max-width: 320px;
-    }
-    .toast-success { background: #1a3a2a; border: 1px solid rgba(0,200,83,0.4); color: var(--success); }
-    .toast-error { background: #3a1a1a; border: 1px solid rgba(255,60,60,0.4); color: var(--primary); }
-    .toast-info { background: var(--surface-2); border: 1px solid var(--border); color: var(--text); }
-    @keyframes slideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+/* ── Main ───────────────────────────────────────────────────── */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-y: auto;
+}
 
-    /* ── Checkbox ── */
-    input[type="checkbox"] { accent-color: var(--primary); width: 14px; height: 14px; cursor: pointer; }
+.topbar {
+  height: 56px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 10;
+}
+.topbar-title { font-size: 16px; font-weight: 600; }
+.topbar-sub { font-size: 12px; color: var(--text-muted); }
+.topbar-actions { margin-left: auto; display: flex; gap: 8px; }
 
-    /* ── Scrollbar ── */
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
-  </style>
+.page-content { padding: 24px; flex: 1; }
+
+/* ── Views ──────────────────────────────────────────────────── */
+.view { display: none; }
+.view.active { display: block; }
+
+/* ── KPI Grid ───────────────────────────────────────────────── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+}
+.kpi-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+.kpi-value { font-size: 28px; font-weight: 700; line-height: 1; letter-spacing: -0.03em; }
+.kpi-value.red    { color: var(--red); }
+.kpi-value.yellow { color: var(--yellow); }
+.kpi-value.green  { color: var(--green); }
+.kpi-value.accent { color: var(--accent); }
+.kpi-sub { font-size: 11px; color: var(--text-faint); margin-top: 6px; }
+
+/* ── Section Header ─────────────────────────────────────────── */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.section-title { font-size: 15px; font-weight: 600; }
+.section-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* ── Table ──────────────────────────────────────────────────── */
+.table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+table { width: 100%; border-collapse: collapse; }
+thead tr { border-bottom: 1px solid var(--border); }
+th {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 10px 14px;
+  text-align: left;
+}
+td { padding: 11px 14px; font-size: 13px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--surface-2); }
+
+.check-col { width: 40px; }
+.table-checkbox { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+
+/* ── Badges ─────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.badge-pending  { background: var(--yellow-dim); color: var(--yellow); }
+.badge-approved { background: var(--green-dim);  color: var(--green);  }
+.badge-rejected { background: var(--red-dim);    color: var(--red);    }
+.badge-flagged  { background: #f9731622;           color: var(--orange); }
+.badge-open     { background: var(--green-dim);  color: var(--green);  }
+.badge-closed   { background: var(--red-dim);    color: var(--red);    }
+.badge-suspended{ background: var(--red-dim);    color: var(--red);    }
+.badge-active   { background: var(--green-dim);  color: var(--green);  }
+.badge-verified { background: var(--accent-dim); color: var(--accent); }
+
+/* ── Filter Bar ─────────────────────────────────────────────── */
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.filter-input {
+  padding: 7px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--text);
+  min-width: 180px;
+  transition: border-color var(--trans);
+}
+.filter-input:focus { outline: none; border-color: var(--accent); }
+.filter-input::placeholder { color: var(--text-faint); }
+
+/* ── Bulk Bar ───────────────────────────────────────────────── */
+.bulk-bar {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent)44;
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--accent);
+}
+.bulk-bar.show { display: flex; }
+.bulk-bar strong { font-weight: 700; }
+.bulk-actions { margin-left: auto; display: flex; gap: 8px; }
+
+/* ── Empty State ────────────────────────────────────────────── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+  color: var(--text-faint);
+  gap: 10px;
+  text-align: center;
+}
+.empty-state svg { opacity: 0.4; }
+.empty-state p { font-size: 13px; color: var(--text-muted); }
+
+/* ── Toast ──────────────────────────────────────────────────── */
+#toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 9999;
+}
+.toast {
+  padding: 11px 16px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid;
+  animation: slideIn 200ms cubic-bezier(0.16,1,0.3,1) forwards;
+  max-width: 320px;
+}
+.toast.success { background: var(--green-dim);  color: var(--green);  border-color: var(--green)44; }
+.toast.error   { background: var(--red-dim);    color: var(--red);    border-color: var(--red)44; }
+.toast.info    { background: var(--accent-dim); color: var(--accent); border-color: var(--accent)44; }
+@keyframes slideIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: none; } }
+
+/* ── Modal ──────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 460px;
+  padding: 28px;
+}
+.modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+.modal p  { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+
+/* ── Audit log ──────────────────────────────────────────────── */
+.log-action { font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
+.log-meta   { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Settings ───────────────────────────────────────────────── */
+.settings-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  max-width: 460px;
+  margin-bottom: 16px;
+}
+.settings-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 16px; }
+
+/* ── Sport Breakdown ────────────────────────────────────────── */
+.sport-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 13px;
+}
+.sport-bar-wrap { flex: 1; background: var(--surface-3); border-radius: 3px; height: 6px; overflow: hidden; }
+.sport-bar { height: 100%; background: var(--accent); border-radius: 3px; transition: width 600ms cubic-bezier(0.16,1,0.3,1); }
+.sport-name { width: 90px; color: var(--text-muted); }
+.sport-count { width: 30px; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  :root { --sidebar-w: 0px; }
+  .sidebar { display: none; }
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
 </head>
 <body>
 
-<!-- Login Overlay -->
-<div id="login-overlay">
-  <div class="login-modal">
-    <div class="modal-logo">
+<!-- ══ AUTH SCREEN ══════════════════════════════════════════════ -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">
       <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-        <rect width="28" height="28" rx="6" fill="#ff3c3c"/>
-        <path d="M7 14h14M14 7l7 7-7 7" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect width="28" height="28" rx="7" fill="currentColor" fill-opacity=".12"/>
+        <path d="M7 14 C7 10 10 7 14 7 C18 7 21 10 21 14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        <circle cx="14" cy="18" r="3.5" fill="currentColor"/>
+        <circle cx="9" cy="16" r="1.8" fill="currentColor" fill-opacity=".6"/>
+        <circle cx="19" cy="16" r="1.8" fill="currentColor" fill-opacity=".6"/>
       </svg>
-      <div>
-        <div style="font-weight:700;font-size:15px;">PLXYGROUND</div>
-        <div style="font-size:10px;color:var(--text-faint);letter-spacing:.08em;">ADMIN CONSOLE</div>
+      <span>PLXYGROUND</span>
+    </div>
+    <h1>Admin Portal</h1>
+    <p>Sign in with your administrator credentials</p>
+    <div id="auth-error" class="auth-error"></div>
+    <form id="login-form">
+      <div class="form-group">
+        <label for="login-email">Email</label>
+        <input id="login-email" class="form-input" type="email" placeholder="admin@plxyground.com" autocomplete="email" required />
       </div>
-    </div>
-    <h2>Sign in</h2>
-    <p>Enter your admin credentials to continue</p>
-    <div class="login-error" id="login-error"></div>
-    <div class="form-group">
-      <label class="form-label">Email</label>
-      <input class="form-input" type="email" id="login-email" placeholder="admin@plxyground.local" autocomplete="username" />
-    </div>
-    <div class="form-group">
-      <label class="form-label">Password</label>
-      <input class="form-input" type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" />
-    </div>
-    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:11px;font-size:13px;" id="login-btn" onclick="doLogin()">Log in</button>
+      <div class="form-group">
+        <label for="login-password">Password</label>
+        <input id="login-password" class="form-input" type="password" placeholder="••••••••" autocomplete="current-password" required />
+      </div>
+      <button type="submit" class="btn btn-primary btn-full" id="login-btn">Sign in</button>
+    </form>
   </div>
 </div>
 
-<!-- Confirm Dialog -->
-<div id="confirm-overlay">
-  <div class="confirm-modal">
-    <h3 id="confirm-title">Are you sure?</h3>
-    <p id="confirm-body">This action cannot be undone.</p>
-    <div class="confirm-actions">
-      <button class="btn btn-ghost" onclick="closeConfirm()">Cancel</button>
-      <button class="btn btn-primary" id="confirm-ok-btn">Confirm</button>
-    </div>
-  </div>
-</div>
-
-<!-- Toast Container -->
-<div id="toast-container"></div>
-
-<!-- Main App -->
+<!-- ══ APP SHELL ════════════════════════════════════════════════ -->
 <div id="app">
+
   <!-- Sidebar -->
-  <aside id="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-mark">
-        <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
-          <rect width="28" height="28" rx="6" fill="#ff3c3c"/>
-          <path d="M7 14h14M14 7l7 7-7 7" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <div>
-          <div class="logo-text">PLXYGROUND</div>
-          <div class="logo-sub">Admin Console</div>
-        </div>
-      </div>
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <svg width="22" height="22" viewBox="0 0 28 28" fill="none">
+        <rect width="28" height="28" rx="7" fill="currentColor" fill-opacity=".12"/>
+        <path d="M7 14 C7 10 10 7 14 7 C18 7 21 10 21 14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        <circle cx="14" cy="18" r="3.5" fill="currentColor"/>
+        <circle cx="9" cy="16" r="1.8" fill="currentColor" fill-opacity=".6"/>
+        <circle cx="19" cy="16" r="1.8" fill="currentColor" fill-opacity=".6"/>
+      </svg>
+      <span class="brand">PLXYGROUND</span>
+      <span class="badge">ADMIN</span>
     </div>
+
     <nav class="sidebar-nav">
-      <button class="nav-item active" data-section="dashboard" onclick="navigate('dashboard')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <div class="nav-section">Overview</div>
+      <div class="nav-item active" data-view="dashboard">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
         Dashboard
-      </button>
-      <button class="nav-item" data-section="queue" onclick="navigate('queue')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4M7 4H4a1 1 0 00-1 1v3M17 4h3a1 1 0 011 1v3M7 20H4a1 1 0 01-1-1v-3M17 20h3a1 1 0 001-1v-3"/></svg>
-        Mod Queue
+      </div>
+
+      <div class="nav-section">Moderation</div>
+      <div class="nav-item" data-view="queue">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        Queue
         <span class="nav-badge" id="queue-badge" style="display:none">0</span>
-      </button>
-      <button class="nav-item" data-section="content" onclick="navigate('content')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      </div>
+      <div class="nav-item" data-view="content">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
         Content
-      </button>
-      <button class="nav-item" data-section="users" onclick="navigate('users')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
-        Users
-      </button>
-      <button class="nav-item" data-section="audit" onclick="navigate('audit')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+
+      <div class="nav-section">Users</div>
+      <div class="nav-item" data-view="creators">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        Creators
+      </div>
+      <div class="nav-item" data-view="businesses">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Businesses
+      </div>
+
+      <div class="nav-section">System</div>
+      <div class="nav-item" data-view="audit">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
         Audit Log
-      </button>
-      <button class="nav-item" data-section="settings" onclick="navigate('settings')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      </div>
+      <div class="nav-item" data-view="settings">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg>
         Settings
-      </button>
+      </div>
     </nav>
+
     <div class="sidebar-footer">
-      <div style="font-size:11px;color:var(--text-faint);padding:0 4px 8px;">Signed in as <span id="admin-email-display" style="color:var(--text-muted);">—</span></div>
-      <button class="btn-logout" onclick="doLogout()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
-        Log out
-      </button>
+      <div class="admin-info">
+        <div class="admin-avatar" id="admin-avatar-initials">A</div>
+        <div>
+          <div class="admin-name" id="admin-username">Admin</div>
+          <div class="admin-role" id="admin-role">superadmin</div>
+        </div>
+        <button class="btn logout-btn" id="logout-btn" title="Sign out">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
     </div>
   </aside>
 
   <!-- Main -->
-  <div id="main">
-    <div class="topbar">
-      <span class="topbar-title" id="topbar-title">Dashboard</span>
-      <span class="topbar-admin" id="topbar-admin"></span>
-    </div>
-    <div class="content-area">
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <div class="topbar-title" id="topbar-title">Dashboard</div>
+        <div class="topbar-sub" id="topbar-sub">Overview of platform activity</div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-ghost btn-sm" id="refresh-btn">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+          Refresh
+        </button>
+      </div>
+    </header>
 
-      <!-- Dashboard -->
-      <section class="section active" id="section-dashboard">
-        <div class="section-header">
-          <div>
-            <div class="section-title">Dashboard</div>
-            <div class="section-subtitle">Platform overview and recent activity</div>
-          </div>
-          <button class="btn btn-ghost btn-sm" onclick="loadDashboard()">↻ Refresh</button>
-        </div>
-        <div class="kpi-grid" id="kpi-grid"></div>
-        <div class="chart-card">
-          <div class="chart-title">Creator Signups — Last 7 Days</div>
-          <div class="bar-chart" id="signups-chart"></div>
-        </div>
-        <div class="chart-card">
-          <div class="chart-title">Recent Audit Activity</div>
-          <div id="alerts-list"></div>
-        </div>
-      </section>
+    <div class="page-content">
 
-      <!-- Queue -->
-      <section class="section" id="section-queue">
-        <div class="section-header">
-          <div>
-            <div class="section-title">Moderation Queue</div>
-            <div class="section-subtitle">Review and approve or reject pending content</div>
-          </div>
-          <button class="btn btn-ghost btn-sm" onclick="loadQueue()">↻ Refresh</button>
+      <!-- ── DASHBOARD ── -->
+      <div class="view active" id="view-dashboard">
+        <div class="kpi-grid" id="kpi-grid">
+          <div class="kpi-card"><div class="kpi-label">Creators</div><div class="kpi-value accent" id="kpi-creators">—</div></div>
+          <div class="kpi-card"><div class="kpi-label">Businesses</div><div class="kpi-value accent" id="kpi-businesses">—</div></div>
+          <div class="kpi-card"><div class="kpi-label">Total Content</div><div class="kpi-value" id="kpi-content">—</div></div>
+          <div class="kpi-card"><div class="kpi-label">Opportunities</div><div class="kpi-value" id="kpi-opps">—</div></div>
+          <div class="kpi-card"><div class="kpi-label">Pending Queue</div><div class="kpi-value yellow" id="kpi-pending">—</div><div class="kpi-sub">Awaiting review</div></div>
+          <div class="kpi-card"><div class="kpi-label">Flagged</div><div class="kpi-value red" id="kpi-flagged">—</div><div class="kpi-sub">Needs attention</div></div>
+          <div class="kpi-card"><div class="kpi-label">Applications</div><div class="kpi-value green" id="kpi-applications">—</div></div>
         </div>
-        <div class="table-card">
-          <div class="bulk-bar" id="queue-bulk-bar">
-            <span class="bulk-count" id="queue-bulk-count">0 selected</span>
-            <div class="bulk-note"><input type="text" id="queue-bulk-note" placeholder="Rejection note (optional)" /></div>
-            <button class="btn btn-success btn-sm" onclick="bulkQueueAction('approve')">✓ Approve</button>
-            <button class="btn btn-danger btn-sm" onclick="bulkQueueAction('reject')">✕ Reject</button>
-            <button class="btn btn-ghost btn-sm" onclick="clearQueueSelection()">Clear</button>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div class="table-wrap" style="padding:20px;">
+            <div class="section-title" style="margin-bottom:14px;">Content Last 7 Days</div>
+            <div id="trend-list"><div class="empty-state" style="padding:20px;"><p>Loading…</p></div></div>
           </div>
-          <div class="table-toolbar">
-            <select id="queue-type-filter" onchange="loadQueue()">
-              <option value="">All types</option>
-              <option value="creatorcontent">Creator content</option>
-              <option value="businesscontent">Business content</option>
-            </select>
-            <span class="spacer"></span>
-            <span id="queue-count-label" style="font-size:12px;color:var(--text-muted);"></span>
+          <div class="table-wrap" style="padding:20px;">
+            <div class="section-title" style="margin-bottom:14px;">Sport Breakdown</div>
+            <div id="sport-breakdown"><div class="empty-state" style="padding:20px;"><p>Loading…</p></div></div>
           </div>
+        </div>
+      </div>
+
+      <!-- ── QUEUE ── -->
+      <div class="view" id="view-queue">
+        <div class="bulk-bar" id="queue-bulk-bar">
+          <strong id="queue-selected-count">0</strong> selected
+          <div class="bulk-actions">
+            <button class="btn btn-success btn-sm" id="bulk-approve-btn">Approve all</button>
+            <button class="btn btn-danger btn-sm" id="bulk-reject-btn">Reject all</button>
+            <button class="btn btn-ghost btn-sm" id="bulk-deselect-btn">Deselect</button>
+          </div>
+        </div>
+        <div class="table-wrap">
           <table>
-            <thead>
-              <tr>
-                <th class="check-col"><input type="checkbox" id="queue-check-all" onchange="toggleAllQueue(this)" /></th>
-                <th>ID</th>
-                <th>Type</th>
-                <th>Title</th>
-                <th>Submitted</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="queue-tbody"></tbody>
+            <thead><tr>
+              <th class="check-col"><input type="checkbox" class="table-checkbox" id="queue-select-all" /></th>
+              <th>Title</th><th>Creator</th><th>Sport</th><th>Status</th><th>Submitted</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="queue-tbody"><tr><td colspan="7"><div class="empty-state"><p>Loading queue…</p></div></td></tr></tbody>
           </table>
-          <div class="pagination">
-            <span id="queue-page-info"></span>
-            <div class="pagination-btns">
-              <button class="btn btn-ghost btn-sm" id="queue-prev" onclick="queuePage(-1)">← Prev</button>
-              <button class="btn btn-ghost btn-sm" id="queue-next" onclick="queuePage(1)">Next →</button>
-            </div>
-          </div>
         </div>
-      </section>
+      </div>
 
-      <!-- Content -->
-      <section class="section" id="section-content">
-        <div class="section-header">
-          <div>
-            <div class="section-title">Content</div>
-            <div class="section-subtitle">All creator and business content</div>
-          </div>
-          <button class="btn btn-ghost btn-sm" onclick="loadContent()">↻ Refresh</button>
+      <!-- ── CONTENT ── -->
+      <div class="view" id="view-content">
+        <div class="filter-bar">
+          <input class="filter-input" id="content-search" placeholder="Search content…" />
+          <select class="filter-input" id="content-status-filter" style="min-width:130px;background:var(--surface);">
+            <option value="">All statuses</option>
+            <option value="approved">Approved</option>
+            <option value="pending">Pending</option>
+            <option value="rejected">Rejected</option>
+            <option value="flagged">Flagged</option>
+          </select>
         </div>
-        <div class="table-card">
-          <div class="table-toolbar">
-            <input type="text" id="content-search" placeholder="Search title..." oninput="debounce(loadContent, 400)()" />
-            <select id="content-status-filter" onchange="loadContent()">
-              <option value="">All statuses</option>
-              <option value="pending">Pending</option>
-              <option value="published">Published</option>
-              <option value="rejected">Rejected</option>
-              <option value="deleted">Deleted</option>
-            </select>
-          </div>
+        <div class="table-wrap">
           <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Title</th>
-                <th>Creator</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th>Views</th>
-                <th>Date</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="content-tbody"></tbody>
+            <thead><tr><th>Title</th><th>Creator</th><th>Sport</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+            <tbody id="content-tbody"><tr><td colspan="6"><div class="empty-state"><p>Loading…</p></div></td></tr></tbody>
           </table>
-          <div class="pagination">
-            <span id="content-page-info"></span>
-            <div class="pagination-btns">
-              <button class="btn btn-ghost btn-sm" id="content-prev" onclick="contentPage(-1)">← Prev</button>
-              <button class="btn btn-ghost btn-sm" id="content-next" onclick="contentPage(1)">Next →</button>
-            </div>
-          </div>
         </div>
-      </section>
+      </div>
 
-      <!-- Users -->
-      <section class="section" id="section-users">
-        <div class="section-header">
-          <div>
-            <div class="section-title">Users</div>
-            <div class="section-subtitle">Manage creators and businesses</div>
-          </div>
-          <button class="btn btn-ghost btn-sm" onclick="loadUsers()">↻ Refresh</button>
+      <!-- ── CREATORS ── -->
+      <div class="view" id="view-creators">
+        <div class="filter-bar">
+          <input class="filter-input" id="creator-search" placeholder="Search creators…" />
         </div>
-        <div class="table-card">
-          <div class="table-toolbar">
-            <input type="text" id="users-search" placeholder="Search name or email..." oninput="debounce(loadUsers, 400)()" />
-            <select id="users-type-filter" onchange="loadUsers()">
-              <option value="">All types</option>
-              <option value="creator">Creators</option>
-              <option value="business">Businesses</option>
-            </select>
-          </div>
+        <div class="table-wrap">
           <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Email</th>
-                <th>Status</th>
-                <th>Verified</th>
-                <th>Joined</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="users-tbody"></tbody>
+            <thead><tr><th>Username</th><th>Display Name</th><th>Sport</th><th>Followers</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="creators-tbody"><tr><td colspan="6"><div class="empty-state"><p>Loading…</p></div></td></tr></tbody>
           </table>
-          <div class="pagination">
-            <span id="users-page-info"></span>
-            <div class="pagination-btns">
-              <button class="btn btn-ghost btn-sm" id="users-prev" onclick="usersPage(-1)">← Prev</button>
-              <button class="btn btn-ghost btn-sm" id="users-next" onclick="usersPage(1)">Next →</button>
-            </div>
-          </div>
         </div>
-      </section>
+      </div>
 
-      <!-- Audit -->
-      <section class="section" id="section-audit">
-        <div class="section-header">
-          <div>
-            <div class="section-title">Audit Log</div>
-            <div class="section-subtitle">All platform actions and events</div>
-          </div>
-          <div style="display:flex;gap:8px;">
-            <button class="btn btn-ghost btn-sm" onclick="exportAudit()">⬇ Export JSON</button>
-            <button class="btn btn-ghost btn-sm" onclick="loadAudit()">↻ Refresh</button>
-          </div>
+      <!-- ── BUSINESSES ── -->
+      <div class="view" id="view-businesses">
+        <div class="filter-bar">
+          <input class="filter-input" id="business-search" placeholder="Search businesses…" />
         </div>
-        <div class="table-card">
-          <div class="table-toolbar">
-            <select id="audit-actor-filter" onchange="loadAudit()">
-              <option value="">All actor types</option>
-              <option value="admin">Admin</option>
-              <option value="creator">Creator</option>
-              <option value="business">Business</option>
-              <option value="system">System</option>
-            </select>
-            <input type="text" id="audit-action-filter" placeholder="Filter by action..." oninput="debounce(loadAudit, 400)()" style="min-width:160px;" />
-          </div>
+        <div class="table-wrap">
           <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Actor</th>
-                <th>Action</th>
-                <th>Target</th>
-                <th>IP</th>
-                <th>Date</th>
-              </tr>
-            </thead>
-            <tbody id="audit-tbody"></tbody>
+            <thead><tr><th>Name</th><th>Email</th><th>Industry</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="businesses-tbody"><tr><td colspan="5"><div class="empty-state"><p>Loading…</p></div></td></tr></tbody>
           </table>
-          <div class="pagination">
-            <span id="audit-page-info"></span>
-            <div class="pagination-btns">
-              <button class="btn btn-ghost btn-sm" id="audit-prev" onclick="auditPage(-1)">← Prev</button>
-              <button class="btn btn-ghost btn-sm" id="audit-next" onclick="auditPage(1)">Next →</button>
+        </div>
+      </div>
+
+      <!-- ── AUDIT LOG ── -->
+      <div class="view" id="view-audit">
+        <div class="filter-bar">
+          <select class="filter-input" id="audit-type-filter" style="min-width:140px;background:var(--surface);">
+            <option value="">All actor types</option>
+            <option value="user">User</option>
+            <option value="business">Business</option>
+            <option value="admin">Admin</option>
+            <option value="system">System</option>
+          </select>
+          <input class="filter-input" id="audit-action-filter" placeholder="Filter by action…" />
+          <button class="btn btn-ghost btn-sm" id="audit-export-btn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export JSON
+          </button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Target</th><th>IP</th><th>Meta</th></tr></thead>
+            <tbody id="audit-tbody"><tr><td colspan="6"><div class="empty-state"><p>Loading…</p></div></td></tr></tbody>
+          </table>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;">
+          <button class="btn btn-ghost btn-sm" id="audit-prev-btn">← Prev</button>
+          <span style="font-size:12px;color:var(--text-muted);align-self:center;" id="audit-page-label">Page 1</span>
+          <button class="btn btn-ghost btn-sm" id="audit-next-btn">Next →</button>
+        </div>
+      </div>
+
+      <!-- ── SETTINGS ── -->
+      <div class="view" id="view-settings">
+        <div class="settings-card">
+          <h3>Change Password</h3>
+          <div id="settings-error" class="auth-error"></div>
+          <div id="settings-success" class="auth-error" style="color:var(--green);background:var(--green-dim);border-color:#22c55e33;"></div>
+          <form id="settings-form">
+            <div class="form-group">
+              <label>Current Password</label>
+              <input class="form-input" type="password" id="settings-current" placeholder="Current password" required />
             </div>
-          </div>
+            <div class="form-group">
+              <label>New Password</label>
+              <input class="form-input" type="password" id="settings-new" placeholder="Min 8 characters" required minlength="8" />
+            </div>
+            <div class="form-group">
+              <label>Confirm New Password</label>
+              <input class="form-input" type="password" id="settings-confirm" placeholder="Repeat new password" required />
+            </div>
+            <button type="submit" class="btn btn-primary">Update Password</button>
+          </form>
         </div>
-      </section>
+        <div class="settings-card">
+          <h3>Session Info</h3>
+          <p style="font-size:13px;color:var(--text-muted);margin:0;">Logged in as <strong id="settings-username"></strong> &middot; Role: <span id="settings-role"></span></p>
+        </div>
+      </div>
 
-      <!-- Settings -->
-      <section class="section" id="section-settings">
-        <div class="section-header">
-          <div>
-            <div class="section-title">Settings</div>
-            <div class="section-subtitle">Account and security settings</div>
-          </div>
-        </div>
-        <div class="form-card">
-          <div style="font-size:14px;font-weight:600;margin-bottom:20px;">Change Password</div>
-          <div class="form-group">
-            <label class="form-label">Current Password</label>
-            <input class="form-input" type="password" id="pw-current" placeholder="••••••••" />
-            <div class="form-error" id="pw-current-err"></div>
-          </div>
-          <div class="form-group">
-            <label class="form-label">New Password</label>
-            <input class="form-input" type="password" id="pw-new" placeholder="Min 8 characters" />
-            <div class="form-error" id="pw-new-err"></div>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Confirm New Password</label>
-            <input class="form-input" type="password" id="pw-confirm" placeholder="Repeat new password" />
-            <div class="form-error" id="pw-confirm-err"></div>
-          </div>
-          <button class="btn btn-primary" onclick="changePassword()">Update Password</button>
-        </div>
-      </section>
+    </div><!-- /page-content -->
+  </main>
+</div>
 
+<!-- ── MODAL ── -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <h2 id="modal-title">Confirm</h2>
+    <p id="modal-body">Are you sure?</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="modal-cancel">Cancel</button>
+      <button class="btn btn-danger" id="modal-confirm">Confirm</button>
     </div>
   </div>
 </div>
 
+<!-- ── TOAST ── -->
+<div id="toast-container"></div>
+
 <script>
+(function () {
   'use strict';
-  const API_BASE = 'http://localhost:3011'; // replace with deployed URL in production
 
-  // ── State ──
-  const state = {
-    queue: { offset: 0, limit: 20, total: 0, selected: new Set() },
-    content: { offset: 0, limit: 20, total: 0 },
-    users: { offset: 0, limit: 20, total: 0 },
-    audit: { offset: 0, limit: 50, total: 0 },
-  };
+  /* ── Config ─────────────────────────────────────────────── */
+  const API = (localStorage.getItem('plxy_api') || 'http://localhost:3001') + '/api';
+  let token = null;
+  let adminData = null;
+  let auditPage = 1;
+  let allAuditLogs = [];
+  let allCreators = [];
+  let allBusinesses = [];
+  let allContent = [];
+  let queueSelected = new Set();
 
-  // ── Auth helpers ──
-  const getToken = () => localStorage.getItem('adminToken');
-  const setToken = (t) => localStorage.setItem('adminToken', t);
-  const clearToken = () => localStorage.removeItem('adminToken');
+  /* ── Helpers ────────────────────────────────────────────── */
+  function toast(msg, type = 'info') {
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.textContent = msg;
+    document.getElementById('toast-container').appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+  }
 
-  const authHeaders = () => ({
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${getToken()}`,
-  });
+  function showModal(title, body, onConfirm, confirmClass = 'btn-danger') {
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-body').textContent = body;
+    const btn = document.getElementById('modal-confirm');
+    btn.className = `btn ${confirmClass}`;
+    document.getElementById('modal-overlay').classList.add('show');
+    btn.onclick = () => { closeModal(); onConfirm(); };
+  }
+  function closeModal() { document.getElementById('modal-overlay').classList.remove('show'); }
+  document.getElementById('modal-cancel').onclick = closeModal;
+  document.getElementById('modal-overlay').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeModal(); });
 
-  async function apiFetch(path, opts = {}) {
-    const res = await fetch(`${API_BASE}${path}`, {
-      headers: authHeaders(),
+  function fmt(dateStr) {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) + ' ' +
+           d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+  }
+
+  function badge(status) {
+    const map = {
+      pending:  'badge-pending',
+      approved: 'badge-approved',
+      rejected: 'badge-rejected',
+      flagged:  'badge-flagged',
+      open:     'badge-open',
+      closed:   'badge-closed',
+      suspended:'badge-suspended',
+      active:   'badge-active',
+      verified: 'badge-verified',
+    };
+    return `<span class="badge ${map[status] || 'badge-pending'}">${status}</span>`;
+  }
+
+  async function api(path, opts = {}) {
+    const res = await fetch(API + path, {
       ...opts,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(opts.headers || {}),
+      },
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
     });
-    if (res.status === 401) { doLogout(); return null; }
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok, status: res.status, data };
   }
 
-  // ── Toast ──
-  function toast(msg, type = 'info') {
-    const el = document.createElement('div');
-    el.className = `toast toast-${type}`;
-    el.textContent = msg;
-    document.getElementById('toast-container').appendChild(el);
-    setTimeout(() => el.remove(), 3000);
-  }
-
-  // ── Confirm ──
-  let confirmResolve = null;
-  function confirm(title, body) {
-    return new Promise((resolve) => {
-      confirmResolve = resolve;
-      document.getElementById('confirm-title').textContent = title;
-      document.getElementById('confirm-body').textContent = body;
-      document.getElementById('confirm-overlay').classList.add('visible');
-      document.getElementById('confirm-ok-btn').onclick = () => { closeConfirm(); resolve(true); };
-    });
-  }
-  function closeConfirm() {
-    document.getElementById('confirm-overlay').classList.remove('visible');
-    if (confirmResolve) { confirmResolve(false); confirmResolve = null; }
-  }
-
-  // ── Debounce ──
-  function debounce(fn, ms) {
-    let t;
-    return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
-  }
-
-  // ── Format ──
-  function fmtDate(iso) {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' });
-  }
-
-  function badgeHtml(status) {
-    return `<span class="badge badge-${status}">${status}</span>`;
-  }
-
-  function emptyRow(cols, msg = 'No results') {
-    return `<tr><td colspan="${cols}" class="empty-state"><div class="empty-state-icon">∅</div><div class="empty-state-text">${msg}</div></td></tr>`;
-  }
-
-  // ── Navigation ──
-  function navigate(section) {
-    document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.section === section));
-    document.querySelectorAll('.section').forEach(el => el.classList.toggle('active', el.id === `section-${section}`));
-    const titles = { dashboard: 'Dashboard', queue: 'Moderation Queue', content: 'Content', users: 'Users', audit: 'Audit Log', settings: 'Settings' };
-    document.getElementById('topbar-title').textContent = titles[section] || section;
-    if (section === 'dashboard') loadDashboard();
-    if (section === 'queue') loadQueue();
-    if (section === 'content') loadContent();
-    if (section === 'users') loadUsers();
-    if (section === 'audit') loadAudit();
-  }
-
-  // ── Login ──
-  async function doLogin() {
-    const email = document.getElementById('login-email').value.trim();
-    const password = document.getElementById('login-password').value;
-    const errEl = document.getElementById('login-error');
+  /* ── Auth ───────────────────────────────────────────────── */
+  document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
     const btn = document.getElementById('login-btn');
-
-    errEl.classList.remove('visible');
+    const errEl = document.getElementById('auth-error');
+    errEl.classList.remove('show');
     btn.disabled = true;
     btn.textContent = 'Signing in…';
 
-    try {
-      const res = await fetch(`${API_BASE}/api/admin/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json();
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
 
-      if (!res.ok) {
-        errEl.textContent = data.error || 'Invalid credentials';
-        errEl.classList.add('visible');
-      } else {
-        setToken(data.token);
-        document.getElementById('admin-email-display').textContent = data.admin.email;
-        document.getElementById('topbar-admin').textContent = data.admin.email;
-        document.getElementById('login-overlay').style.display = 'none';
-        loadDashboard();
-      }
-    } catch (e) {
-      errEl.textContent = 'Network error — is the backend running?';
-      errEl.classList.add('visible');
-    } finally {
+    const { ok, data } = await api('/admin/auth/login', { method: 'POST', body: { email, password } });
+    if (!ok) {
+      errEl.textContent = data.error || 'Login failed';
+      errEl.classList.add('show');
       btn.disabled = false;
-      btn.textContent = 'Log in';
+      btn.textContent = 'Sign in';
+      return;
     }
-  }
 
-  document.getElementById('login-password').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') doLogin();
+    token = data.token;
+    adminData = data.admin;
+    showApp();
   });
 
-  function doLogout() {
-    clearToken();
-    document.getElementById('login-overlay').style.display = 'flex';
-    document.getElementById('admin-email-display').textContent = '—';
-    document.getElementById('topbar-admin').textContent = '';
-    document.getElementById('login-email').value = '';
-    document.getElementById('login-password').value = '';
+  function showApp() {
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('app').classList.add('active');
+    const initials = (adminData.username || 'A').slice(0, 2).toUpperCase();
+    document.getElementById('admin-avatar-initials').textContent = initials;
+    document.getElementById('admin-username').textContent = adminData.username;
+    document.getElementById('admin-role').textContent = adminData.role;
+    document.getElementById('settings-username').textContent = adminData.username;
+    document.getElementById('settings-role').textContent = adminData.role;
+    loadDashboard();
   }
 
-  // ── Init ──
-  (function init() {
-    if (!getToken()) {
-      document.getElementById('login-overlay').style.display = 'flex';
-    } else {
-      document.getElementById('login-overlay').style.display = 'none';
-      apiFetch('/api/admin/auth/me').then(r => {
-        if (r && r.ok) {
-          document.getElementById('admin-email-display').textContent = r.data.admin.email;
-          document.getElementById('topbar-admin').textContent = r.data.admin.email;
-        }
-      });
-      loadDashboard();
-    }
-  })();
+  document.getElementById('logout-btn').addEventListener('click', () => {
+    showModal('Sign out', 'Are you sure you want to sign out?', () => {
+      token = null; adminData = null;
+      document.getElementById('app').classList.remove('active');
+      document.getElementById('auth-screen').style.display = 'flex';
+      document.getElementById('login-form').reset();
+    }, 'btn-danger');
+  });
 
-  // ──────────────────────────────────────────────
-  // DASHBOARD
-  // ──────────────────────────────────────────────
-  async function loadDashboard() {
-    const [analytics, alerts] = await Promise.all([
-      apiFetch('/api/admin/analytics'),
-      apiFetch('/api/admin/audit?limit=10'),
-    ]);
+  /* ── Navigation ─────────────────────────────────────────── */
+  const viewMeta = {
+    dashboard:  { title: 'Dashboard',   sub: 'Overview of platform activity' },
+    queue:      { title: 'Mod Queue',    sub: 'Pending and flagged content' },
+    content:    { title: 'Content',      sub: 'All platform content' },
+    creators:   { title: 'Creators',     sub: 'Registered creator accounts' },
+    businesses: { title: 'Businesses',   sub: 'Registered business accounts' },
+    audit:      { title: 'Audit Log',    sub: 'Full platform activity trail' },
+    settings:   { title: 'Settings',     sub: 'Admin account settings' },
+  };
 
-    if (!analytics || !analytics.ok) { toast('Failed to load analytics', 'error'); return; }
-
-    const k = analytics.data.kpis || {};
-    const kpiDefs = [
-      { label: 'Total Creators', key: 'total_creators', cls: '' },
-      { label: 'Total Businesses', key: 'total_businesses', cls: '' },
-      { label: 'Published Content', key: 'approved_content', cls: 'green' },
-      { label: 'Pending Queue', key: 'pending_queue', cls: 'red' },
-      { label: 'Active Opps', key: 'active_opportunities', cls: '' },
-    ];
-
-    const grid = document.getElementById('kpi-grid');
-    grid.innerHTML = kpiDefs.map(d => `
-      <div class="kpi-card">
-        <div class="kpi-label">${d.label}</div>
-        <div class="kpi-value ${d.cls}">${(k[d.key] ?? '—').toLocaleString()}</div>
-      </div>
-    `).join('');
-
-    // Update queue badge
-    const pending = k.pending_queue || 0;
-    const badge = document.getElementById('queue-badge');
-    badge.textContent = pending;
-    badge.style.display = pending > 0 ? 'inline-block' : 'none';
-
-    // Signups chart
-    const signups = (analytics.data.creator_signups_30d || []).slice(-7);
-    const maxCount = Math.max(...signups.map(d => d.count), 1);
-    const chart = document.getElementById('signups-chart');
-    if (signups.length === 0) {
-      chart.innerHTML = '<div style="color:var(--text-faint);font-size:12px;">No signup data available</div>';
-    } else {
-      chart.innerHTML = signups.map(d => {
-        const h = Math.round((d.count / maxCount) * 72);
-        const label = new Date(d.day).toLocaleDateString('en-GB', { weekday: 'short' });
-        return `<div class="bar-col">
-          <div class="bar" style="height:${h}px;" title="${d.count} signups on ${d.day}"></div>
-          <div class="bar-label">${label}</div>
-        </div>`;
-      }).join('');
-    }
-
-    // Alerts
-    const alertsList = document.getElementById('alerts-list');
-    const logs = (alerts && alerts.data.logs) || [];
-    if (logs.length === 0) {
-      alertsList.innerHTML = '<div style="color:var(--text-faint);font-size:12px;padding:12px 0;">No recent activity</div>';
-    } else {
-      alertsList.innerHTML = logs.map(l => `
-        <div class="alert-row">
-          <div class="alert-dot"></div>
-          <div>
-            <div class="alert-action">${l.action}</div>
-            <div class="alert-meta">${l.actor_type} #${l.actor_id} · ${fmtDate(l.created_at)}</div>
-          </div>
-        </div>
-      `).join('');
-    }
-  }
-
-  // ──────────────────────────────────────────────
-  // MODERATION QUEUE
-  // ──────────────────────────────────────────────
-  async function loadQueue() {
-    const type = document.getElementById('queue-type-filter').value;
-    const params = new URLSearchParams({
-      limit: state.queue.limit,
-      offset: state.queue.offset,
-      status: 'pending',
+  document.querySelectorAll('.nav-item').forEach((item) => {
+    item.addEventListener('click', () => {
+      const view = item.dataset.view;
+      document.querySelectorAll('.nav-item').forEach((i) => i.classList.remove('active'));
+      item.classList.add('active');
+      document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
+      document.getElementById(`view-${view}`).classList.add('active');
+      const meta = viewMeta[view] || {};
+      document.getElementById('topbar-title').textContent = meta.title || view;
+      document.getElementById('topbar-sub').textContent = meta.sub || '';
+      if (view === 'dashboard')  loadDashboard();
+      if (view === 'queue')      loadQueue();
+      if (view === 'content')    loadContent();
+      if (view === 'creators')   loadCreators();
+      if (view === 'businesses') loadBusinesses();
+      if (view === 'audit')      loadAudit();
     });
-    if (type) params.set('content_type', type);
+  });
 
-    const r = await apiFetch(`/api/admin/queue?${params}`);
-    if (!r || !r.ok) { toast('Failed to load queue', 'error'); return; }
+  document.getElementById('refresh-btn').addEventListener('click', () => {
+    const activeView = document.querySelector('.nav-item.active')?.dataset.view;
+    if (activeView === 'dashboard')  loadDashboard();
+    if (activeView === 'queue')      loadQueue();
+    if (activeView === 'content')    loadContent();
+    if (activeView === 'creators')   loadCreators();
+    if (activeView === 'businesses') loadBusinesses();
+    if (activeView === 'audit')      loadAudit();
+    toast('Refreshed', 'info');
+  });
 
-    const { queue, total } = r.data;
-    state.queue.total = total || 0;
-    state.queue.selected.clear();
-    document.getElementById('queue-check-all').checked = false;
-    updateQueueBulkBar();
+  /* ── Dashboard ──────────────────────────────────────────── */
+  async function loadDashboard() {
+    const { ok, data } = await api('/admin/analytics');
+    if (!ok) { toast('Failed to load analytics', 'error'); return; }
+    const k = data.kpis;
+    document.getElementById('kpi-creators').textContent     = k.total_creators.toLocaleString();
+    document.getElementById('kpi-businesses').textContent   = k.total_businesses.toLocaleString();
+    document.getElementById('kpi-content').textContent      = k.total_content.toLocaleString();
+    document.getElementById('kpi-opps').textContent         = k.total_opps.toLocaleString();
+    document.getElementById('kpi-pending').textContent      = k.pending_queue.toLocaleString();
+    document.getElementById('kpi-flagged').textContent      = k.flagged_queue.toLocaleString();
+    document.getElementById('kpi-applications').textContent = k.total_applications.toLocaleString();
 
-    document.getElementById('queue-count-label').textContent = `${total} pending item${total !== 1 ? 's' : ''}`;
-    document.getElementById('queue-page-info').textContent = `${state.queue.offset + 1}–${Math.min(state.queue.offset + state.queue.limit, total)} of ${total}`;
-    document.getElementById('queue-prev').disabled = state.queue.offset === 0;
-    document.getElementById('queue-next').disabled = state.queue.offset + state.queue.limit >= total;
-
+    const queueTotal = k.pending_queue + k.flagged_queue;
     const badge = document.getElementById('queue-badge');
-    badge.textContent = total;
-    badge.style.display = total > 0 ? 'inline-block' : 'none';
+    badge.textContent = queueTotal;
+    badge.style.display = queueTotal > 0 ? 'inline-block' : 'none';
 
+    // Trend
+    const trendEl = document.getElementById('trend-list');
+    if (!data.content_last_7_days.length) {
+      trendEl.innerHTML = '<div class="empty-state" style="padding:16px;"><p>No data yet</p></div>';
+    } else {
+      trendEl.innerHTML = data.content_last_7_days.map((r) =>
+        `<div class="sport-row"><span class="sport-name" style="width:80px;font-size:12px;">${r.day}</span>
+         <div class="sport-bar-wrap"><div class="sport-bar" style="width:${Math.min(100, r.posts * 10)}%"></div></div>
+         <span class="sport-count">${r.posts}</span></div>`
+      ).join('');
+    }
+
+    // Sport breakdown
+    const sportEl = document.getElementById('sport-breakdown');
+    if (!data.sport_breakdown.length) {
+      sportEl.innerHTML = '<div class="empty-state" style="padding:16px;"><p>No data yet</p></div>';
+    } else {
+      const max = Math.max(...data.sport_breakdown.map((r) => parseInt(r.count, 10)));
+      sportEl.innerHTML = data.sport_breakdown.map((r) =>
+        `<div class="sport-row"><span class="sport-name">${r.sport}</span>
+         <div class="sport-bar-wrap"><div class="sport-bar" style="width:${(parseInt(r.count,10)/max*100).toFixed(1)}%"></div></div>
+         <span class="sport-count">${r.count}</span></div>`
+      ).join('');
+    }
+  }
+
+  /* ── Queue ──────────────────────────────────────────────── */
+  async function loadQueue() {
+    queueSelected.clear();
+    updateBulkBar();
+    const { ok, data } = await api('/admin/queue');
+    if (!ok) { toast('Failed to load queue', 'error'); return; }
+    renderQueue(data.queue);
+  }
+
+  function renderQueue(items) {
     const tbody = document.getElementById('queue-tbody');
-    if (!queue || queue.length === 0) {
-      tbody.innerHTML = emptyRow(6, 'No pending items — queue is clear ✓');
+    if (!items.length) {
+      tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg><p>Queue is clear — nothing to review</p></div></td></tr>';
       return;
     }
-
-    tbody.innerHTML = queue.map(item => `
-      <tr id="qrow-${item.id}">
-        <td><input type="checkbox" class="queue-check" data-id="${item.id}" onchange="toggleQueueItem(this)" /></td>
-        <td class="muted">#${item.id}</td>
-        <td>${badgeHtml(item.content_type || 'creator')}</td>
-        <td class="cell-truncate">${escHtml(item.title)}</td>
-        <td class="muted">${fmtDate(item.submitted_at || item.created_at)}</td>
+    tbody.innerHTML = items.map((item) => `
+      <tr data-id="${item.id}">
+        <td><input type="checkbox" class="table-checkbox queue-check" data-id="${item.id}" /></td>
+        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${item.title}">${item.title}</td>
+        <td>${item.display_name || item.username}</td>
+        <td>${item.sport || '—'}</td>
+        <td>${badge(item.status)}</td>
+        <td style="color:var(--text-muted);font-size:12px;">${fmt(item.created_at)}</td>
         <td>
           <div style="display:flex;gap:6px;">
-            <button class="btn btn-success btn-sm" onclick="singleQueueAction(${item.id}, 'approve')">✓ Approve</button>
-            <button class="btn btn-danger btn-sm" onclick="singleQueueAction(${item.id}, 'reject')">✕ Reject</button>
+            <button class="btn btn-success btn-sm queue-action" data-id="${item.id}" data-action="approved">Approve</button>
+            <button class="btn btn-danger btn-sm queue-action" data-id="${item.id}" data-action="rejected">Reject</button>
+            <button class="btn btn-ghost btn-sm queue-action" data-id="${item.id}" data-action="flagged" style="color:var(--orange);">Flag</button>
           </div>
         </td>
-      </tr>
-    `).join('');
-  }
+      </tr>`).join('');
 
-  async function singleQueueAction(id, action) {
-    const ok = await confirm(
-      action === 'approve' ? 'Approve this item?' : 'Reject this item?',
-      action === 'approve' ? 'This will publish the content to the platform.' : 'This will reject the content and notify the creator.'
-    );
-    if (!ok) return;
-
-    const r = await apiFetch(`/api/admin/queue/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ action }),
+    tbody.querySelectorAll('.queue-check').forEach((cb) => {
+      cb.addEventListener('change', () => {
+        cb.checked ? queueSelected.add(Number(cb.dataset.id)) : queueSelected.delete(Number(cb.dataset.id));
+        updateBulkBar();
+      });
     });
-    if (!r || !r.ok) { toast(`Failed to ${action} item`, 'error'); return; }
-    toast(`Item ${action}d successfully`, 'success');
-    document.getElementById(`qrow-${id}`)?.remove();
-    state.queue.total = Math.max(0, state.queue.total - 1);
-  }
 
-  function toggleQueueItem(cb) {
-    const id = parseInt(cb.dataset.id);
-    if (cb.checked) state.queue.selected.add(id);
-    else state.queue.selected.delete(id);
-    updateQueueBulkBar();
-  }
-
-  function toggleAllQueue(masterCb) {
-    document.querySelectorAll('.queue-check').forEach(cb => {
-      cb.checked = masterCb.checked;
-      const id = parseInt(cb.dataset.id);
-      if (masterCb.checked) state.queue.selected.add(id);
-      else state.queue.selected.delete(id);
+    tbody.querySelectorAll('.queue-action').forEach((btn) => {
+      btn.addEventListener('click', () => moderateItem(Number(btn.dataset.id), btn.dataset.action));
     });
-    updateQueueBulkBar();
   }
 
-  function clearQueueSelection() {
-    state.queue.selected.clear();
-    document.querySelectorAll('.queue-check').forEach(cb => cb.checked = false);
-    document.getElementById('queue-check-all').checked = false;
-    updateQueueBulkBar();
-  }
-
-  function updateQueueBulkBar() {
+  function updateBulkBar() {
     const bar = document.getElementById('queue-bulk-bar');
-    const count = state.queue.selected.size;
-    bar.classList.toggle('visible', count > 0);
-    document.getElementById('queue-bulk-count').textContent = `${count} selected`;
+    document.getElementById('queue-selected-count').textContent = queueSelected.size;
+    bar.classList.toggle('show', queueSelected.size > 0);
   }
 
-  async function bulkQueueAction(action) {
-    const ids = Array.from(state.queue.selected);
-    if (ids.length === 0) return;
-    const note = document.getElementById('queue-bulk-note').value.trim();
-    const ok = await confirm(
-      `${action === 'approve' ? 'Approve' : 'Reject'} ${ids.length} item${ids.length !== 1 ? 's' : ''}?`,
-      action === 'approve' ? 'Selected content will be published.' : 'Selected content will be rejected.'
-    );
-    if (!ok) return;
-
-    const r = await apiFetch('/api/admin/queue/bulk', {
-      method: 'POST',
-      body: JSON.stringify({ ids, action, rejection_reason: note || undefined }),
+  document.getElementById('queue-select-all').addEventListener('change', (e) => {
+    document.querySelectorAll('.queue-check').forEach((cb) => {
+      cb.checked = e.target.checked;
+      e.target.checked ? queueSelected.add(Number(cb.dataset.id)) : queueSelected.delete(Number(cb.dataset.id));
     });
-    if (!r || !r.ok) { toast(`Bulk ${action} failed`, 'error'); return; }
-    toast(`${r.data.updated} item${r.data.updated !== 1 ? 's' : ''} ${action}d`, 'success');
+    updateBulkBar();
+  });
+
+  document.getElementById('bulk-approve-btn').addEventListener('click', () => bulkModerate('approved'));
+  document.getElementById('bulk-reject-btn').addEventListener('click', () => bulkModerate('rejected'));
+  document.getElementById('bulk-deselect-btn').addEventListener('click', () => {
+    queueSelected.clear();
+    document.querySelectorAll('.queue-check').forEach((cb) => (cb.checked = false));
+    document.getElementById('queue-select-all').checked = false;
+    updateBulkBar();
+  });
+
+  async function moderateItem(id, status) {
+    const { ok, data } = await api(`/admin/queue/${id}`, { method: 'PATCH', body: { status } });
+    if (!ok) { toast(data.error || 'Moderation failed', 'error'); return; }
+    toast(`Content ${status}`, 'success');
     loadQueue();
   }
 
-  function queuePage(dir) {
-    state.queue.offset = Math.max(0, state.queue.offset + dir * state.queue.limit);
-    loadQueue();
+  async function bulkModerate(status) {
+    const ids = Array.from(queueSelected);
+    showModal(`Bulk ${status}`, `${status} ${ids.length} item(s)?`, async () => {
+      const { ok, data } = await api('/admin/queue/bulk', { method: 'POST', body: { ids, status } });
+      if (!ok) { toast(data.error || 'Bulk action failed', 'error'); return; }
+      toast(`${data.updated} items ${status}`, 'success');
+      loadQueue();
+    }, status === 'approved' ? 'btn-success' : 'btn-danger');
   }
 
-  // ──────────────────────────────────────────────
-  // CONTENT
-  // ──────────────────────────────────────────────
+  /* ── Content ────────────────────────────────────────────── */
   async function loadContent() {
-    const search = document.getElementById('content-search').value.trim();
-    const status = document.getElementById('content-status-filter').value;
-    const params = new URLSearchParams({ limit: state.content.limit, offset: state.content.offset });
-    if (search) params.set('search', search);
-    if (status) params.set('status', status);
+    const { ok, data } = await api('/content?limit=50');
+    if (!ok) { toast('Failed to load content', 'error'); return; }
+    allContent = data.content || [];
+    renderContent(allContent);
+  }
 
-    const r = await apiFetch(`/api/admin/content?${params}`);
-    if (!r || !r.ok) { toast('Failed to load content', 'error'); return; }
-
-    const { content, total } = r.data;
-    state.content.total = total || content?.length || 0;
-
-    document.getElementById('content-page-info').textContent = `${state.content.offset + 1}–${Math.min(state.content.offset + state.content.limit, state.content.total)} of ${state.content.total}`;
-    document.getElementById('content-prev').disabled = state.content.offset === 0;
-    document.getElementById('content-next').disabled = state.content.offset + state.content.limit >= state.content.total;
-
+  function renderContent(items) {
     const tbody = document.getElementById('content-tbody');
-    if (!content || content.length === 0) { tbody.innerHTML = emptyRow(8); return; }
-
-    tbody.innerHTML = content.map(item => `
+    if (!items.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>No content found</p></div></td></tr>'; return; }
+    tbody.innerHTML = items.map((c) => `
       <tr>
-        <td class="muted">#${item.id}</td>
-        <td class="cell-truncate">${escHtml(item.title)}</td>
-        <td class="muted">${escHtml(item.display_name || item.username || '—')}</td>
-        <td class="muted">${item.content_type || '—'}</td>
-        <td>${badgeHtml(item.status)}</td>
-        <td class="muted">${(item.view_count || 0).toLocaleString()}</td>
-        <td class="muted">${fmtDate(item.created_at)}</td>
-        <td>
-          <button class="btn btn-danger btn-sm" onclick="deleteContent(${item.id})">Delete</button>
-        </td>
-      </tr>
-    `).join('');
+        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.title}</td>
+        <td>${c.display_name || '—'}</td>
+        <td>${c.sport || '—'}</td>
+        <td>${badge(c.status)}</td>
+        <td style="color:var(--text-muted);font-size:12px;">${fmt(c.created_at)}</td>
+        <td><div style="display:flex;gap:6px;">
+          <button class="btn btn-success btn-sm" onclick="moderateFromContent(${c.id},'approved')">✓</button>
+          <button class="btn btn-danger btn-sm" onclick="moderateFromContent(${c.id},'rejected')">✗</button>
+        </div></td>
+      </tr>`).join('');
   }
 
-  async function deleteContent(id) {
-    const ok = await confirm('Delete content?', 'This is a hard delete and cannot be undone.');
-    if (!ok) return;
-    const r = await apiFetch(`/api/admin/content/${id}`, { method: 'DELETE' });
-    if (!r) return;
-    if (r.status === 204 || r.ok) { toast('Content deleted', 'success'); loadContent(); }
-    else toast('Failed to delete', 'error');
+  window.moderateFromContent = async (id, status) => {
+    const { ok, data } = await api(`/admin/queue/${id}`, { method: 'PATCH', body: { status } });
+    if (!ok) { toast(data.error || 'Failed', 'error'); return; }
+    toast(`Content ${status}`, 'success'); loadContent();
+  };
+
+  document.getElementById('content-search').addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase();
+    const status = document.getElementById('content-status-filter').value;
+    renderContent(allContent.filter((c) => (!q || c.title.toLowerCase().includes(q)) && (!status || c.status === status)));
+  });
+  document.getElementById('content-status-filter').addEventListener('change', (e) => {
+    const q = document.getElementById('content-search').value.toLowerCase();
+    const status = e.target.value;
+    renderContent(allContent.filter((c) => (!q || c.title.toLowerCase().includes(q)) && (!status || c.status === status)));
+  });
+
+  /* ── Creators ───────────────────────────────────────────── */
+  async function loadCreators() {
+    const { ok, data } = await api('/admin/users?type=creator&limit=100');
+    if (!ok) { toast('Failed to load creators', 'error'); return; }
+    allCreators = data.users || [];
+    renderCreators(allCreators);
   }
 
-  function contentPage(dir) {
-    state.content.offset = Math.max(0, state.content.offset + dir * state.content.limit);
-    loadContent();
-  }
-
-  // ──────────────────────────────────────────────
-  // USERS
-  // ──────────────────────────────────────────────
-  async function loadUsers() {
-    const search = document.getElementById('users-search').value.trim();
-    const type = document.getElementById('users-type-filter').value;
-
-    let creators = [], businesses = [];
-
-    if (!type || type === 'creator') {
-      const params = new URLSearchParams({ limit: state.users.limit, offset: state.users.offset });
-      if (search) params.set('search', search);
-      const r = await apiFetch(`/api/admin/users/creators?${params}`);
-      if (r && r.ok) creators = (r.data.creators || []).map(c => ({ ...c, _type: 'creator' }));
-    }
-
-    if (!type || type === 'business') {
-      const params = new URLSearchParams({ limit: state.users.limit, offset: state.users.offset });
-      if (search) params.set('search', search);
-      const r = await apiFetch(`/api/admin/users/businesses?${params}`);
-      if (r && r.ok) businesses = (r.data.businesses || []).map(b => ({ ...b, _type: 'business', display_name: b.business_name }));
-    }
-
-    const all = [...creators, ...businesses].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-    const tbody = document.getElementById('users-tbody');
-    if (all.length === 0) { tbody.innerHTML = emptyRow(8); return; }
-
-    tbody.innerHTML = all.map(u => `
+  function renderCreators(items) {
+    const tbody = document.getElementById('creators-tbody');
+    if (!items.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>No creators found</p></div></td></tr>'; return; }
+    tbody.innerHTML = items.map((u) => `
       <tr>
-        <td class="muted">#${u.id}</td>
-        <td>${escHtml(u.display_name || u.business_name || u.username || '—')}</td>
-        <td>${badgeHtml(u._type)}</td>
-        <td class="muted">${escHtml(u.email)}</td>
-        <td>${u.is_suspended ? badgeHtml('suspended') : badgeHtml('active')}</td>
-        <td>${u.is_verified ? '<span style="color:var(--success);">✓</span>' : '<span style="color:var(--text-faint);">—</span>'}</td>
-        <td class="muted">${fmtDate(u.created_at)}</td>
-        <td>
-          <div style="display:flex;gap:4px;flex-wrap:wrap;">
-            ${u.is_suspended
-              ? `<button class="btn btn-success btn-sm" onclick="reactivateUser(${u.id}, '${u._type}')">Reactivate</button>`
-              : `<button class="btn btn-warning btn-sm" onclick="suspendUser(${u.id}, '${u._type}')">Suspend</button>`
-            }
-            ${!u.is_verified && u._type === 'creator'
-              ? `<button class="btn btn-ghost btn-sm" onclick="verifyCreator(${u.id})">Verify</button>`
-              : ''
-            }
-          </div>
-        </td>
-      </tr>
-    `).join('');
+        <td style="font-family:var(--font-mono);font-size:12px;">@${u.username}</td>
+        <td>${u.display_name || '—'}</td>
+        <td>${u.sport || '—'}</td>
+        <td style="font-variant-numeric:tabular-nums;">${(u.follower_count || 0).toLocaleString()}</td>
+        <td>${u.is_suspended ? badge('suspended') : (u.is_verified ? badge('verified') : badge('active'))}</td>
+        <td><div style="display:flex;gap:6px;">
+          ${u.is_suspended
+            ? `<button class="btn btn-success btn-sm" onclick="userAction('creator',${u.id},'reactivate','Reactivate @${u.username}?')">Reactivate</button>`
+            : `<button class="btn btn-danger btn-sm" onclick="userAction('creator',${u.id},'suspend','Suspend @${u.username}?')">Suspend</button>`}
+          ${!u.is_verified ? `<button class="btn btn-ghost btn-sm" onclick="userAction('creator',${u.id},'verify','Verify @${u.username}?')">Verify</button>` : ''}
+        </div></td>
+      </tr>`).join('');
   }
 
-  async function suspendUser(id, type) {
-    const ok = await confirm('Suspend this user?', 'They will be prevented from logging in.');
-    if (!ok) return;
-    const path = type === 'creator' ? `/api/admin/users/creators/${id}/suspend` : `/api/admin/users/businesses/${id}/suspend`;
-    const r = await apiFetch(path, { method: 'PATCH', body: JSON.stringify({}) });
-    if (!r || !r.ok) { toast('Failed to suspend', 'error'); return; }
-    toast('User suspended', 'success');
-    loadUsers();
+  document.getElementById('creator-search').addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase();
+    renderCreators(allCreators.filter((u) => !q || u.username.toLowerCase().includes(q) || (u.display_name || '').toLowerCase().includes(q)));
+  });
+
+  /* ── Businesses ─────────────────────────────────────────── */
+  async function loadBusinesses() {
+    const { ok, data } = await api('/admin/users?type=business&limit=100');
+    if (!ok) { toast('Failed to load businesses', 'error'); return; }
+    allBusinesses = data.users || [];
+    renderBusinesses(allBusinesses);
   }
 
-  async function reactivateUser(id, type) {
-    const ok = await confirm('Reactivate this user?', 'They will regain full access.');
-    if (!ok) return;
-    const path = type === 'creator' ? `/api/admin/users/creators/${id}/reactivate` : `/api/admin/users/businesses/${id}/reactivate`;
-    const r = await apiFetch(path, { method: 'PATCH', body: JSON.stringify({}) });
-    if (!r || !r.ok) { toast('Failed to reactivate', 'error'); return; }
-    toast('User reactivated', 'success');
-    loadUsers();
+  function renderBusinesses(items) {
+    const tbody = document.getElementById('businesses-tbody');
+    if (!items.length) { tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><p>No businesses found</p></div></td></tr>'; return; }
+    tbody.innerHTML = items.map((b) => `
+      <tr>
+        <td>${b.name}</td>
+        <td style="color:var(--text-muted);font-size:12px;">${b.email}</td>
+        <td>${b.industry || '—'}</td>
+        <td>${b.is_suspended ? badge('suspended') : (b.is_verified ? badge('verified') : badge('active'))}</td>
+        <td><div style="display:flex;gap:6px;">
+          ${b.is_suspended
+            ? `<button class="btn btn-success btn-sm" onclick="userAction('business',${b.id},'reactivate','Reactivate ${b.name}?')">Reactivate</button>`
+            : `<button class="btn btn-danger btn-sm" onclick="userAction('business',${b.id},'suspend','Suspend ${b.name}?')">Suspend</button>`}
+          ${!b.is_verified ? `<button class="btn btn-ghost btn-sm" onclick="userAction('business',${b.id},'verify','Verify ${b.name}?')">Verify</button>` : ''}
+        </div></td>
+      </tr>`).join('');
   }
 
-  async function verifyCreator(id) {
-    const ok = await confirm('Verify this creator?', 'A verified badge will appear on their profile.');
-    if (!ok) return;
-    const r = await apiFetch(`/api/admin/users/creators/${id}/verify`, { method: 'PATCH', body: JSON.stringify({}) });
-    if (!r || !r.ok) { toast('Failed to verify', 'error'); return; }
-    toast('Creator verified', 'success');
-    loadUsers();
-  }
+  document.getElementById('business-search').addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase();
+    renderBusinesses(allBusinesses.filter((b) => !q || b.name.toLowerCase().includes(q) || b.email.toLowerCase().includes(q)));
+  });
 
-  function usersPage(dir) {
-    state.users.offset = Math.max(0, state.users.offset + dir * state.users.limit);
-    loadUsers();
-  }
+  window.userAction = async (type, id, action, confirmMsg) => {
+    showModal(action.charAt(0).toUpperCase() + action.slice(1), confirmMsg, async () => {
+      const { ok, data } = await api(`/admin/users/${type}/${id}`, { method: 'PATCH', body: { action } });
+      if (!ok) { toast(data.error || 'Action failed', 'error'); return; }
+      toast(`User ${action}d`, 'success');
+      type === 'business' ? loadBusinesses() : loadCreators();
+    }, action === 'suspend' ? 'btn-danger' : 'btn-success');
+  };
 
-  // ──────────────────────────────────────────────
-  // AUDIT LOG
-  // ──────────────────────────────────────────────
+  /* ── Audit Log ──────────────────────────────────────────── */
   async function loadAudit() {
-    const actor_type = document.getElementById('audit-actor-filter').value;
-    const action = document.getElementById('audit-action-filter').value.trim();
-    const params = new URLSearchParams({ limit: state.audit.limit, offset: state.audit.offset });
-    if (actor_type) params.set('actor_type', actor_type);
+    const type   = document.getElementById('audit-type-filter').value;
+    const action = document.getElementById('audit-action-filter').value;
+    const params = new URLSearchParams({ page: auditPage, limit: 50 });
+    if (type)   params.set('actor_type', type);
     if (action) params.set('action', action);
+    const { ok, data } = await api(`/admin/audit?${params}`);
+    if (!ok) { toast('Failed to load audit log', 'error'); return; }
+    allAuditLogs = data.logs || [];
+    renderAudit(allAuditLogs);
+    document.getElementById('audit-page-label').textContent = `Page ${auditPage}`;
+  }
 
-    const r = await apiFetch(`/api/admin/audit?${params}`);
-    if (!r || !r.ok) { toast('Failed to load audit log', 'error'); return; }
-
-    const { logs, total } = r.data;
-    state.audit.total = total || 0;
-
-    document.getElementById('audit-page-info').textContent = `${state.audit.offset + 1}–${Math.min(state.audit.offset + state.audit.limit, total)} of ${total}`;
-    document.getElementById('audit-prev').disabled = state.audit.offset === 0;
-    document.getElementById('audit-next').disabled = state.audit.offset + state.audit.limit >= total;
-
+  function renderAudit(logs) {
     const tbody = document.getElementById('audit-tbody');
-    if (!logs || logs.length === 0) { tbody.innerHTML = emptyRow(6); return; }
-
-    tbody.innerHTML = logs.map(l => `
+    if (!logs.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>No log entries</p></div></td></tr>'; return; }
+    tbody.innerHTML = logs.map((l) => `
       <tr>
-        <td class="muted">#${l.id}</td>
-        <td>${badgeHtml(l.actor_type)} <span class="muted">#${l.actor_id || '—'}</span></td>
-        <td style="font-family:monospace;font-size:11px;">${escHtml(l.action)}</td>
-        <td class="muted">${l.target_type ? `${l.target_type} #${l.target_id}` : '—'}</td>
-        <td class="muted">${escHtml(l.ip_address || '—')}</td>
-        <td class="muted">${fmtDate(l.created_at)}</td>
-      </tr>
-    `).join('');
+        <td style="color:var(--text-muted);font-size:12px;white-space:nowrap;">${fmt(l.created_at)}</td>
+        <td><span class="badge ${l.actor_type === 'admin' ? 'badge-verified' : 'badge-pending'}">${l.actor_type}</span>${l.actor_id ? ` <span style="font-size:11px;color:var(--text-faint);">#${l.actor_id}</span>` : ''}</td>
+        <td><span class="log-action">${l.action}</span></td>
+        <td style="font-size:12px;color:var(--text-muted);">${l.target_type ? `${l.target_type} #${l.target_id}` : '—'}</td>
+        <td style="font-family:var(--font-mono);font-size:11px;color:var(--text-faint);">${l.ip || '—'}</td>
+        <td><span class="log-meta" title="${JSON.stringify(l.meta)}">${l.meta && Object.keys(l.meta).length ? JSON.stringify(l.meta) : '—'}</span></td>
+      </tr>`).join('');
   }
 
-  async function exportAudit() {
-    const res = await fetch(`${API_BASE}/api/admin/audit/export`, { headers: authHeaders() });
-    if (!res.ok) { toast('Export failed', 'error'); return; }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
+  document.getElementById('audit-type-filter').addEventListener('change', () => { auditPage = 1; loadAudit(); });
+  document.getElementById('audit-action-filter').addEventListener('input', () => { auditPage = 1; loadAudit(); });
+  document.getElementById('audit-prev-btn').addEventListener('click', () => { if (auditPage > 1) { auditPage--; loadAudit(); } });
+  document.getElementById('audit-next-btn').addEventListener('click', () => { auditPage++; loadAudit(); });
+
+  document.getElementById('audit-export-btn').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(allAuditLogs, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `audit-export-${Date.now()}.json`;
+    a.href = URL.createObjectURL(blob);
+    a.download = `plxyground-audit-${Date.now()}.json`;
     a.click();
-    URL.revokeObjectURL(url);
     toast('Audit log exported', 'success');
-  }
+  });
 
-  function auditPage(dir) {
-    state.audit.offset = Math.max(0, state.audit.offset + dir * state.audit.limit);
-    loadAudit();
-  }
+  /* ── Settings ───────────────────────────────────────────── */
+  document.getElementById('settings-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById('settings-error');
+    const sucEl = document.getElementById('settings-success');
+    errEl.classList.remove('show'); sucEl.classList.remove('show');
 
-  // ──────────────────────────────────────────────
-  // SETTINGS
-  // ──────────────────────────────────────────────
-  async function changePassword() {
-    const current = document.getElementById('pw-current').value;
-    const newPw = document.getElementById('pw-new').value;
-    const confirm = document.getElementById('pw-confirm').value;
+    const current = document.getElementById('settings-current').value;
+    const newPw   = document.getElementById('settings-new').value;
+    const confirm = document.getElementById('settings-confirm').value;
 
-    const clearErrs = () => ['pw-current-err','pw-new-err','pw-confirm-err'].forEach(id => {
-      const el = document.getElementById(id);
-      el.textContent = ''; el.classList.remove('visible');
-    });
-    const showErr = (id, msg) => {
-      const el = document.getElementById(id);
-      el.textContent = msg; el.classList.add('visible');
-    };
-
-    clearErrs();
-    let valid = true;
-    if (!current) { showErr('pw-current-err', 'Current password is required'); valid = false; }
-    if (newPw.length < 8) { showErr('pw-new-err', 'New password must be at least 8 characters'); valid = false; }
-    if (newPw !== confirm) { showErr('pw-confirm-err', 'Passwords do not match'); valid = false; }
-    if (!valid) return;
-
-    const r = await apiFetch('/api/admin/auth/change-password', {
-      method: 'POST',
-      body: JSON.stringify({ current_password: current, new_password: newPw }),
-    });
-
-    if (!r || !r.ok) {
-      showErr('pw-current-err', r?.data?.error || 'Failed to change password');
+    if (newPw !== confirm) {
+      errEl.textContent = 'New passwords do not match';
+      errEl.classList.add('show');
       return;
     }
 
-    toast('Password changed successfully', 'success');
-    document.getElementById('pw-current').value = '';
-    document.getElementById('pw-new').value = '';
-    document.getElementById('pw-confirm').value = '';
-  }
+    const { ok, data } = await api('/admin/settings/password', {
+      method: 'PATCH',
+      body: { current_password: current, new_password: newPw },
+    });
 
-  // ──────────────────────────────────────────────
-  // UTILS
-  // ──────────────────────────────────────────────
-  function escHtml(str) {
-    if (!str) return '';
-    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
+    if (!ok) {
+      errEl.textContent = data.error || 'Failed to update password';
+      errEl.classList.add('show');
+    } else {
+      sucEl.textContent = 'Password updated successfully';
+      sucEl.classList.add('show');
+      document.getElementById('settings-form').reset();
+      toast('Password updated', 'success');
+    }
+  });
+
+})();
 </script>
 </body>
 </html>

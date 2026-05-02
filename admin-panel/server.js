@@ -1,23 +1,20 @@
 'use strict';
-
 const http = require('http');
-const fs = require('fs');
 const path = require('path');
+const handler = require('serve-handler');
 
-const PORT = 3012;
-const FILE = path.join(__dirname, 'index.html');
+const PORT = process.env.ADMIN_PORT || 3012;
 
 const server = http.createServer((req, res) => {
-  fs.readFile(FILE, (err, data) => {
-    if (err) {
-      res.writeHead(500, { 'Content-Type': 'text/plain' });
-      return res.end('Error loading admin panel');
-    }
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(data);
+  handler(req, res, {
+    public: path.join(__dirname),
+    rewrites: [{ source: '**', destination: '/index.html' }],
+    headers: [
+      { source: '**', headers: [{ key: 'X-Frame-Options', value: 'DENY' }, { key: 'X-Content-Type-Options', value: 'nosniff' }] },
+    ],
   });
 });
 
 server.listen(PORT, () => {
-  console.log(`PLXYGROUND Admin Panel running on http://localhost:${PORT}`);
+  process.stdout.write(`[admin] running at http://localhost:${PORT}\n`);
 });
