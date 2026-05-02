@@ -1,183 +1,89 @@
+'use strict';
 const express = require('express');
-const db = require('../db/setup');
-const { verifyToken, requireRole } = require('../middleware/auth');
+const { body } = require('express-validator');
+const db = require('../db/client');
+const { requireAuth } = require('../middleware/auth');
+const validate = require('../middleware/validate');
 
 const router = express.Router();
 
-// GET /api/opportunities - list all published opportunities
-router.get('/', async (req, res) => {
-  const { limit = 20, offset = 0 } = req.query;
-  const lim = Math.min(Math.max(parseInt(limit), 1), 100);
-  const off = parseInt(offset) || 0;
-
+// GET /api/opportunities
+router.get('/', (req, res) => {
   try {
-    const rows = await db.prepare(`
-      SELECT o.*, c.name as creator_name, c.profile_slug, c.role as creator_role
-      FROM opportunities o
-      JOIN creators c ON c.id = o.creator_id
-      WHERE o.is_published = 1
-      ORDER BY o.created_at DESC
-      LIMIT ? OFFSET ?
-    `).all(lim, off);
-
-    res.json({ data: rows, limit: lim, offset: off });
+    const limit = parseInt(req.query.limit || '20', 10);
+    const offset = parseInt(req.query.offset || '0', 10);
+    const search = req.query.search || '';
+    const sport = req.query.sport || '';
+    let sql = `SELECT * FROM opportunities WHERE status = 'published'`;
+    const params = [];
+    if (search) { sql += ' AND (title LIKE ? OR description LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
+    if (sport) { sql += ' AND sport = ?'; params.push(sport); }
+    sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+    const rows = db.prepare(sql).all(...params);
+    const total = db.prepare(`SELECT COUNT(*) as c FROM opportunities WHERE status = 'published'`).get().c;
+    return res.json({ success: true, data: { items: rows, total, limit, offset } });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ success: false, error: 'Server error' });
   }
 });
 
-// GET /api/opportunities/mine - list all opportunities for the authenticated business
-router.get('/mine', verifyToken, requireRole('BUSINESS'), async (req, res) => {
+// GET /api/opportunities/:id
+router.get('/:id', (req, res) => {
   try {
-    const rows = await db.prepare(`
-      SELECT o.*, c.name as creator_name, c.profile_slug, c.role as creator_role
-      FROM opportunities o
-      JOIN creators c ON c.id = o.creator_id
-      WHERE o.creator_id = ?
-      ORDER BY o.created_at DESC
-    `).all(req.user.id);
-
-    res.json({ data: rows });
+    const row = db.prepare(`SELECT * FROM opportunities WHERE id = ? AND status = 'published'`).get(req.params.id);
+    if (!row) return res.status(404).json({ success: false, error: 'Not found' });
+    return res.json({ success: true, data: row });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ success: false, error: 'Server error' });
   }
 });
 
-// GET /api/opportunities/:id - single opportunity
-router.get('/:id', async (req, res) => {
+// POST /api/opportunities
+router.post('/', requireAuth, [
+  body('title').trim().isLength({ min: 1, max: 200 }),
+  body('description').trim().isLength({ min: 1 }),
+], validate, (req, res) => {
   try {
-    const row = await db.prepare(`
-      SELECT o.*, c.name as creator_name, c.profile_slug, c.role as creator_role
-      FROM opportunities o
-      JOIN creators c ON c.id = o.creator_id
-      WHERE o.id = ? AND o.is_published = 1
-    `).get(req.params.id);
-
-    if (!row) return res.status(404).json({ error: 'Not found' });
-    res.json(row);
+    const { title, description, sport, location, budget, deadline } = req.body;
+    const posted_by_type = req.userType === 'business' ? 'business' : 'creator';
+    const result = db.prepare(
+      `INSERT INTO opportunities (posted_by_type, posted_by_id, title, description, sport, location, budget, deadline) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(posted_by_type, req.user.sub, title, description, sport || null, location || null, budget || null, deadline || null);
+    const created = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(result.lastInsertRowid);
+    return res.status(201).json({ success: true, data: created });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ success: false, error: 'Server error' });
   }
 });
 
-// POST /api/opportunities/:id/apply - apply to an opportunity (creator user)
-router.post('/:id/apply', verifyToken, requireRole('CREATOR'), async (req, res) => {
+// PUT /api/opportunities/:id
+router.put('/:id', requireAuth, (req, res) => {
   try {
-    const opportunity = await db.prepare('SELECT * FROM opportunities WHERE id = ? AND is_published = 1').get(req.params.id);
-    if (!opportunity) return res.status(404).json({ error: 'Opportunity not found' });
-
-    const { message } = req.body;
-    const exists = await db.prepare('SELECT * FROM opportunity_applications WHERE opportunity_id = ? AND creator_id = ?').get(req.params.id, req.user.id);
-    if (exists) return res.status(409).json({ error: 'Already applied' });
-
-    const result = await db.prepare(`
-      INSERT INTO opportunity_applications (opportunity_id, creator_id, message)
-      VALUES (?, ?, ?)
-    `).run(req.params.id, req.user.id, message || null);
-
-    await db.prepare(`INSERT INTO audit_log (action_type, actor, target, metadata) VALUES (?, ?, ?, ?)`)
-      .run('opportunity_application', req.user.id, `opportunity:${req.params.id}`, JSON.stringify({ application_id: result.lastInsertRowid, message }));
-
-    res.status(201).json({ message: 'Application submitted', applicationId: result.lastInsertRowid });
+    const posted_by_type = req.userType === 'business' ? 'business' : 'creator';
+    const row = db.prepare('SELECT * FROM opportunities WHERE id = ? AND posted_by_id = ? AND posted_by_type = ?').get(req.params.id, req.user.sub, posted_by_type);
+    if (!row) return res.status(404).json({ success: false, error: 'Not found or not yours' });
+    const { title, description, sport, location, budget, deadline } = req.body;
+    db.prepare(
+      `UPDATE opportunities SET title = ?, description = ?, sport = ?, location = ?, budget = ?, deadline = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+    ).run(title ?? row.title, description ?? row.description, sport ?? row.sport, location ?? row.location, budget ?? row.budget, deadline ?? row.deadline, row.id);
+    const updated = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(row.id);
+    return res.json({ success: true, data: updated });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ success: false, error: 'Server error' });
   }
 });
 
-// POST /api/opportunities - create opportunity (auth required)
-router.post('/', verifyToken, requireRole('BUSINESS'), async (req, res) => {
-  const { title, role_type, body, requirements, benefits } = req.body;
-
-  if (!title || !body) {
-    return res.status(400).json({ error: 'title and body are required' });
-  }
-
+// DELETE /api/opportunities/:id
+router.delete('/:id', requireAuth, (req, res) => {
   try {
-    const result = await db.prepare(`
-      INSERT INTO opportunities (creator_id, title, role_type, body, requirements, benefits, is_published)
-      VALUES (?, ?, ?, ?, ?, ?, 0)
-    `).run(req.user.id, title, role_type || null, body, requirements || null, benefits || null);
-
-    await db.prepare(`
-      INSERT INTO moderation_queue (type, status, title_or_name, submitted_by, entity_id)
-      VALUES ('opportunity', 'pending', ?, ?, ?)
-    `).run(title, req.user.email, result.lastInsertRowid);
-
-    const opportunity = await db.prepare('SELECT * FROM opportunities WHERE id = ?').get(result.lastInsertRowid);
-    res.status(201).json(opportunity);
+    const posted_by_type = req.userType === 'business' ? 'business' : 'creator';
+    const row = db.prepare('SELECT * FROM opportunities WHERE id = ? AND posted_by_id = ? AND posted_by_type = ?').get(req.params.id, req.user.sub, posted_by_type);
+    if (!row) return res.status(404).json({ success: false, error: 'Not found or not yours' });
+    db.prepare(`UPDATE opportunities SET status = 'deleted', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(row.id);
+    return res.json({ success: true, data: { message: 'Deleted' } });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// PUT /api/opportunities/:id - edit opportunity (owner only, returns to moderation)
-router.put('/:id', verifyToken, requireRole('BUSINESS'), async (req, res) => {
-  const { title, role_type, body, requirements, benefits } = req.body;
-
-  try {
-    const opp = await db.prepare('SELECT * FROM opportunities WHERE id = ?').get(req.params.id);
-    if (!opp) return res.status(404).json({ error: 'Not found' });
-    if (opp.creator_id !== req.user.id) return res.status(403).json({ error: 'Not your opportunity' });
-
-    await db.prepare(`
-      UPDATE opportunities SET
-        title = ?, role_type = ?, body = ?, requirements = ?,
-        benefits = ?, is_published = 0, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(
-      title || opp.title,
-      role_type || opp.role_type,
-      body || opp.body,
-      requirements !== undefined ? requirements : opp.requirements,
-      benefits !== undefined ? benefits : opp.benefits,
-      req.params.id
-    );
-
-    const updated = await db.prepare('SELECT * FROM opportunities WHERE id = ?').get(req.params.id);
-
-    const queueItem = await db.prepare(`
-      SELECT id FROM moderation_queue
-      WHERE entity_id = ? AND type = 'opportunity'
-    `).get(req.params.id);
-
-    if (queueItem) {
-      await db.prepare(`
-        UPDATE moderation_queue
-        SET status = 'pending', title_or_name = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `).run(updated.title, queueItem.id);
-    } else {
-      await db.prepare(`
-        INSERT INTO moderation_queue (type, status, title_or_name, submitted_by, entity_id)
-        VALUES ('opportunity', 'pending', ?, ?, ?)
-      `).run(updated.title, req.user.email, req.params.id);
-    }
-
-    res.json(updated);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// DELETE /api/opportunities/:id - delete opportunity (owner only)
-router.delete('/:id', verifyToken, requireRole('BUSINESS'), async (req, res) => {
-  try {
-    const opp = await db.prepare('SELECT * FROM opportunities WHERE id = ?').get(req.params.id);
-    if (!opp) return res.status(404).json({ error: 'Not found' });
-    if (opp.creator_id !== req.user.id) return res.status(403).json({ error: 'Not your opportunity' });
-
-    await db.prepare('DELETE FROM opportunities WHERE id = ?').run(req.params.id);
-    await db.prepare(`DELETE FROM moderation_queue WHERE entity_id = ? AND type = 'opportunity'`).run(req.params.id);
-    res.json({ message: 'Deleted' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ success: false, error: 'Server error' });
   }
 });
 

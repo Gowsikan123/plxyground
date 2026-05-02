@@ -1,148 +1,111 @@
+'use strict';
 const express = require('express');
-const db = require('../db/setup');
-const { verifyToken } = require('../middleware/auth');
+const { body, query } = require('express-validator');
+const db = require('../db/client');
+const { requireAuth } = require('../middleware/auth');
+const validate = require('../middleware/validate');
 
 const router = express.Router();
-const CONTENT_TYPES = ['article', 'video_embed', 'image_story'];
 
-function isValidUrl(value) {
+// GET /api/content
+router.get('/', [
+  query('limit').optional().isInt({ min: 1, max: 100 }),
+  query('offset').optional().isInt({ min: 0 }),
+], validate, (req, res) => {
   try {
-    const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
+    const limit = parseInt(req.query.limit || '20', 10);
+    const offset = parseInt(req.query.offset || '0', 10);
+    const search = req.query.search || '';
+    const sport = req.query.sport || '';
+    const tags = req.query.tags || '';
 
-// GET /api/content - public feed
-router.get('/', async (req, res) => {
-  const { search, limit = 20, offset = 0 } = req.query;
-  const lim = Math.min(Math.max(parseInt(limit), 1), 100);
-  const off = parseInt(offset) || 0;
+    let sql = `
+      SELECT c.*, cr.display_name, cr.username, cr.slug AS creator_slug, cr.sport AS creator_sport, cr.avatar_url
+      FROM content c
+      JOIN creators cr ON cr.id = c.creator_id
+      WHERE c.status = 'published'
+    `;
+    const params = [];
+    if (search) { sql += ` AND (c.title LIKE ? OR c.body LIKE ?)`; params.push(`%${search}%`, `%${search}%`); }
+    if (sport) { sql += ` AND cr.sport = ?`; params.push(sport); }
+    if (tags) { sql += ` AND c.tags LIKE ?`; params.push(`%${tags}%`); }
+    sql += ` ORDER BY c.created_at DESC LIMIT ? OFFSET ?`;
+    params.push(limit, offset);
 
-  let query = `
-    SELECT c.*, cr.name as creator_name, cr.profile_slug
-    FROM content c
-    JOIN creators cr ON cr.id = c.creator_id
-    WHERE c.is_published = 1
-  `;
-  const params = [];
-
-  if (search) {
-    query += ` AND (c.title LIKE ? OR c.body LIKE ? OR cr.name LIKE ?)`;
-    const s = `%${search}%`;
-    params.push(s, s, s);
-  }
-
-  query += ` ORDER BY c.feed_rank_at DESC, c.published_at DESC LIMIT ? OFFSET ?`;
-  params.push(lim, off);
-
-  const rows = await db.prepare(query).all(...params);
-  res.json({ data: rows, limit: lim, offset: off });
-});
-
-// GET /api/content/recommend - recommended content
-// IMPORTANT: this route MUST be defined before /:id so Express does not
-// treat the literal string "recommend" as an id parameter.
-router.get('/recommend', async (req, res) => {
-  // Use optional chaining — this route is public and req.user may be undefined
-  const userId = req.user?.id ?? null;
-  const recent = await db.prepare(`SELECT c.*, cr.name as creator_name, cr.profile_slug FROM content c JOIN creators cr ON c.creator_id = cr.id WHERE c.is_published = 1 ORDER BY c.created_at DESC LIMIT 10`).all();
-  const trending = await db.prepare(`SELECT c.*, cr.name as creator_name, cr.profile_slug FROM content c JOIN creators cr ON c.creator_id = cr.id WHERE c.is_published = 1 ORDER BY c.order_priority DESC, c.updated_at DESC LIMIT 10`).all();
-
-  if (userId) {
-    const personal = await db.prepare(`SELECT c.*, cr.name as creator_name, cr.profile_slug FROM content c JOIN creators cr ON c.creator_id = cr.id WHERE c.is_published = 1 ORDER BY c.feed_rank_at DESC, c.created_at DESC LIMIT 10`).all();
-    return res.json({ mode: 'personal', data: personal, fallback: { trending, recent } });
-  }
-
-  res.json({ mode: 'aggregate', data: [...new Map([...trending, ...recent].map((item) => [item.id, item])).values()] });
-});
-
-// GET /api/content/:id - single post
-router.get('/:id', async (req, res) => {
-  const row = await db.prepare(`
-    SELECT c.*, cr.name as creator_name, cr.profile_slug
-    FROM content c
-    JOIN creators cr ON cr.id = c.creator_id
-    WHERE c.id = ? AND c.is_published = 1
-  `).get(req.params.id);
-
-  if (!row) return res.status(404).json({ error: 'Not found' });
-  res.json(row);
-});
-
-// POST /api/content - create post (auth required)
-router.post('/', verifyToken, async (req, res) => {
-  const { title, body, content_type, media_url, order_priority } = req.body;
-
-  if (!title || !body || !content_type || !media_url) {
-    return res.status(400).json({ error: 'title, body, content_type, and media_url are required' });
-  }
-
-  if (title.trim().length > 500) return res.status(400).json({ error: 'title must be 500 characters or less' });
-  if (body.trim().length > 50000) return res.status(400).json({ error: 'body must be 50000 characters or less' });
-  if (!CONTENT_TYPES.includes(content_type)) return res.status(400).json({ error: 'content_type must be article, video_embed, or image_story' });
-  if (!isValidUrl(media_url)) return res.status(400).json({ error: 'media_url must be a valid URL' });
-
-  try {
-    const result = await db.prepare(`
-      INSERT INTO content (creator_id, content_type, title, body, media_url, order_priority, is_published)
-      VALUES (?, ?, ?, ?, ?, ?, 0)
-    `).run(req.user.id, content_type, title, body, media_url, order_priority || 0);
-
-    await db.prepare(`
-      INSERT INTO moderation_queue (type, status, title_or_name, submitted_by, entity_id)
-      VALUES ('content', 'pending', ?, ?, ?)
-    `).run(title, req.user.email, result.lastInsertRowid);
-
-    const post = await db.prepare('SELECT * FROM content WHERE id = ?').get(result.lastInsertRowid);
-    res.status(201).json(post);
+    const rows = db.prepare(sql).all(...params);
+    const total = db.prepare(`SELECT COUNT(*) as c FROM content WHERE status = 'published'`).get().c;
+    return res.json({ success: true, data: { items: rows, total, limit, offset } });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ success: false, error: 'Server error' });
   }
 });
 
-// PUT /api/content/:id - edit post (owner only)
-// media_url is optional — omitting it preserves the existing value
-router.put('/:id', verifyToken, async (req, res) => {
-  const { title, body, content_type, media_url, order_priority } = req.body;
-
-  if (title && title.trim().length > 500) return res.status(400).json({ error: 'title must be 500 characters or less' });
-  if (body && body.trim().length > 50000) return res.status(400).json({ error: 'body must be 50000 characters or less' });
-  if (content_type && !CONTENT_TYPES.includes(content_type)) return res.status(400).json({ error: 'content_type must be article, video_embed, or image_story' });
-  if (media_url && !isValidUrl(media_url)) return res.status(400).json({ error: 'media_url must be a valid URL' });
-
-  const post = await db.prepare('SELECT * FROM content WHERE id = ?').get(req.params.id);
-  if (!post) return res.status(404).json({ error: 'Not found' });
-  if (post.creator_id !== req.user.id) return res.status(403).json({ error: 'Not your post' });
-
-  await db.prepare(`
-    UPDATE content SET
-      title = ?, body = ?, content_type = ?, media_url = ?,
-      order_priority = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `).run(
-    title || post.title,
-    body || post.body,
-    content_type || post.content_type,
-    media_url || post.media_url,
-    order_priority ?? post.order_priority,
-    req.params.id
-  );
-
-  const updated = await db.prepare('SELECT * FROM content WHERE id = ?').get(req.params.id);
-  res.json(updated);
+// GET /api/content/:id
+router.get('/:id', (req, res) => {
+  try {
+    const row = db.prepare(`
+      SELECT c.*, cr.display_name, cr.username, cr.slug AS creator_slug, cr.sport AS creator_sport, cr.avatar_url
+      FROM content c JOIN creators cr ON cr.id = c.creator_id
+      WHERE c.id = ? AND c.status = 'published'
+    `).get(req.params.id);
+    if (!row) return res.status(404).json({ success: false, error: 'Not found' });
+    db.prepare('UPDATE content SET view_count = view_count + 1 WHERE id = ?').run(row.id);
+    return res.json({ success: true, data: row });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Server error' });
+  }
 });
 
-// DELETE /api/content/:id - delete post (owner only)
-router.delete('/:id', verifyToken, async (req, res) => {
-  const post = await db.prepare('SELECT * FROM content WHERE id = ?').get(req.params.id);
-  if (!post) return res.status(404).json({ error: 'Not found' });
-  if (post.creator_id !== req.user.id) return res.status(403).json({ error: 'Not your post' });
+// POST /api/content
+router.post('/', requireAuth, [
+  body('title').trim().isLength({ min: 1, max: 200 }),
+  body('media_type').optional().isIn(['image', 'video', 'none']),
+], validate, (req, res) => {
+  try {
+    if (req.userType !== 'creator') return res.status(403).json({ success: false, error: 'Forbidden' });
+    const { title, body: bodyText, media_url, media_type, tags } = req.body;
+    const tagsStr = Array.isArray(tags) ? JSON.stringify(tags) : (tags || null);
+    const result = db.prepare(
+      `INSERT INTO content (creator_id, title, body, media_url, media_type, tags) VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(req.user.sub, title, bodyText || null, media_url || null, media_type || 'none', tagsStr);
+    db.prepare(`INSERT INTO moderation_queue (content_type, content_id) VALUES ('creator_content', ?)`).run(result.lastInsertRowid);
+    const created = db.prepare('SELECT * FROM content WHERE id = ?').get(result.lastInsertRowid);
+    return res.status(201).json({ success: true, data: created });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
 
-  await db.prepare('DELETE FROM content WHERE id = ?').run(req.params.id);
-  res.json({ message: 'Deleted' });
+// PUT /api/content/:id
+router.put('/:id', requireAuth, (req, res) => {
+  try {
+    if (req.userType !== 'creator') return res.status(403).json({ success: false, error: 'Forbidden' });
+    const row = db.prepare('SELECT * FROM content WHERE id = ? AND creator_id = ?').get(req.params.id, req.user.sub);
+    if (!row) return res.status(404).json({ success: false, error: 'Not found or not yours' });
+    const { title, body: bodyText, media_url, media_type, tags } = req.body;
+    const tagsStr = Array.isArray(tags) ? JSON.stringify(tags) : (tags || row.tags);
+    db.prepare(
+      `UPDATE content SET title = ?, body = ?, media_url = ?, media_type = ?, tags = ?, status = 'pending', updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+    ).run(title || row.title, bodyText ?? row.body, media_url ?? row.media_url, media_type || row.media_type, tagsStr, row.id);
+    db.prepare(`INSERT INTO moderation_queue (content_type, content_id) VALUES ('creator_content', ?)`).run(row.id);
+    const updated = db.prepare('SELECT * FROM content WHERE id = ?').get(row.id);
+    return res.json({ success: true, data: updated });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+// DELETE /api/content/:id
+router.delete('/:id', requireAuth, (req, res) => {
+  try {
+    if (req.userType !== 'creator') return res.status(403).json({ success: false, error: 'Forbidden' });
+    const row = db.prepare('SELECT * FROM content WHERE id = ? AND creator_id = ?').get(req.params.id, req.user.sub);
+    if (!row) return res.status(404).json({ success: false, error: 'Not found or not yours' });
+    db.prepare(`UPDATE content SET status = 'deleted', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(row.id);
+    return res.json({ success: true, data: { message: 'Deleted' } });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Server error' });
+  }
 });
 
 module.exports = router;

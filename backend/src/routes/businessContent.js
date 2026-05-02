@@ -1,75 +1,55 @@
+'use strict';
 const express = require('express');
-const db = require('../db/setup');
-const { verifyToken, requireRole } = require('../middleware/auth');
+const { body } = require('express-validator');
+const db = require('../db/client');
+const { requireAuth } = require('../middleware/auth');
+const validate = require('../middleware/validate');
 
 const router = express.Router();
 
-router.use(verifyToken, requireRole('BUSINESS'));
-
-// GET /api/business/content/mine - all business posts including pending items
-router.get('/mine', async (req, res) => {
-  const rows = await db.prepare(`
-    SELECT c.*, cr.name as creator_name, cr.profile_slug
-    FROM content c
-    JOIN creators cr ON cr.id = c.creator_id
-    WHERE c.creator_id = ?
-    ORDER BY c.created_at DESC
-  `).all(req.user.id);
-
-  res.json({ data: rows });
+// POST /api/business/content
+router.post('/', requireAuth, [
+  body('title').trim().isLength({ min: 1, max: 200 }),
+], validate, (req, res) => {
+  try {
+    if (req.userType !== 'business') return res.status(403).json({ success: false, error: 'Forbidden' });
+    const { title, body: bodyText, media_url, budget_range, target_sport } = req.body;
+    const result = db.prepare(
+      `INSERT INTO business_content (business_id, title, body, media_url, budget_range, target_sport) VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(req.user.sub, title, bodyText || null, media_url || null, budget_range || null, target_sport || null);
+    db.prepare(`INSERT INTO moderation_queue (content_type, content_id) VALUES ('business_content', ?)`).run(result.lastInsertRowid);
+    const created = db.prepare('SELECT * FROM business_content WHERE id = ?').get(result.lastInsertRowid);
+    return res.status(201).json({ success: true, data: created });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Server error' });
+  }
 });
 
-// POST /api/business/content - create a business campaign/content post
-router.post('/', async (req, res) => {
-  const {
-    title,
-    body,
-    content_type,
-    media_url,
-    order_priority,
-    campaign_goal,
-    call_to_action,
-    target_creator_profile,
-  } = req.body;
-
-  if (!title || !body || !content_type || !media_url) {
-    return res.status(400).json({ error: 'title, body, content_type, and media_url are required' });
-  }
-
-  const allowed = ['article', 'video_embed', 'image_story'];
-  if (!allowed.includes(content_type)) {
-    return res.status(400).json({ error: 'content_type must be article, video_embed, or image_story' });
-  }
-
+// GET /api/business/content/mine
+router.get('/mine', requireAuth, (req, res) => {
   try {
-    const result = await db.prepare(`
-      INSERT INTO content (
-        creator_id, content_type, title, body, media_url, order_priority,
-        is_published, campaign_goal, call_to_action, target_creator_profile
-      )
-      VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
-    `).run(
-      req.user.id,
-      content_type,
-      title,
-      body,
-      media_url,
-      order_priority || 0,
-      campaign_goal || null,
-      call_to_action || null,
-      target_creator_profile || null
-    );
-
-    await db.prepare(`
-      INSERT INTO moderation_queue (type, status, title_or_name, submitted_by, entity_id)
-      VALUES ('content', 'pending', ?, ?, ?)
-    `).run(title, req.user.email, result.lastInsertRowid);
-
-    const post = await db.prepare('SELECT * FROM content WHERE id = ?').get(result.lastInsertRowid);
-    res.status(201).json(post);
+    if (req.userType !== 'business') return res.status(403).json({ success: false, error: 'Forbidden' });
+    const rows = db.prepare('SELECT * FROM business_content WHERE business_id = ? ORDER BY created_at DESC').all(req.user.sub);
+    return res.json({ success: true, data: rows });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+// PUT /api/business/content/:id
+router.put('/:id', requireAuth, (req, res) => {
+  try {
+    if (req.userType !== 'business') return res.status(403).json({ success: false, error: 'Forbidden' });
+    const row = db.prepare('SELECT * FROM business_content WHERE id = ? AND business_id = ?').get(req.params.id, req.user.sub);
+    if (!row) return res.status(404).json({ success: false, error: 'Not found or not yours' });
+    const { title, body: bodyText, budget_range, target_sport } = req.body;
+    db.prepare(
+      `UPDATE business_content SET title = ?, body = ?, budget_range = ?, target_sport = ?, status = 'pending', updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+    ).run(title ?? row.title, bodyText ?? row.body, budget_range ?? row.budget_range, target_sport ?? row.target_sport, row.id);
+    const updated = db.prepare('SELECT * FROM business_content WHERE id = ?').get(row.id);
+    return res.json({ success: true, data: updated });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Server error' });
   }
 });
 
