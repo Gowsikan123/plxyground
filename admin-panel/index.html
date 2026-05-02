@@ -1,689 +1,1054 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-section="dashboard">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PLXYGROUND Admin</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: sans-serif; background: #f1f5f9; display: flex; min-height: 100vh; }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PLXYGROUND Admin</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    /* SIDEBAR */
-    #sidebar {
-      width: 220px; background: #0f172a; color: #fff;
-      display: flex; flex-direction: column; padding: 24px 0;
-      position: fixed; top: 0; left: 0; height: 100vh;
-    }
-    #sidebar .logo { font-size: 20px; font-weight: 700; color: #2563eb; padding: 0 24px 24px; border-bottom: 1px solid #1e293b; }
-    #sidebar nav { flex: 1; padding-top: 16px; }
-    #sidebar nav button {
-      display: block; width: 100%; text-align: left;
-      background: none; border: none; color: #94a3b8;
-      padding: 12px 24px; cursor: pointer; font-size: 14px;
-    }
-    #sidebar nav button:hover, #sidebar nav button.active { background: #1e293b; color: #fff; }
-    #sidebar .signout { padding: 24px; }
-    #sidebar .signout button {
-      width: 100%; background: #dc2626; color: #fff;
-      border: none; padding: 10px; border-radius: 6px;
-      cursor: pointer; font-size: 14px;
-    }
+  :root {
+    --bg:        #0a0a0a;
+    --sidebar:   #111111;
+    --surface:   #1a1a1a;
+    --surface2:  #222222;
+    --border:    #2a2a2a;
+    --primary:   #ff3c3c;
+    --primary-d: #cc1f1f;
+    --success:   #00c853;
+    --warning:   #ffb300;
+    --error:     #ff3c3c;
+    --txt:       #ffffff;
+    --txt-s:     #8a8a8a;
+    --txt-m:     #555555;
+    --radius:    6px;
+    --transition: 140ms ease;
+  }
 
-    /* MAIN */
-    #main { margin-left: 220px; flex: 1; padding: 32px; }
-    #topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-    #topbar h1 { font-size: 22px; font-weight: 700; color: #0f172a; }
+  html, body { height: 100%; background: var(--bg); color: var(--txt); font-family: system-ui, -apple-system, sans-serif; font-size: 14px; }
 
-    /* LOGIN */
-    #login-screen {
-      position: fixed; inset: 0; background: #0f172a;
-      display: flex; align-items: center; justify-content: center; z-index: 100;
-    }
-    #login-box {
-      background: #1e293b; padding: 40px; border-radius: 12px;
-      width: 360px;
-    }
-    #login-box h2 { color: #fff; margin-bottom: 8px; font-size: 22px; }
-    #login-box p { color: #94a3b8; margin-bottom: 24px; font-size: 14px; }
-    #login-box input {
-      width: 100%; padding: 10px 14px; border-radius: 6px;
-      border: 1px solid #334155; background: #0f172a; color: #fff;
-      margin-bottom: 12px; font-size: 14px;
-    }
-    #login-box button {
-      width: 100%; padding: 12px; background: #2563eb; color: #fff;
-      border: none; border-radius: 6px; cursor: pointer; font-size: 15px; font-weight: 600;
-    }
-    #login-error { color: #f87171; font-size: 13px; margin-top: 10px; display: none; }
+  /* ── Layout ────────────────────────────────── */
+  #app { display: flex; height: 100vh; overflow: hidden; }
 
-    /* BANNER */
-    #banner {
-      position: fixed; top: 16px; right: 16px; z-index: 999;
-      padding: 12px 20px; border-radius: 8px; font-size: 14px;
-      font-weight: 600; display: none; max-width: 360px;
-    }
-    #banner.success { background: #16a34a; color: #fff; }
-    #banner.error { background: #dc2626; color: #fff; }
+  /* ── Sidebar ───────────────────────────────── */
+  #sidebar {
+    width: 220px; min-width: 220px;
+    background: var(--sidebar);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    padding: 0;
+    overflow-y: auto;
+  }
+  #sidebar-logo {
+    padding: 20px 20px 16px;
+    font-size: 16px; font-weight: 700; letter-spacing: 1.5px;
+    color: var(--primary);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  #sidebar-logo svg { flex-shrink: 0; }
+  #sidebar nav { flex: 1; padding: 12px 0; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 20px;
+    cursor: pointer; color: var(--txt-s); border: none; background: none;
+    width: 100%; text-align: left; font-size: 13px;
+    border-left: 3px solid transparent;
+    transition: color var(--transition), background var(--transition), border-color var(--transition);
+  }
+  .nav-item:hover { color: var(--txt); background: rgba(255,255,255,0.04); }
+  .nav-item.active { color: var(--txt); background: rgba(255,60,60,0.08); border-left-color: var(--primary); }
+  .nav-item svg { flex-shrink: 0; }
+  #sidebar-footer {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+  }
+  #btn-logout {
+    width: 100%; padding: 8px 12px;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--txt-s); border-radius: var(--radius); cursor: pointer;
+    font-size: 12px; transition: all var(--transition);
+  }
+  #btn-logout:hover { border-color: var(--primary); color: var(--primary); }
 
-    /* CARDS */
-    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
-    .kpi-card { background: #fff; border-radius: 10px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-    .kpi-card .label { font-size: 12px; color: #64748b; margin-bottom: 6px; }
-    .kpi-card .value { font-size: 28px; font-weight: 700; color: #0f172a; }
+  /* ── Main ──────────────────────────────────── */
+  #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  #topbar {
+    height: 52px; background: var(--sidebar);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 24px;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  #topbar-title { font-weight: 600; font-size: 15px; }
+  #topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .badge-count {
+    background: var(--primary); color: #fff;
+    border-radius: 99px; font-size: 11px; font-weight: 700;
+    padding: 1px 7px; min-width: 20px; text-align: center;
+  }
+  #content-area { flex: 1; overflow-y: auto; padding: 24px; }
 
-    /* TABLE */
-    .table-wrap { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th { background: #f8fafc; padding: 12px 16px; text-align: left; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0; }
-    td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; color: #1e293b; vertical-align: top; }
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: #f8fafc; }
+  /* ── Login Modal ───────────────────────────── */
+  #login-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999;
+  }
+  #login-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 36px 32px;
+    width: 100%; max-width: 380px;
+  }
+  #login-box h2 { font-size: 20px; margin-bottom: 6px; }
+  #login-box p { color: var(--txt-s); font-size: 13px; margin-bottom: 24px; }
+  #login-error { color: var(--error); font-size: 13px; margin-bottom: 12px; display: none; }
 
-    /* BADGES */
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-    .badge.green { background: #dcfce7; color: #16a34a; }
-    .badge.red { background: #fee2e2; color: #dc2626; }
-    .badge.yellow { background: #fef9c3; color: #ca8a04; }
-    .badge.blue { background: #dbeafe; color: #2563eb; }
-    .badge.gray { background: #f1f5f9; color: #64748b; }
+  /* ── Forms ─────────────────────────────────── */
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12px; color: var(--txt-s); margin-bottom: 5px; }
+  .field input, .field select, .field textarea {
+    width: 100%; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    color: var(--txt); padding: 8px 12px; font-size: 13px;
+    transition: border-color var(--transition);
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    outline: none; border-color: var(--primary);
+  }
 
-    /* BUTTONS */
-    .btn { padding: 6px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px; font-weight: 600; }
-    .btn-green { background: #16a34a; color: #fff; }
-    .btn-red { background: #dc2626; color: #fff; }
-    .btn-blue { background: #2563eb; color: #fff; }
-    .btn-gray { background: #e2e8f0; color: #374151; }
-    .btn + .btn { margin-left: 4px; }
+  /* ── Buttons ───────────────────────────────── */
+  .btn {
+    padding: 8px 16px; border-radius: var(--radius);
+    border: none; cursor: pointer; font-size: 13px; font-weight: 500;
+    transition: all var(--transition); display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: var(--primary-d); }
+  .btn-ghost { background: transparent; color: var(--txt-s); border: 1px solid var(--border); }
+  .btn-ghost:hover { color: var(--txt); border-color: #555; }
+  .btn-success { background: rgba(0,200,83,0.15); color: var(--success); border: 1px solid rgba(0,200,83,0.3); }
+  .btn-success:hover { background: rgba(0,200,83,0.25); }
+  .btn-danger  { background: rgba(255,60,60,0.1);  color: var(--error);   border: 1px solid rgba(255,60,60,0.25); }
+  .btn-danger:hover  { background: rgba(255,60,60,0.2); }
+  .btn-warning { background: rgba(255,179,0,0.12); color: var(--warning); border: 1px solid rgba(255,179,0,0.25); }
+  .btn-warning:hover { background: rgba(255,179,0,0.22); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    /* SEARCH */
-    .search-bar { margin-bottom: 16px; }
-    .search-bar input {
-      padding: 10px 14px; border-radius: 6px; border: 1px solid #e2e8f0;
-      font-size: 14px; width: 300px; background: #fff;
-    }
+  /* ── Toast ─────────────────────────────────── */
+  #toast-container {
+    position: fixed; bottom: 24px; right: 24px;
+    display: flex; flex-direction: column; gap: 8px; z-index: 10000;
+  }
+  .toast {
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 12px 16px; border-radius: var(--radius);
+    font-size: 13px; max-width: 320px;
+    animation: slideIn 0.2s ease;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .toast.success { border-color: rgba(0,200,83,0.4); color: var(--success); }
+  .toast.error   { border-color: rgba(255,60,60,0.4); color: var(--error); }
+  .toast.info    { border-color: rgba(138,138,138,0.4); color: var(--txt); }
+  @keyframes slideIn { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
 
-    /* SECTION */
-    .section { display: none; }
-    .section.active { display: block; }
+  /* ── Confirm Dialog ────────────────────────── */
+  #confirm-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: none; align-items: center; justify-content: center; z-index: 9998;
+  }
+  #confirm-overlay.show { display: flex; }
+  #confirm-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 28px 28px 22px;
+    max-width: 360px; width: 100%;
+  }
+  #confirm-box h3 { margin-bottom: 10px; }
+  #confirm-box p { color: var(--txt-s); font-size: 13px; margin-bottom: 20px; }
+  #confirm-box .row { display: flex; gap: 10px; justify-content: flex-end; }
 
-    /* MODAL */
-    #modal-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-      display: none; align-items: center; justify-content: center; z-index: 200;
-    }
-    #modal-overlay.open { display: flex; }
-    #modal-box {
-      background: #fff; border-radius: 12px; padding: 32px;
-      width: 420px; max-width: 90vw;
-    }
-    #modal-box h3 { margin-bottom: 12px; font-size: 18px; }
-    #modal-box p { color: #64748b; margin-bottom: 20px; font-size: 14px; }
-    #modal-box .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
-  </style>
+  /* ── KPI Cards ─────────────────────────────── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 14px; margin-bottom: 24px;
+  }
+  .kpi-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px 16px;
+  }
+  .kpi-label { font-size: 11px; color: var(--txt-s); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+  .kpi-value { font-size: 28px; font-weight: 700; }
+  .kpi-value.red { color: var(--primary); }
+  .kpi-value.green { color: var(--success); }
+  .kpi-value.yellow { color: var(--warning); }
+
+  /* ── Section header ────────────────────────── */
+  .section-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 18px; flex-wrap: wrap;
+  }
+  .section-header h2 { font-size: 16px; font-weight: 600; margin-right: auto; }
+
+  /* ── Table ─────────────────────────────────── */
+  .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: var(--surface2); }
+  th { padding: 10px 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--txt-s); text-align: left; white-space: nowrap; }
+  td { padding: 10px 12px; border-top: 1px solid var(--border); font-size: 13px; vertical-align: middle; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .empty-row td { text-align: center; color: var(--txt-m); padding: 32px; }
+
+  /* ── Pagination ────────────────────────────── */
+  .pagination {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 16px; justify-content: flex-end;
+  }
+  .pagination span { font-size: 12px; color: var(--txt-s); }
+
+  /* ── Status badges ─────────────────────────── */
+  .status {
+    display: inline-block; padding: 2px 8px;
+    border-radius: 99px; font-size: 11px; font-weight: 600;
+  }
+  .status-pending    { background: rgba(255,179,0,0.15);  color: var(--warning); }
+  .status-approved, .status-published { background: rgba(0,200,83,0.12); color: var(--success); }
+  .status-rejected, .status-deleted   { background: rgba(255,60,60,0.12); color: var(--error); }
+  .status-suspended  { background: rgba(255,60,60,0.12); color: var(--error); }
+  .status-active     { background: rgba(0,200,83,0.12); color: var(--success); }
+
+  /* ── Bulk bar ──────────────────────────────── */
+  #bulk-bar {
+    display: none; align-items: center; gap: 10px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px 14px;
+    margin-bottom: 14px;
+  }
+  #bulk-bar.show { display: flex; }
+  #bulk-bar span { margin-right: auto; font-size: 13px; color: var(--txt-s); }
+  #bulk-note { flex: 1; max-width: 260px; }
+
+  /* ── Chart bars ────────────────────────────── */
+  .chart-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 24px; }
+  .chart-title { font-size: 13px; font-weight: 600; margin-bottom: 16px; color: var(--txt-s); }
+  .chart-bars { display: flex; align-items: flex-end; gap: 10px; height: 100px; }
+  .chart-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
+  .chart-bar { width: 100%; background: var(--primary); border-radius: 3px 3px 0 0; opacity: 0.85; transition: opacity var(--transition); }
+  .chart-bar:hover { opacity: 1; }
+  .chart-label { font-size: 10px; color: var(--txt-m); }
+
+  /* ── Alerts ────────────────────────────────── */
+  .alert-feed { display: flex; flex-direction: column; gap: 8px; }
+  .alert-item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 14px;
+    display: flex; gap: 12px; align-items: flex-start;
+  }
+  .alert-action { font-weight: 600; font-size: 12px; color: var(--primary); }
+  .alert-meta { font-size: 11px; color: var(--txt-m); margin-top: 2px; }
+
+  /* ── Skeleton ──────────────────────────────── */
+  @keyframes shimmer { 0%{background-position:-400px 0} 100%{background-position:400px 0} }
+  .skel {
+    background: linear-gradient(90deg, var(--surface2) 25%, #2e2e2e 50%, var(--surface2) 75%);
+    background-size: 400px 100%; animation: shimmer 1.4s infinite;
+    border-radius: 4px; height: 14px; display: block;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* Hide sections */
+  .section { display: none; }
+  .section.active { display: block; }
+</style>
 </head>
 <body>
 
-<!-- LOGIN -->
-<div id="login-screen">
+<!-- ── Toast container ──────────────────────── -->
+<div id="toast-container"></div>
+
+<!-- ── Confirm Dialog ───────────────────────── -->
+<div id="confirm-overlay">
+  <div id="confirm-box">
+    <h3 id="confirm-title">Are you sure?</h3>
+    <p id="confirm-msg">This action cannot be undone.</p>
+    <div class="row">
+      <button class="btn btn-ghost" id="confirm-cancel">Cancel</button>
+      <button class="btn btn-primary" id="confirm-ok">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Login Overlay ────────────────────────── -->
+<div id="login-overlay">
   <div id="login-box">
     <h2>PLXYGROUND</h2>
-    <p>Admin Panel — sign in to continue</p>
-    <input type="email" id="login-email" placeholder="Email" />
-    <input type="password" id="login-password" placeholder="Password" />
-    <button onclick="doLogin()">Sign In</button>
-    <div id="login-error"></div>
+    <p>Admin Dashboard — sign in to continue</p>
+    <p id="login-error">Invalid credentials. Please try again.</p>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="login-email" placeholder="admin@plxyground.local" />
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="login-password" placeholder="••••••••" />
+    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:6px" id="btn-login">
+      Log In
+    </button>
   </div>
 </div>
 
-<!-- BANNER -->
-<div id="banner"></div>
+<!-- ── App Shell ─────────────────────────────── -->
+<div id="app">
 
-<!-- MODAL -->
-<div id="modal-overlay">
-  <div id="modal-box">
-    <h3 id="modal-title"></h3>
-    <p id="modal-body"></p>
-    <div class="modal-actions">
-      <button class="btn btn-gray" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-red" id="modal-confirm">Confirm</button>
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <div id="sidebar-logo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ff3c3c" stroke-width="2.2" stroke-linecap="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 8v4l3 3"/>
+      </svg>
+      PLXYGROUND
     </div>
-  </div>
-</div>
-
-<!-- SIDEBAR -->
-<div id="sidebar">
-  <div class="logo">PLXYGROUND</div>
-  <nav>
-    <button onclick="showSection('queue', event)" class="active">Queue</button>
-    <button onclick="showSection('content', event)">Content</button>
-    <button onclick="showSection('opportunities', event)">Opportunities</button>
-    <button onclick="showSection('users', event)">Users</button>
-    <button onclick="showSection('audit', event)">Audit Log</button>
-    <button onclick="showSection('analytics', event)">Analytics</button>
-    <button onclick="showSection('alerts', event)">Live Alerts</button>
-    <button onclick="showSection('security', event)">Admin Security</button>
-  </nav>
-  <div class="signout"><button onclick="doSignout()">Sign Out</button></div>
-</div>
-
-<!-- MAIN -->
-<div id="main">
-  <div id="topbar"><h1 id="section-title">Moderation Queue</h1></div>
-
-  <!-- QUEUE -->
-  <div id="section-queue" class="section active">
-    <div class="search-bar"><input type="text" id="queue-search" placeholder="Search queue..." oninput="filterQueue()" /></div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th><input type="checkbox" id="queue-check-all" onchange="toggleAllQueue()" /></th><th>Type</th><th>Title/Name</th><th>Submitted By</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
-        <tbody id="queue-body"></tbody>
-      </table>
-    </div>
-    <div style="margin-top:12px;display:flex;gap:8px;">
-      <button class="btn btn-green" onclick="bulkQueue('approve')">Bulk Approve</button>
-      <button class="btn btn-red" onclick="bulkQueue('reject')">Bulk Reject</button>
-      <button class="btn btn-gray" onclick="bulkQueue('delete')">Bulk Delete</button>
+    <nav id="sidebar-nav">
+      <button class="nav-item active" data-section="dashboard">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </button>
+      <button class="nav-item" data-section="queue">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Mod Queue <span id="queue-badge" class="badge-count" style="display:none"></span>
+      </button>
+      <button class="nav-item" data-section="content">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Content
+      </button>
+      <button class="nav-item" data-section="users">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Users
+      </button>
+      <button class="nav-item" data-section="audit">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        Audit Log
+      </button>
+      <button class="nav-item" data-section="settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </button>
+    </nav>
+    <div id="sidebar-footer">
+      <div style="font-size:11px;color:var(--txt-m);margin-bottom:8px" id="sidebar-admin-email"></div>
+      <button class="btn-logout" id="btn-logout">Log Out</button>
     </div>
   </div>
 
-  <!-- CONTENT -->
-  <div id="section-content" class="section">
-    <div class="search-bar"><input type="text" id="content-search" placeholder="Search content..." oninput="loadContent()" /></div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Title</th><th>Creator</th><th>Type</th><th>Status</th><th>Body</th><th>Media</th><th>Date</th><th>Actions</th></tr></thead>
-        <tbody id="content-body"></tbody>
-      </table>
+  <!-- Main -->
+  <div id="main">
+    <div id="topbar">
+      <span id="topbar-title">Dashboard</span>
+      <div id="topbar-right"></div>
     </div>
-  </div>
+    <div id="content-area">
 
-  <!-- OPPORTUNITIES -->
-  <div id="section-opportunities" class="section">
-    <div class="search-bar"><input type="text" id="opportunities-search" placeholder="Search opportunities..." oninput="loadOpportunities()" /></div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Title</th><th>Business</th><th>Role Type</th><th>Status</th><th>Summary</th><th>Date</th><th>Actions</th></tr></thead>
-        <tbody id="opportunities-body"></tbody>
-      </table>
-    </div>
-  </div>
+      <!-- ── Dashboard ── -->
+      <div class="section active" id="section-dashboard">
+        <div class="kpi-grid" id="kpi-grid">
+          <div class="kpi-card"><div class="kpi-label">Creators</div><div class="kpi-value" id="kpi-creators"><span class="skel" style="width:60px;height:28px"></span></div></div>
+          <div class="kpi-card"><div class="kpi-label">Businesses</div><div class="kpi-value" id="kpi-businesses"><span class="skel" style="width:60px;height:28px"></span></div></div>
+          <div class="kpi-card"><div class="kpi-label">Total Content</div><div class="kpi-value" id="kpi-content"><span class="skel" style="width:60px;height:28px"></span></div></div>
+          <div class="kpi-card"><div class="kpi-label">Published</div><div class="kpi-value green" id="kpi-published"><span class="skel" style="width:60px;height:28px"></span></div></div>
+          <div class="kpi-card"><div class="kpi-label">Pending Queue</div><div class="kpi-value yellow" id="kpi-pending"><span class="skel" style="width:60px;height:28px"></span></div></div>
+          <div class="kpi-card"><div class="kpi-label">Opportunities</div><div class="kpi-value" id="kpi-opps"><span class="skel" style="width:60px;height:28px"></span></div></div>
+        </div>
+        <div class="chart-wrap">
+          <div class="chart-title">Weekly Signups</div>
+          <div class="chart-bars" id="chart-bars"></div>
+        </div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--txt-s)">RECENT ALERTS</div>
+        <div class="alert-feed" id="alert-feed">
+          <div style="color:var(--txt-m);font-size:13px">Loading alerts…</div>
+        </div>
+      </div>
 
-  <!-- USERS -->
-  <div id="section-users" class="section">
-    <div class="search-bar"><input type="text" id="users-search" placeholder="Search users..." oninput="loadUsers()" /></div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
-        <tbody id="users-body"></tbody>
-      </table>
-    </div>
-  </div>
+      <!-- ── Mod Queue ── -->
+      <div class="section" id="section-queue">
+        <div class="section-header">
+          <h2>Moderation Queue</h2>
+          <div class="field" style="margin:0;min-width:140px">
+            <select id="queue-status-filter" onchange="loadQueue()">
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="loadQueue()">Refresh</button>
+        </div>
+        <div id="bulk-bar">
+          <span id="bulk-count">0 selected</span>
+          <input class="field" id="bulk-note" placeholder="Moderation note (optional)" style="margin:0;padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--txt);font-size:13px" />
+          <button class="btn btn-success btn-sm" onclick="bulkAction('approve')">Approve</button>
+          <button class="btn btn-warning btn-sm" onclick="bulkAction('reject')">Reject</button>
+          <button class="btn btn-danger btn-sm"  onclick="bulkAction('delete')">Delete</button>
+        </div>
+        <div class="table-wrap">
+          <table id="queue-table">
+            <thead><tr>
+              <th><input type="checkbox" id="chk-all" onchange="toggleAllQueue(this)" /></th>
+              <th>ID</th><th>Type</th><th>Title</th><th>Submitted</th><th>Status</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="queue-tbody"></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="queue-pagination"></div>
+      </div>
 
-  <!-- AUDIT -->
-  <div id="section-audit" class="section">
-    <div style="margin-bottom:12px;">
-      <a id="audit-export-link" href="#" onclick="exportAudit()" class="btn btn-blue">Export JSON</a>
-    </div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Action</th><th>Actor</th><th>Target</th><th>Reason</th><th>Time</th></tr></thead>
-        <tbody id="audit-body"></tbody>
-      </table>
-    </div>
-  </div>
+      <!-- ── Content ── -->
+      <div class="section" id="section-content">
+        <div class="section-header">
+          <h2>Content</h2>
+          <select id="content-status-filter" onchange="loadContent()" style="background:var(--surface2);border:1px solid var(--border);color:var(--txt);padding:6px 10px;border-radius:var(--radius);font-size:13px">
+            <option value="">All statuses</option>
+            <option value="pending">Pending</option>
+            <option value="published">Published</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <input id="content-search" placeholder="Search…" oninput="debounceContent()" style="background:var(--surface2);border:1px solid var(--border);color:var(--txt);padding:6px 10px;border-radius:var(--radius);font-size:13px;width:200px" />
+          <button class="btn btn-ghost btn-sm" onclick="loadContent()">Refresh</button>
+        </div>
+        <div class="table-wrap">
+          <table id="content-table">
+            <thead><tr><th>ID</th><th>Title</th><th>Creator</th><th>Status</th><th>Views</th><th>Date</th><th>Actions</th></tr></thead>
+            <tbody id="content-tbody"></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="content-pagination"></div>
+      </div>
 
-  <!-- ANALYTICS -->
-  <div id="section-analytics" class="section">
-    <div style="margin-bottom:16px;">
-      <button class="btn btn-blue" onclick="loadAnalytics()">Refresh</button>
-    </div>
-    <div class="kpi-grid" id="kpi-grid"></div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Day</th><th>Posts</th></tr></thead>
-        <tbody id="trend-body"></tbody>
-      </table>
-    </div>
-  </div>
+      <!-- ── Users ── -->
+      <div class="section" id="section-users">
+        <div class="section-header">
+          <h2>Users</h2>
+          <select id="users-type-filter" onchange="loadUsers()" style="background:var(--surface2);border:1px solid var(--border);color:var(--txt);padding:6px 10px;border-radius:var(--radius);font-size:13px">
+            <option value="">All types</option>
+            <option value="creator">Creators</option>
+            <option value="business">Businesses</option>
+          </select>
+          <input id="users-search" placeholder="Search…" oninput="debounceUsers()" style="background:var(--surface2);border:1px solid var(--border);color:var(--txt);padding:6px 10px;border-radius:var(--radius);font-size:13px;width:200px" />
+          <button class="btn btn-ghost btn-sm" onclick="loadUsers()">Refresh</button>
+        </div>
+        <div class="table-wrap">
+          <table id="users-table">
+            <thead><tr><th>ID</th><th>Name / Company</th><th>Type</th><th>Email</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+            <tbody id="users-tbody"></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="users-pagination"></div>
+      </div>
 
-  <!-- ALERTS -->
-  <div id="section-alerts" class="section">
-    <p style="color:#64748b;font-size:13px;margin-bottom:12px;">Live Alerts — recent activity (distinct from Audit Log)</p>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Type</th><th>Name</th><th>Time</th></tr></thead>
-        <tbody id="alerts-body"></tbody>
-      </table>
-    </div>
-  </div>
+      <!-- ── Audit ── -->
+      <div class="section" id="section-audit">
+        <div class="section-header">
+          <h2>Audit Log</h2>
+          <select id="audit-type-filter" onchange="loadAudit()" style="background:var(--surface2);border:1px solid var(--border);color:var(--txt);padding:6px 10px;border-radius:var(--radius);font-size:13px">
+            <option value="">All actor types</option>
+            <option value="admin">Admin</option>
+            <option value="creator">Creator</option>
+            <option value="business">Business</option>
+            <option value="system">System</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="loadAudit()">Refresh</button>
+          <button class="btn btn-primary btn-sm" onclick="exportAudit()">Export JSON</button>
+        </div>
+        <div class="table-wrap">
+          <table id="audit-table">
+            <thead><tr><th>ID</th><th>Actor Type</th><th>Actor ID</th><th>Action</th><th>Target</th><th>IP</th><th>Date</th></tr></thead>
+            <tbody id="audit-tbody"></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="audit-pagination"></div>
+      </div>
 
-  <!-- SECURITY -->
-  <div id="section-security" class="section">
-    <div style="background:#fff;border-radius:10px;padding:32px;max-width:400px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
-      <h2 style="margin-bottom:20px;font-size:18px;">Change Admin Password</h2>
-      <input type="email" id="sec-email" placeholder="Admin email" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:10px;font-size:14px;" />
-      <input type="password" id="sec-current" placeholder="Current password" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:10px;font-size:14px;" />
-      <input type="password" id="sec-new" placeholder="New password" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:16px;font-size:14px;" />
-      <button class="btn btn-blue" style="width:100%;padding:12px;font-size:15px;" onclick="changePassword()">Update Password</button>
-      <div id="sec-msg" style="margin-top:12px;font-size:13px;"></div>
-    </div>
-  </div>
+      <!-- ── Settings ── -->
+      <div class="section" id="section-settings">
+        <div style="max-width:400px">
+          <h2 style="margin-bottom:20px;font-size:16px">Change Password</h2>
+          <p id="settings-msg" style="display:none;margin-bottom:14px;font-size:13px"></p>
+          <div class="field">
+            <label>Current Password</label>
+            <input type="password" id="s-cur-pwd" placeholder="••••••••" />
+          </div>
+          <div class="field">
+            <label>New Password</label>
+            <input type="password" id="s-new-pwd" placeholder="Min 8 chars, 1 uppercase, 1 number" />
+          </div>
+          <div class="field">
+            <label>Confirm New Password</label>
+            <input type="password" id="s-confirm-pwd" placeholder="••••••••" />
+          </div>
+          <button class="btn btn-primary" onclick="changePassword()">Update Password</button>
+        </div>
+      </div>
 
-</div>
+    </div><!-- /content-area -->
+  </div><!-- /main -->
+</div><!-- /app -->
 
 <script>
-  const API = '';
-  let token = null;
-  let queueData = [];
+'use strict';
 
-  // --- AUTH ---
-  async function doLogin() {
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-password').value;
-    const err = document.getElementById('login-error');
-    err.style.display = 'none';
-    try {
-      const res = await fetch(`${API}/api/admin/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await res.json();
-      if (!res.ok) { err.textContent = data.error || 'Login failed'; err.style.display = 'block'; return; }
-      token = data.token;
-      document.getElementById('login-screen').style.display = 'none';
-      loadQueue();
-    } catch(e) { err.textContent = 'Cannot reach server'; err.style.display = 'block'; }
-  }
+const APIBASE = 'http://localhost:3011'; // replace with deployed URL
 
-  function doSignout() {
-    token = null;
-    document.getElementById('login-screen').style.display = 'flex';
-  }
+// ── State ──────────────────────────────────────────────────────────
+let adminToken = localStorage.getItem('adminToken');
+let currentSection = 'dashboard';
+const state = {
+  queue:   { page: 0, limit: 20, total: 0, selected: new Set() },
+  content: { page: 0, limit: 20, total: 0 },
+  users:   { page: 0, limit: 20, total: 0 },
+  audit:   { page: 0, limit: 20, total: 0 },
+};
 
-  // --- BANNER ---
-  function showBanner(msg, type) {
-    const b = document.getElementById('banner');
-    b.textContent = msg;
-    b.className = type;
-    b.style.display = 'block';
-    setTimeout(() => b.style.display = 'none', 3000);
-  }
+// ── Init ───────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  if (adminToken) bootApp();
+  else showLogin();
 
-  // --- MODAL ---
-  let modalCallback = null;
-  function openModal(title, body, cb) {
-    document.getElementById('modal-title').textContent = title;
-    document.getElementById('modal-body').textContent = body;
-    document.getElementById('modal-overlay').classList.add('open');
-    modalCallback = cb;
-    document.getElementById('modal-confirm').onclick = () => { closeModal(); cb(); };
-  }
-  function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
+  document.getElementById('btn-login').addEventListener('click', doLogin);
+  document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('btn-logout').addEventListener('click', doLogout);
 
-  // --- NAV ---
-  function showSection(name, event) {
-    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-    document.querySelectorAll('#sidebar nav button').forEach(b => b.classList.remove('active'));
-    document.getElementById(`section-${name}`).classList.add('active');
-    const titles = { queue:'Moderation Queue', content:'Content', opportunities:'Opportunities', users:'Users', audit:'Audit Log', analytics:'Analytics', alerts:'Live Alerts', security:'Admin Security' };
-    document.getElementById('section-title').textContent = titles[name];
-    if (event && event.target) event.target.classList.add('active');
-    if (name === 'queue') loadQueue();
-    if (name === 'content') loadContent();
-    if (name === 'opportunities') loadOpportunities();
-    if (name === 'users') loadUsers();
-    if (name === 'audit') loadAudit();
-    if (name === 'analytics') loadAnalytics();
-    if (name === 'alerts') loadAlerts();
-  }
-
-  function authHeaders() { return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }; }
-
-  function escape(str) {
-    if (!str) return '';
-    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-
-  function fmtDate(d) { return d ? new Date(d).toLocaleString() : '-'; }
-
-  // --- QUEUE ---
-  async function loadQueue() {
-    try {
-      const res = await fetch(`${API}/api/admin/queue`, { headers: authHeaders() });
-      const data = await res.json();
-      queueData = data.data || [];
-      renderQueue(queueData);
-    } catch(e) { showBanner('Failed to load queue', 'error'); }
-  }
-
-  function renderQueue(rows) {
-    const tbody = document.getElementById('queue-body');
-    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:24px;">No items in queue</td></tr>'; return; }
-    tbody.innerHTML = rows.map(r => `
-      <tr>
-        <td><input type="checkbox" class="queue-cb" value="${r.id}" /></td>
-        <td><span class="badge blue">${escape(r.type)}</span></td>
-        <td>${escape(r.title_or_name)}</td>
-        <td>${escape(r.submitted_by)}</td>
-        <td><span class="badge ${r.status==='approved'?'green':r.status==='rejected'?'red':'yellow'}">${escape(r.status)}</span></td>
-        <td>${fmtDate(r.created_at)}</td>
-        <td>
-          <button class="btn btn-green" onclick="queueAction([${r.id}],'approve')">Approve</button>
-          <button class="btn btn-red" onclick="queueAction([${r.id}],'reject')">Reject</button>
-          <button class="btn btn-gray" onclick="queueAction([${r.id}],'delete')">Delete</button>
-        </td>
-      </tr>
-    `).join('');
-  }
-
-  function filterQueue() {
-    const q = document.getElementById('queue-search').value.toLowerCase();
-    renderQueue(queueData.filter(r => (r.title_or_name||'').toLowerCase().includes(q) || (r.submitted_by||'').toLowerCase().includes(q)));
-  }
-
-  function toggleAllQueue() {
-    const checked = document.getElementById('queue-check-all').checked;
-    document.querySelectorAll('.queue-cb').forEach(cb => cb.checked = checked);
-  }
-
-  function bulkQueue(action) {
-    const ids = [...document.querySelectorAll('.queue-cb:checked')].map(cb => parseInt(cb.value));
-    if (!ids.length) { showBanner('Select at least one item', 'error'); return; }
-    openModal(`Bulk ${action}`, `${action} ${ids.length} item(s)?`, () => queueAction(ids, action));
-  }
-
-  async function queueAction(ids, action) {
-    try {
-      const res = await fetch(`${API}/api/admin/queue/bulk-action`, {
-        method: 'POST', headers: authHeaders(),
-        body: JSON.stringify({ action, ids })
-      });
-      if (!res.ok) throw new Error();
-      showBanner(`${action} successful`, 'success');
-      loadQueue();
-    } catch(e) { showBanner(`Failed to ${action}`, 'error'); }
-  }
-
-  // --- CONTENT ---
-  async function loadContent() {
-    const search = document.getElementById('content-search').value;
-    try {
-      const res = await fetch(`${API}/api/admin/content?limit=2000&search=${encodeURIComponent(search)}`, { headers: authHeaders() });
-      const data = await res.json();
-      const rows = data.data || [];
-      const tbody = document.getElementById('content-body');
-      if (!rows.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:24px;">No content found</td></tr>'; return; }
-      tbody.innerHTML = rows.map(r => `
-        <tr>
-          <td>${escape(r.title)}</td>
-          <td>${escape(r.creator_name)}</td>
-          <td><span class="badge blue">${escape(r.content_type)}</span></td>
-          <td><span class="badge ${r.is_published?'green':'yellow'}">${r.is_published?'Published':'Pending'}</span></td>
-          <td style="max-width:200px;white-space:pre-wrap;">${escape(r.body)}</td>
-          <td>${r.media_url ? `<a href="${escape(r.media_url)}" target="_blank" class="btn btn-gray">View</a>` : '-'}</td>
-          <td>${fmtDate(r.created_at)}</td>
-          <td>
-            <button class="btn ${r.is_published?'btn-gray':'btn-green'}" onclick="togglePublish(${r.id},${r.is_published})">${r.is_published?'Unpublish':'Publish'}</button>
-            <button class="btn btn-red" onclick="deleteContent(${r.id})">Delete</button>
-          </td>
-        </tr>
-      `).join('');
-    } catch(e) { showBanner('Failed to load content', 'error'); }
-  }
-
-  async function togglePublish(id, current) {
-    try {
-      const res = await fetch(`${API}/api/admin/content/${id}`, {
-        method: 'PUT', headers: authHeaders(),
-        body: JSON.stringify({ is_published: current ? 0 : 1 })
-      });
-      if (!res.ok) throw new Error();
-      showBanner(current ? 'Unpublished' : 'Published', 'success');
-      loadContent();
-    } catch(e) { showBanner('Action failed', 'error'); }
-  }
-
-  function deleteContent(id) {
-    openModal('Delete Content', 'Are you sure you want to delete this post?', async () => {
-      try {
-        const res = await fetch(`${API}/api/admin/content/${id}`, { method: 'DELETE', headers: authHeaders() });
-        if (!res.ok) throw new Error();
-        showBanner('Deleted', 'success');
-        loadContent();
-      } catch(e) { showBanner('Delete failed', 'error'); }
-    });
-  }
-
-  // --- OPPORTUNITIES ---
-  async function loadOpportunities() {
-    const search = document.getElementById('opportunities-search').value;
-    try {
-      const res = await fetch(`${API}/api/admin/opportunities?limit=2000&search=${encodeURIComponent(search)}`, { headers: authHeaders() });
-      const data = await res.json();
-      const rows = data.data || [];
-      const tbody = document.getElementById('opportunities-body');
-      if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:24px;">No opportunities found</td></tr>'; return; }
-      tbody.innerHTML = rows.map(r => `
-        <tr>
-          <td>${escape(r.title)}</td>
-          <td>${escape(r.creator_name)}</td>
-          <td><span class="badge blue">${escape(r.role_type || 'Partnership')}</span></td>
-          <td><span class="badge ${r.is_published?'green':'yellow'}">${r.is_published?'Published':'Pending'}</span></td>
-          <td style="max-width:260px;white-space:pre-wrap;">${escape(r.body)}</td>
-          <td>${fmtDate(r.created_at)}</td>
-          <td>
-            <button class="btn ${r.is_published?'btn-gray':'btn-green'}" onclick="toggleOpportunityPublish(${r.id},${r.is_published})">${r.is_published?'Unpublish':'Approve'}</button>
-            <button class="btn btn-red" onclick="rejectOpportunity(${r.id})">Reject</button>
-            <button class="btn btn-gray" onclick="deleteOpportunity(${r.id})">Delete</button>
-          </td>
-        </tr>
-      `).join('');
-    } catch(e) { showBanner('Failed to load opportunities', 'error'); }
-  }
-
-  async function toggleOpportunityPublish(id, current) {
-    try {
-      const res = await fetch(`${API}/api/admin/opportunities/${id}`, {
-        method: 'PUT', headers: authHeaders(),
-        body: JSON.stringify({ is_published: current ? 0 : 1 })
-      });
-      if (!res.ok) throw new Error();
-      showBanner(current ? 'Opportunity unpublished' : 'Opportunity approved', 'success');
-      loadOpportunities();
-      loadQueue();
-    } catch(e) { showBanner('Opportunity action failed', 'error'); }
-  }
-
-  async function rejectOpportunity(id) {
-    try {
-      const res = await fetch(`${API}/api/admin/opportunities/${id}`, {
-        method: 'PUT', headers: authHeaders(),
-        body: JSON.stringify({ is_published: 0, moderation_status: 'rejected' })
-      });
-      if (!res.ok) throw new Error();
-      showBanner('Opportunity rejected', 'success');
-      loadOpportunities();
-      loadQueue();
-    } catch(e) { showBanner('Failed to reject opportunity', 'error'); }
-  }
-
-  function deleteOpportunity(id) {
-    openModal('Delete Opportunity', 'Are you sure you want to delete this opportunity?', async () => {
-      try {
-        const res = await fetch(`${API}/api/admin/opportunities/${id}`, { method: 'DELETE', headers: authHeaders() });
-        if (!res.ok) throw new Error();
-        showBanner('Opportunity deleted', 'success');
-        loadOpportunities();
-        loadQueue();
-      } catch(e) { showBanner('Delete failed', 'error'); }
-    });
-  }
-
-  // --- USERS ---
-  async function loadUsers() {
-    const search = document.getElementById('users-search').value;
-    try {
-      const res = await fetch(`${API}/api/admin/users?search=${encodeURIComponent(search)}`, { headers: authHeaders() });
-      const data = await res.json();
-      const rows = data.data || [];
-      const tbody = document.getElementById('users-body');
-      if (!rows.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:24px;">No users found</td></tr>'; return; }
-      tbody.innerHTML = rows.map(r => `
-        <tr>
-          <td>${escape(r.name)}</td>
-          <td>${escape(r.email)}</td>
-          <td><span class="badge blue">${escape(r.role)}</span></td>
-          <td><span class="badge ${r.is_suspended?'red':'green'}">${r.is_suspended?'Suspended':'Active'}</span></td>
-          <td>${fmtDate(r.created_at)}</td>
-          <td>
-            ${r.is_suspended
-              ? `<button class="btn btn-green" onclick="reactivateUser(${r.id})">Reactivate</button>`
-              : `<button class="btn btn-red" onclick="suspendUser(${r.id})">Suspend</button>`
-            }
-            <button class="btn btn-gray" onclick="verifyEmail(${r.id})">Verify Email</button>
-            <button class="btn btn-gray" onclick="resetPassword('${escape(r.email)}')">Reset PW</button>
-          </td>
-        </tr>
-      `).join('');
-    } catch(e) { showBanner('Failed to load users', 'error'); }
-  }
-
-  async function suspendUser(id) {
-    openModal('Suspend User', 'Are you sure you want to suspend this user?', async () => {
-      try {
-        const res = await fetch(`${API}/api/admin/users/${id}/suspend`, {
-          method: 'POST', headers: authHeaders(),
-          body: JSON.stringify({ reason: 'Suspended by admin' })
-        });
-        if (!res.ok) throw new Error();
-        showBanner('User suspended', 'success');
-        loadUsers();
-      } catch(e) { showBanner('Failed to suspend', 'error'); }
-    });
-  }
-
-  async function reactivateUser(id) {
-    try {
-      const res = await fetch(`${API}/api/admin/users/${id}/reactivate`, { method: 'POST', headers: authHeaders() });
-      if (!res.ok) throw new Error();
-      showBanner('User reactivated', 'success');
-      loadUsers();
-    } catch(e) { showBanner('Failed to reactivate', 'error'); }
-  }
-
-  async function verifyEmail(id) {
-    try {
-      const res = await fetch(`${API}/api/admin/users/${id}/email-verify`, { method: 'PUT', headers: authHeaders() });
-      if (!res.ok) throw new Error();
-      showBanner('Email verified', 'success');
-      loadUsers();
-    } catch(e) { showBanner('Failed to verify', 'error'); }
-  }
-
-  async function resetPassword(email) {
-    try {
-      const res = await fetch(`${API}/api/admin/users/reset-password`, {
-        method: 'POST', headers: authHeaders(),
-        body: JSON.stringify({ email })
-      });
-      if (!res.ok) throw new Error();
-      showBanner('Password reset sent', 'success');
-    } catch(e) { showBanner('Failed to reset', 'error'); }
-  }
-
-  // --- AUDIT ---
-  async function loadAudit() {
-    try {
-      const res = await fetch(`${API}/api/admin/audit`, { headers: authHeaders() });
-      const data = await res.json();
-      const rows = data.data || [];
-      const tbody = document.getElementById('audit-body');
-      if (!rows.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:24px;">No audit entries</td></tr>'; return; }
-      tbody.innerHTML = rows.map(r => `
-        <tr>
-          <td><span class="badge blue">${escape(r.action_type)}</span></td>
-          <td>${escape(r.actor)}</td>
-          <td>${escape(r.target)}</td>
-          <td>${escape(r.reason)}</td>
-          <td>${fmtDate(r.created_at)}</td>
-        </tr>
-      `).join('');
-    } catch(e) { showBanner('Failed to load audit', 'error'); }
-  }
-
-  async function exportAudit() {
-    const res = await fetch(`${API}/api/admin/audit/export`, { headers: authHeaders() });
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'audit-log.json'; a.click();
-  }
-
-  // --- ANALYTICS ---
-  async function loadAnalytics() {
-    try {
-      const res = await fetch(`${API}/api/admin/analytics`, { headers: authHeaders() });
-      const data = await res.json();
-      const kpis = data.kpis || {};
-      document.getElementById('kpi-grid').innerHTML = [
-        { label: 'Creators', value: kpis.totalCreators },
-        { label: 'Businesses', value: kpis.totalBusinesses },
-        { label: 'Total Content', value: kpis.totalContent },
-        { label: 'Published', value: kpis.publishedContent },
-        { label: 'Pending', value: kpis.pendingContent },
-        { label: 'Opportunities', value: kpis.totalOpportunities },
-        { label: 'Opps Live', value: kpis.publishedOpportunities },
-        { label: 'Opps Pending', value: kpis.pendingOpportunities },
-        { label: 'Last 7 Days', value: kpis.last7Days },
-      ].map(k => `<div class="kpi-card"><div class="label">${k.label}</div><div class="value">${k.value ?? '-'}</div></div>`).join('');
-
-      const trend = data.weeklyTrend || [];
-      document.getElementById('trend-body').innerHTML = trend.length
-        ? trend.map(t => `<tr><td>${escape(t.day)}</td><td>${t.count}</td></tr>`).join('')
-        : '<tr><td colspan="2" style="text-align:center;color:#94a3b8;padding:24px;">No trend data</td></tr>';
-    } catch(e) { showBanner('Failed to load analytics', 'error'); }
-  }
-
-  // --- ALERTS ---
-  async function loadAlerts() {
-    try {
-      const res = await fetch(`${API}/api/admin/alerts`, { headers: authHeaders() });
-      const data = await res.json();
-      const rows = data.data || [];
-      const tbody = document.getElementById('alerts-body');
-      if (!rows.length) { tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#94a3b8;padding:24px;">No alerts</td></tr>'; return; }
-      tbody.innerHTML = rows.map(r => `
-        <tr>
-          <td><span class="badge ${r.type==='user'?'blue':'green'}">${escape(r.type)}</span></td>
-          <td>${escape(r.name)}</td>
-          <td>${fmtDate(r.created_at)}</td>
-        </tr>
-      `).join('');
-    } catch(e) { showBanner('Failed to load alerts', 'error'); }
-  }
-
-  // --- SECURITY ---
-  async function changePassword() {
-    const email = document.getElementById('sec-email').value;
-    const currentPassword = document.getElementById('sec-current').value;
-    const newPassword = document.getElementById('sec-new').value;
-    const msg = document.getElementById('sec-msg');
-    try {
-      const res = await fetch(`${API}/api/admin/auth/change-password`, {
-        method: 'POST', headers: authHeaders(),
-        body: JSON.stringify({ email, currentPassword, newPassword })
-      });
-      const data = await res.json();
-      msg.style.color = res.ok ? '#16a34a' : '#dc2626';
-      msg.textContent = data.message || data.error;
-    } catch(e) { msg.style.color = '#dc2626'; msg.textContent = 'Failed to change password'; }
-  }
-
-  // LOGIN ON ENTER
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && document.getElementById('login-screen').style.display !== 'none') doLogin();
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    btn.addEventListener('click', () => navigate(btn.dataset.section));
   });
+});
+
+function bootApp() {
+  const payload = parseJWT(adminToken);
+  if (!payload) { doLogout(); return; }
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('sidebar-admin-email').textContent = payload.email || 'Admin';
+  loadSection('dashboard');
+  pollQueueBadge();
+}
+
+function showLogin() {
+  document.getElementById('login-overlay').style.display = 'flex';
+}
+
+// ── Auth ───────────────────────────────────────────────────────────
+async function doLogin() {
+  const email    = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl    = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  const btn = document.getElementById('btn-login');
+  btn.disabled = true; btn.textContent = 'Signing in…';
+
+  try {
+    const res  = await apiFetch('/api/admin/auth/login', { method: 'POST', body: { email, password } }, false);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Login failed');
+    adminToken = data.token;
+    localStorage.setItem('adminToken', adminToken);
+    bootApp();
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Log In';
+  }
+}
+
+function doLogout() {
+  localStorage.removeItem('adminToken');
+  adminToken = null;
+  showLogin();
+  toast('Logged out', 'info');
+}
+
+// ── Navigation ─────────────────────────────────────────────────────
+function navigate(section) {
+  currentSection = section;
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.section === section));
+  document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === 'section-' + section));
+  const titles = { dashboard:'Dashboard', queue:'Moderation Queue', content:'Content', users:'Users', audit:'Audit Log', settings:'Settings' };
+  document.getElementById('topbar-title').textContent = titles[section] || section;
+  loadSection(section);
+}
+
+function loadSection(section) {
+  if (section === 'dashboard') loadDashboard();
+  else if (section === 'queue')   { state.queue.page = 0;   loadQueue(); }
+  else if (section === 'content') { state.content.page = 0; loadContent(); }
+  else if (section === 'users')   { state.users.page = 0;   loadUsers(); }
+  else if (section === 'audit')   { state.audit.page = 0;   loadAudit(); }
+}
+
+// ── API helper ─────────────────────────────────────────────────────
+async function apiFetch(path, opts = {}, auth = true) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (auth && adminToken) headers['Authorization'] = 'Bearer ' + adminToken;
+  const body = opts.body ? JSON.stringify(opts.body) : undefined;
+  return fetch(APIBASE + path, { ...opts, headers, body });
+}
+
+function parseJWT(token) {
+  try {
+    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(b64));
+  } catch { return null; }
+}
+
+// ── Toast ──────────────────────────────────────────────────────────
+function toast(msg, type = 'info') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 3200);
+}
+
+// ── Confirm dialog ─────────────────────────────────────────────────
+function confirm(title, msg) {
+  return new Promise(resolve => {
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-msg').textContent   = msg;
+    const overlay = document.getElementById('confirm-overlay');
+    overlay.classList.add('show');
+    const okBtn    = document.getElementById('confirm-ok');
+    const cancelBtn= document.getElementById('confirm-cancel');
+    function cleanup(val) {
+      overlay.classList.remove('show');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      resolve(val);
+    }
+    const onOk     = () => cleanup(true);
+    const onCancel = () => cleanup(false);
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+  });
+}
+
+// ── Pagination helper ──────────────────────────────────────────────
+function renderPagination(containerId, s, loadFn) {
+  const el = document.getElementById(containerId);
+  const pages = Math.ceil(s.total / s.limit);
+  el.innerHTML = '';
+  if (pages <= 1) return;
+  const prev = document.createElement('button');
+  prev.className = 'btn btn-ghost btn-sm'; prev.textContent = '← Prev';
+  prev.disabled = s.page === 0;
+  prev.onclick = () => { s.page--; loadFn(); };
+  el.appendChild(prev);
+  const info = document.createElement('span');
+  info.textContent = `Page ${s.page + 1} of ${pages}`;
+  el.appendChild(info);
+  const next = document.createElement('button');
+  next.className = 'btn btn-ghost btn-sm'; next.textContent = 'Next →';
+  next.disabled = s.page >= pages - 1;
+  next.onclick = () => { s.page++; loadFn(); };
+  el.appendChild(next);
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+}
+
+// ── Poll queue badge ───────────────────────────────────────────────
+async function pollQueueBadge() {
+  try {
+    const res  = await apiFetch('/api/admin/queue?status=pending&limit=1');
+    const data = await res.json();
+    const badge = document.getElementById('queue-badge');
+    const count = data.meta?.total || 0;
+    if (count > 0) { badge.textContent = count; badge.style.display = 'inline-block'; }
+    else badge.style.display = 'none';
+  } catch { /* silent */ }
+  setTimeout(pollQueueBadge, 30000);
+}
+
+// ── Dashboard ──────────────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const [anaRes, alertRes] = await Promise.all([
+      apiFetch('/api/admin/analytics'),
+      apiFetch('/api/admin/alerts'),
+    ]);
+    const ana    = await anaRes.json();
+    const alerts = await alertRes.json();
+
+    document.getElementById('kpi-creators').textContent   = ana.total_creators   ?? 0;
+    document.getElementById('kpi-businesses').textContent = ana.total_businesses  ?? 0;
+    document.getElementById('kpi-content').textContent    = ana.total_content     ?? 0;
+    document.getElementById('kpi-published').textContent  = ana.published_content ?? 0;
+    document.getElementById('kpi-pending').textContent    = ana.pending_moderation ?? 0;
+    document.getElementById('kpi-opps').textContent       = ana.total_opportunities ?? 0;
+
+    // Chart
+    const barsEl = document.getElementById('chart-bars');
+    barsEl.innerHTML = '';
+    const weekly = ana.weekly_signups || [];
+    const maxVal = Math.max(...weekly.map(w => (w.creators || 0) + (w.businesses || 0)), 1);
+    weekly.forEach(w => {
+      const total = (w.creators || 0) + (w.businesses || 0);
+      const pct   = Math.round((total / maxVal) * 100);
+      const label = w.date ? w.date.slice(5) : '';
+      const col = document.createElement('div');
+      col.className = 'chart-col';
+      col.innerHTML = `<div class="chart-bar" style="height:${pct}px" title="${total} signups on ${w.date}"></div><div class="chart-label">${label}</div>`;
+      barsEl.appendChild(col);
+    });
+
+    // Alerts
+    const feedEl = document.getElementById('alert-feed');
+    feedEl.innerHTML = '';
+    if (!alerts.length) { feedEl.innerHTML = '<div style="color:var(--txt-m);font-size:13px">No recent activity.</div>'; return; }
+    alerts.forEach(a => {
+      const el = document.createElement('div');
+      el.className = 'alert-item';
+      el.innerHTML = `
+        <div>
+          <div class="alert-action">${a.action}</div>
+          <div class="alert-meta">${a.actor_type} #${a.actor_id} &mdash; ${fmtDate(a.created_at)}${a.ip_address ? ' &mdash; ' + a.ip_address : ''}</div>
+        </div>`;
+      feedEl.appendChild(el);
+    });
+  } catch (err) {
+    toast('Failed to load dashboard: ' + err.message, 'error');
+  }
+}
+
+// ── Mod Queue ──────────────────────────────────────────────────────
+async function loadQueue() {
+  const status = document.getElementById('queue-status-filter').value;
+  const s = state.queue;
+  const tbody = document.getElementById('queue-tbody');
+  tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--txt-m);padding:24px">Loading…</td></tr>`;
+  s.selected.clear(); updateBulkBar();
+
+  try {
+    const res  = await apiFetch(`/api/admin/queue?status=${status}&limit=${s.limit}&offset=${s.page * s.limit}`);
+    const data = await res.json();
+    s.total = data.meta?.total || 0;
+    const rows = data.data || [];
+    tbody.innerHTML = '';
+    if (!rows.length) { tbody.innerHTML = `<tr class="empty-row"><td colspan="7">No items in queue.</td></tr>`; renderPagination('queue-pagination', s, loadQueue); return; }
+    rows.forEach(row => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="checkbox" class="queue-chk" value="${row.id}" onchange="toggleQueueItem(this)" /></td>
+        <td>${row.id}</td>
+        <td><span class="status">${row.content_type || '—'}</span></td>
+        <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${row.title || row.content_id}</td>
+        <td>${fmtDate(row.submitted_at)}</td>
+        <td><span class="status status-${row.status}">${row.status}</span></td>
+        <td style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-success btn-sm" onclick="singleQueueAction(${row.id},'approve')">Approve</button>
+          <button class="btn btn-warning btn-sm" onclick="singleQueueAction(${row.id},'reject')">Reject</button>
+          <button class="btn btn-danger btn-sm"  onclick="singleQueueAction(${row.id},'delete')">Delete</button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+    renderPagination('queue-pagination', s, loadQueue);
+  } catch (err) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">Error loading queue.</td></tr>`;
+    toast(err.message, 'error');
+  }
+}
+
+function toggleAllQueue(chk) {
+  const s = state.queue;
+  document.querySelectorAll('.queue-chk').forEach(c => {
+    c.checked = chk.checked;
+    if (chk.checked) s.selected.add(parseInt(c.value)); else s.selected.clear();
+  });
+  updateBulkBar();
+}
+
+function toggleQueueItem(chk) {
+  const id = parseInt(chk.value);
+  if (chk.checked) state.queue.selected.add(id); else state.queue.selected.delete(id);
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('bulk-bar');
+  const n   = state.queue.selected.size;
+  document.getElementById('bulk-count').textContent = `${n} selected`;
+  bar.classList.toggle('show', n > 0);
+}
+
+async function singleQueueAction(id, action) {
+  const ok = await confirm(`${action.charAt(0).toUpperCase()+action.slice(1)} item`, `Are you sure you want to ${action} queue item #${id}?`);
+  if (!ok) return;
+  await doQueueAction([id], action, '');
+}
+
+async function bulkAction(action) {
+  const ids  = [...state.queue.selected];
+  if (!ids.length) return;
+  const note = document.getElementById('bulk-note').value;
+  const ok   = await confirm(`Bulk ${action}`, `${action.charAt(0).toUpperCase()+action.slice(1)} ${ids.length} item(s)?`);
+  if (!ok) return;
+  await doQueueAction(ids, action, note);
+}
+
+async function doQueueAction(ids, action, note) {
+  try {
+    const res  = await apiFetch('/api/admin/queue/bulk-action', { method: 'POST', body: { ids, action, note } });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Action failed');
+    toast(`${data.processed || ids.length} item(s) ${action}d`, 'success');
+    loadQueue(); pollQueueBadge();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+// ── Content ────────────────────────────────────────────────────────
+let contentDebounce;
+function debounceContent() { clearTimeout(contentDebounce); contentDebounce = setTimeout(loadContent, 400); }
+
+async function loadContent() {
+  const status = document.getElementById('content-status-filter').value;
+  const search = document.getElementById('content-search').value;
+  const s      = state.content;
+  const tbody  = document.getElementById('content-tbody');
+  tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--txt-m);padding:24px">Loading…</td></tr>`;
+
+  try {
+    let qs = `/api/admin/content?limit=${s.limit}&offset=${s.page * s.limit}`;
+    if (status) qs += '&status=' + encodeURIComponent(status);
+    if (search) qs += '&search=' + encodeURIComponent(search);
+    const res  = await apiFetch(qs);
+    const data = await res.json();
+    s.total = data.meta?.total || 0;
+    const rows = data.data || [];
+    tbody.innerHTML = '';
+    if (!rows.length) { tbody.innerHTML = `<tr class="empty-row"><td colspan="7">No content found.</td></tr>`; renderPagination('content-pagination', s, loadContent); return; }
+    rows.forEach(row => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${row.id}</td>
+        <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(row.title || '—')}</td>
+        <td>${esc(row.creator_name || row.display_name || '—')}</td>
+        <td><span class="status status-${row.status}">${row.status}</span></td>
+        <td>${row.view_count ?? 0}</td>
+        <td>${fmtDate(row.created_at)}</td>
+        <td style="display:flex;gap:6px">
+          ${row.status !== 'published' ? `<button class="btn btn-success btn-sm" onclick="publishContent(${row.id})">Publish</button>` : `<button class="btn btn-warning btn-sm" onclick="unpublishContent(${row.id})">Unpublish</button>`}
+          <button class="btn btn-danger btn-sm" onclick="deleteContent(${row.id})">Delete</button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+    renderPagination('content-pagination', s, loadContent);
+  } catch (err) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">Error loading content.</td></tr>`;
+    toast(err.message, 'error');
+  }
+}
+
+async function publishContent(id) {
+  const ok = await confirm('Publish content', `Publish content #${id}?`);
+  if (!ok) return;
+  try {
+    const res = await apiFetch(`/api/admin/content/${id}`, { method: 'PUT', body: { is_published: true } });
+    if (!res.ok) throw new Error((await res.json()).error);
+    toast('Content published', 'success'); loadContent();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function unpublishContent(id) {
+  const ok = await confirm('Unpublish content', `Unpublish content #${id}?`);
+  if (!ok) return;
+  try {
+    const res = await apiFetch(`/api/admin/content/${id}`, { method: 'PUT', body: { is_published: false } });
+    if (!res.ok) throw new Error((await res.json()).error);
+    toast('Content unpublished', 'info'); loadContent();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function deleteContent(id) {
+  const ok = await confirm('Delete content', `Permanently delete content #${id}? This cannot be undone.`);
+  if (!ok) return;
+  try {
+    const res = await apiFetch(`/api/admin/content/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error((await res.json()).error);
+    toast('Content deleted', 'success'); loadContent();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+// ── Users ──────────────────────────────────────────────────────────
+let usersDebounce;
+function debounceUsers() { clearTimeout(usersDebounce); usersDebounce = setTimeout(loadUsers, 400); }
+
+async function loadUsers() {
+  const type   = document.getElementById('users-type-filter').value;
+  const search = document.getElementById('users-search').value;
+  const s      = state.users;
+  const tbody  = document.getElementById('users-tbody');
+  tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--txt-m);padding:24px">Loading…</td></tr>`;
+
+  try {
+    let qs = `/api/admin/users?limit=${s.limit}&offset=${s.page * s.limit}`;
+    if (type)   qs += '&type='   + encodeURIComponent(type);
+    if (search) qs += '&search=' + encodeURIComponent(search);
+    const res  = await apiFetch(qs);
+    const data = await res.json();
+    s.total = data.meta?.total || 0;
+    const rows = data.data || [];
+    tbody.innerHTML = '';
+    if (!rows.length) { tbody.innerHTML = `<tr class="empty-row"><td colspan="8">No users found.</td></tr>`; renderPagination('users-pagination', s, loadUsers); return; }
+    rows.forEach(row => {
+      const name = esc(row.display_name || row.company_name || row.username || '—');
+      const suspended = row.is_suspended;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${row.id}</td>
+        <td>${name}</td>
+        <td><span class="status">${row.type}</span></td>
+        <td>${esc(row.email || '—')}</td>
+        <td>${row.role || '—'}</td>
+        <td><span class="status ${suspended ? 'status-suspended' : 'status-active'}">${suspended ? 'Suspended' : 'Active'}</span></td>
+        <td>${fmtDate(row.created_at)}</td>
+        <td style="display:flex;gap:6px;flex-wrap:wrap">
+          ${suspended
+            ? `<button class="btn btn-success btn-sm" onclick="reactivateUser(${row.id},'${row.type}')">Reactivate</button>`
+            : `<button class="btn btn-danger btn-sm"  onclick="suspendUser(${row.id},'${row.type}')">Suspend</button>`}
+          <button class="btn btn-ghost btn-sm" onclick="verifyEmail(${row.id},'${row.type}')">Verify Email</button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+    renderPagination('users-pagination', s, loadUsers);
+  } catch (err) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="8">Error loading users.</td></tr>`;
+    toast(err.message, 'error');
+  }
+}
+
+async function suspendUser(id, type) {
+  const ok = await confirm('Suspend user', `Suspend ${type} #${id}? They will not be able to log in.`);
+  if (!ok) return;
+  try {
+    const res = await apiFetch(`/api/admin/users/${id}/suspend`, { method: 'POST', body: { usertype: type } });
+    if (!res.ok) throw new Error((await res.json()).error);
+    toast('User suspended', 'success'); loadUsers();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function reactivateUser(id, type) {
+  const ok = await confirm('Reactivate user', `Reactivate ${type} #${id}?`);
+  if (!ok) return;
+  try {
+    const res = await apiFetch(`/api/admin/users/${id}/reactivate`, { method: 'POST', body: { usertype: type } });
+    if (!res.ok) throw new Error((await res.json()).error);
+    toast('User reactivated', 'success'); loadUsers();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function verifyEmail(id, type) {
+  const ok = await confirm('Verify email', `Mark email verified for ${type} #${id}?`);
+  if (!ok) return;
+  try {
+    const res = await apiFetch(`/api/admin/users/${id}/email-verify`, { method: 'PUT', body: { usertype: type } });
+    if (!res.ok) throw new Error((await res.json()).error);
+    toast('Email marked as verified', 'success'); loadUsers();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+// ── Audit ──────────────────────────────────────────────────────────
+async function loadAudit() {
+  const type = document.getElementById('audit-type-filter').value;
+  const s    = state.audit;
+  const tbody = document.getElementById('audit-tbody');
+  tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--txt-m);padding:24px">Loading…</td></tr>`;
+
+  try {
+    let qs = `/api/admin/audit?limit=${s.limit}&offset=${s.page * s.limit}`;
+    if (type) qs += '&actortype=' + encodeURIComponent(type);
+    const res  = await apiFetch(qs);
+    const data = await res.json();
+    s.total = data.meta?.total || 0;
+    const rows = data.data || [];
+    tbody.innerHTML = '';
+    if (!rows.length) { tbody.innerHTML = `<tr class="empty-row"><td colspan="7">No audit entries found.</td></tr>`; renderPagination('audit-pagination', s, loadAudit); return; }
+    rows.forEach(row => {
+      const tr = document.createElement('tr');
+      const target = [row.target_type, row.target_id].filter(Boolean).join(' #');
+      tr.innerHTML = `
+        <td>${row.id}</td>
+        <td>${row.actor_type}</td>
+        <td>${row.actor_id ?? '—'}</td>
+        <td style="font-family:monospace;font-size:12px">${esc(row.action)}</td>
+        <td>${esc(target || '—')}</td>
+        <td style="font-size:12px;color:var(--txt-m)">${esc(row.ip_address || '—')}</td>
+        <td>${fmtDate(row.created_at)}</td>`;
+      tbody.appendChild(tr);
+    });
+    renderPagination('audit-pagination', s, loadAudit);
+  } catch (err) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">Error loading audit log.</td></tr>`;
+    toast(err.message, 'error');
+  }
+}
+
+async function exportAudit() {
+  try {
+    const res  = await apiFetch('/api/admin/audit/export');
+    if (!res.ok) throw new Error('Export failed');
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'audit-export.json'; a.click();
+    URL.revokeObjectURL(url);
+    toast('Audit log exported', 'success');
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+// ── Settings ───────────────────────────────────────────────────────
+async function changePassword() {
+  const cur     = document.getElementById('s-cur-pwd').value;
+  const nw      = document.getElementById('s-new-pwd').value;
+  const confirm2 = document.getElementById('s-confirm-pwd').value;
+  const msgEl   = document.getElementById('settings-msg');
+  msgEl.style.display = 'none';
+
+  if (!cur || !nw || !confirm2) { showSettingsMsg('All fields are required.', 'error'); return; }
+  if (nw !== confirm2)           { showSettingsMsg('New passwords do not match.', 'error'); return; }
+  if (nw.length < 8)             { showSettingsMsg('Password must be at least 8 characters.', 'error'); return; }
+  if (!/[A-Z]/.test(nw))        { showSettingsMsg('Password must contain an uppercase letter.', 'error'); return; }
+  if (!/[0-9]/.test(nw))        { showSettingsMsg('Password must contain a number.', 'error'); return; }
+
+  try {
+    const res  = await apiFetch('/api/admin/auth/change-password', { method: 'POST', body: { currentPassword: cur, newPassword: nw } });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to update password');
+    showSettingsMsg('Password updated successfully.', 'success');
+    document.getElementById('s-cur-pwd').value = '';
+    document.getElementById('s-new-pwd').value = '';
+    document.getElementById('s-confirm-pwd').value = '';
+  } catch (err) { showSettingsMsg(err.message, 'error'); }
+}
+
+function showSettingsMsg(msg, type) {
+  const el = document.getElementById('settings-msg');
+  el.textContent = msg;
+  el.style.color = type === 'error' ? 'var(--error)' : 'var(--success)';
+  el.style.display = 'block';
+}
+
+// ── Utils ──────────────────────────────────────────────────────────
+function esc(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 </script>
 </body>
 </html>
