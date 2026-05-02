@@ -1,51 +1,44 @@
 'use strict';
-const express = require('express');
-const router = express.Router();
-
+const { Router } = require('express');
 const db = require('../../db/client');
 const { requireAdmin } = require('../../middleware/auth');
-const logger = require('../../logger');
 
-// GET /api/admin/analytics
-router.get('/', requireAdmin, async (req, res) => {
+const router = Router();
+
+router.get('/', requireAdmin, (req, res) => {
   try {
-    const [users, businesses, content, opps, pendingQ, flaggedQ, apps] = await Promise.all([
-      db.query('SELECT COUNT(*) FROM users'),
-      db.query('SELECT COUNT(*) FROM businesses'),
-      db.query('SELECT COUNT(*) FROM content'),
-      db.query('SELECT COUNT(*) FROM opportunities'),
-      db.query("SELECT COUNT(*) FROM content WHERE status = 'pending'"),
-      db.query("SELECT COUNT(*) FROM content WHERE status = 'flagged'"),
-      db.query('SELECT COUNT(*) FROM applications'),
-    ]);
+    const total_creators = db.prepare('SELECT COUNT(*) as count FROM creators').get().count;
+    const total_businesses = db.prepare('SELECT COUNT(*) as count FROM businesses').get().count;
+    const total_content = db.prepare("SELECT COUNT(*) as count FROM content WHERE status != 'deleted'").get().count;
+    const published_content = db.prepare("SELECT COUNT(*) as count FROM content WHERE status = 'published'").get().count;
+    const pending_moderation = db.prepare("SELECT COUNT(*) as count FROM moderation_queue WHERE status = 'pending'").get().count;
+    const total_opportunities = db.prepare("SELECT COUNT(*) as count FROM opportunities WHERE status != 'deleted'").get().count;
 
-    const last7 = await db.query(
-      `SELECT DATE(created_at) AS day, COUNT(*) AS posts
-       FROM content
-       WHERE created_at >= NOW() - INTERVAL '7 days'
-       GROUP BY day ORDER BY day ASC`,
-    );
-
-    const sportBreakdown = await db.query(
-      `SELECT sport, COUNT(*) AS count FROM content WHERE sport IS NOT NULL GROUP BY sport ORDER BY count DESC LIMIT 10`,
-    );
+    const weekly_signups = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().slice(0, 10);
+      const creators_count = db.prepare("SELECT COUNT(*) as count FROM creators WHERE DATE(created_at) = ?").get(dateStr).count;
+      const businesses_count = db.prepare("SELECT COUNT(*) as count FROM businesses WHERE DATE(created_at) = ?").get(dateStr).count;
+      weekly_signups.push({ date: dateStr, creators: creators_count, businesses: businesses_count });
+    }
 
     return res.json({
-      kpis: {
-        total_creators:    parseInt(users.rows[0].count, 10),
-        total_businesses:  parseInt(businesses.rows[0].count, 10),
-        total_content:     parseInt(content.rows[0].count, 10),
-        total_opps:        parseInt(opps.rows[0].count, 10),
-        pending_queue:     parseInt(pendingQ.rows[0].count, 10),
-        flagged_queue:     parseInt(flaggedQ.rows[0].count, 10),
-        total_applications: parseInt(apps.rows[0].count, 10),
-      },
-      content_last_7_days: last7.rows,
-      sport_breakdown: sportBreakdown.rows,
+      success: true,
+      data: { total_creators, total_businesses, total_content, published_content, pending_moderation, total_opportunities, weekly_signups },
     });
   } catch (err) {
-    logger.error('admin.analytics error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/alerts', requireAdmin, (req, res) => {
+  try {
+    const alerts = db.prepare('SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 10').all();
+    return res.json({ success: true, data: alerts });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 

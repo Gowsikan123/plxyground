@@ -1,21 +1,21 @@
 'use strict';
 const rateLimit = require('express-rate-limit');
-const config = require('../config');
 
 const globalLimiter = rateLimit({
-  windowMs: config.rateLimits.global.windowMs,
-  max: config.rateLimits.global.max,
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many requests, please try again later.' },
+  skip: (req) => req.path === '/healthz',
+  message: { success: false, error: 'Too many requests, please try again later.' },
 });
 
 const authLimiter = rateLimit({
-  windowMs: config.rateLimits.auth.windowMs,
-  max: config.rateLimits.auth.max,
+  windowMs: 15 * 60 * 1000,
+  max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many login attempts, please try again later.' },
+  message: { success: false, error: 'Too many authentication attempts, please try again later.' },
 });
 
 module.exports = { globalLimiter, authLimiter };

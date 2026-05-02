@@ -1,65 +1,65 @@
 'use strict';
-const express = require('express');
-const bcrypt = require('bcrypt');
+const { Router } = require('express');
 const { body } = require('express-validator');
-const router = express.Router();
-
+const bcrypt = require('bcryptjs');
 const db = require('../../db/client');
 const { signToken } = require('../../utils/jwt');
-const { validate } = require('../../middleware/validate');
+const { validationErrorHandler } = require('../../middleware/validate');
 const { requireAdmin } = require('../../middleware/auth');
-const { auditLog } = require('../../utils/auditLogger');
-const logger = require('../../logger');
+const { authLimiter } = require('../../middleware/rateLimiter');
+const audit = require('../../utils/auditLogger');
 
-// POST /api/admin/auth/login
+const router = Router();
+
 router.post(
   '/login',
+  authLimiter,
   [
-    body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
-    body('password').notEmpty().withMessage('Password required'),
+    body('email').notEmpty().withMessage('Email is required'),
+    body('password').notEmpty().withMessage('Password is required'),
   ],
-  validate,
+  validationErrorHandler,
   async (req, res) => {
     try {
       const { email, password } = req.body;
-      const result = await db.query(
-        'SELECT id, username, email, password_hash, role, is_active FROM admins WHERE email = $1',
-        [email],
-      );
-      const admin = result.rows[0];
-
-      if (!admin || !(await bcrypt.compare(password, admin.password_hash))) {
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
-      if (!admin.is_active) {
-        return res.status(403).json({ error: 'Account deactivated' });
-      }
-
-      await db.query('UPDATE admins SET last_login_at = NOW() WHERE id = $1', [admin.id]);
-      const token = signToken({ id: admin.id, username: admin.username, role: admin.role, type: 'admin' }, true);
-
-      auditLog({ actorId: admin.id, actorType: 'admin', action: 'admin.login', ip: req.ip });
-      return res.json({ token, admin: { id: admin.id, username: admin.username, email: admin.email, role: admin.role } });
+      const admin = db.prepare('SELECT * FROM admins WHERE email = ?').get(email);
+      if (!admin) return res.status(401).json({ success: false, error: 'Invalid credentials.' });
+      const valid = bcrypt.compareSync(password, admin.password_hash);
+      if (!valid) return res.status(401).json({ success: false, error: 'Invalid credentials.' });
+      const token = signToken({ sub: admin.id, type: 'admin' });
+      audit.log({ actor_type: 'admin', actor_id: admin.id, action: 'ADMIN_LOGIN', ip_address: req.ip });
+      return res.json({ success: true, data: { token, admin: { id: admin.id, email: admin.email } } });
     } catch (err) {
-      logger.error('admin.login error', { message: err.message });
-      return res.status(500).json({ error: 'Internal server error' });
+      return res.status(500).json({ success: false, error: err.message });
     }
-  },
+  }
 );
 
-// GET /api/admin/auth/me
-router.get('/me', requireAdmin, async (req, res) => {
-  try {
-    const result = await db.query(
-      'SELECT id, username, email, role, last_login_at FROM admins WHERE id = $1',
-      [req.admin.id],
-    );
-    if (!result.rows.length) return res.status(404).json({ error: 'Admin not found' });
-    return res.json({ admin: result.rows[0] });
-  } catch (err) {
-    logger.error('admin.me error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+router.post(
+  '/change-password',
+  requireAdmin,
+  [
+    body('current_password').notEmpty().withMessage('Current password is required'),
+    body('new_password')
+      .isLength({ min: 8 }).withMessage('New password must be at least 8 characters')
+      .matches(/[A-Z]/).withMessage('Must contain uppercase')
+      .matches(/[0-9]/).withMessage('Must contain digit'),
+  ],
+  validationErrorHandler,
+  async (req, res) => {
+    try {
+      const { current_password, new_password } = req.body;
+      const admin = db.prepare('SELECT * FROM admins WHERE id = ?').get(req.admin.id);
+      const valid = bcrypt.compareSync(current_password, admin.password_hash);
+      if (!valid) return res.status(401).json({ success: false, error: 'Current password is incorrect.' });
+      const newHash = bcrypt.hashSync(new_password, 12);
+      db.prepare('UPDATE admins SET password_hash = ? WHERE id = ?').run(newHash, admin.id);
+      audit.log({ actor_type: 'admin', actor_id: admin.id, action: 'ADMIN_PASSWORD_CHANGED', ip_address: req.ip });
+      return res.json({ success: true });
+    } catch (err) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
   }
-});
+);
 
 module.exports = router;

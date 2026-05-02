@@ -2,19 +2,12 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config');
 
-function signToken(payload, isAdmin = false) {
-  const secret  = isAdmin ? config.adminJwt.secret  : config.jwt.secret;
-  const expires = isAdmin ? config.adminJwt.expiresIn : config.jwt.expiresIn;
-  return jwt.sign(payload, secret, { expiresIn: expires, algorithm: 'HS256' });
+function signToken({ sub, type }) {
+  return jwt.sign({ sub, type }, config.JWT_SECRET, { expiresIn: config.JWT_EXPIRES_IN });
 }
 
-function verifyToken(token, isAdmin = false) {
-  const secret = isAdmin ? config.adminJwt.secret : config.jwt.secret;
-  return jwt.verify(token, secret, { algorithms: ['HS256'] });
+function verifyToken(token) {
+  return jwt.verify(token, config.JWT_SECRET);
 }
 
-function decodeToken(token) {
-  return jwt.decode(token);
-}
-
-module.exports = { signToken, verifyToken, decodeToken };
+module.exports = { signToken, verifyToken };

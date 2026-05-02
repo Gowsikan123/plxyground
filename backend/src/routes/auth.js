@@ -1,114 +1,116 @@
 'use strict';
-const express = require('express');
-const bcrypt = require('bcrypt');
+const { Router } = require('express');
 const { body } = require('express-validator');
-const router = express.Router();
-
+const bcrypt = require('bcryptjs');
 const db = require('../db/client');
 const { signToken } = require('../utils/jwt');
-const { validate } = require('../middleware/validate');
+const { slugify, ensureUniqueSlug } = require('../utils/slugify');
+const { validationErrorHandler } = require('../middleware/validate');
 const { requireAuth } = require('../middleware/auth');
-const { auditLog } = require('../utils/auditLogger');
-const { slugify, uniqueSlug } = require('../utils/slugify');
-const config = require('../config');
-const logger = require('../logger');
+const audit = require('../utils/auditLogger');
+const { authLimiter } = require('../middleware/rateLimiter');
 
-// POST /api/auth/signup
+const router = Router();
+
 router.post(
   '/signup',
+  authLimiter,
   [
-    body('username').trim().isLength({ min: 3, max: 50 }).withMessage('Username must be 3-50 chars'),
-    body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
-    body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 chars'),
-    body('display_name').optional().trim().isLength({ max: 100 }),
-    body('sport').optional().trim().isLength({ max: 50 }),
+    body('email').isEmail().withMessage('Valid email required'),
+    body('password')
+      .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+      .matches(/[A-Z]/).withMessage('Password must contain an uppercase letter')
+      .matches(/[0-9]/).withMessage('Password must contain a digit'),
+    body('username')
+      .matches(/^[a-zA-Z0-9_]{3,20}$/).withMessage('Username must be 3–20 alphanumeric characters or underscores'),
+    body('display_name').trim().isLength({ min: 1, max: 50 }).withMessage('Display name is required (max 50 chars)'),
   ],
-  validate,
+  validationErrorHandler,
   async (req, res) => {
     try {
-      const { username, email, password, display_name, sport } = req.body;
+      const { email, password, username, display_name, sport = '', location = '' } = req.body;
+      const existingUsername = db.prepare('SELECT id FROM creators WHERE username = ?').get(username);
+      if (existingUsername) return res.status(409).json({ success: false, error: 'Username already taken.' });
+      const existingEmail = db.prepare('SELECT id FROM creator_accounts WHERE email = ?').get(email);
+      if (existingEmail) return res.status(409).json({ success: false, error: 'Email already registered.' });
 
-      const existing = await db.query(
-        'SELECT id FROM users WHERE email = $1 OR username = $2',
-        [email, username],
-      );
-      if (existing.rows.length) {
-        return res.status(409).json({ error: 'Email or username already taken' });
-      }
+      const hash = bcrypt.hashSync(password, 12);
+      let slug = slugify(username);
+      slug = ensureUniqueSlug(db, 'creators', slug);
 
-      const password_hash = await bcrypt.hash(password, config.bcrypt.rounds);
-      const baseSlug = slugify(display_name || username);
-      const slug = await uniqueSlug(baseSlug, 'users');
+      const creator = db.prepare(
+        'INSERT INTO creators (username, slug, display_name, sport, location) VALUES (?, ?, ?, ?, ?)'
+      ).run(username, slug, display_name, sport, location);
 
-      const result = await db.query(
-        `INSERT INTO users (username, email, password_hash, display_name, sport, slug)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING id, username, email, display_name, sport, slug, created_at`,
-        [username, email, password_hash, display_name || username, sport || null, slug],
-      );
+      const account = db.prepare(
+        'INSERT INTO creator_accounts (creator_id, email, password_hash) VALUES (?, ?, ?)'
+      ).run(creator.lastInsertRowid, email, hash);
 
-      const user = result.rows[0];
-      const token = signToken({ id: user.id, username: user.username, type: 'user' });
+      const token = signToken({ sub: account.lastInsertRowid, type: 'creator' });
+      audit.log({ actor_type: 'creator', actor_id: account.lastInsertRowid, action: 'CREATOR_SIGNUP', ip_address: req.ip });
 
-      auditLog({ actorId: user.id, actorType: 'user', action: 'auth.signup', ip: req.ip });
-      return res.status(201).json({ token, user });
+      return res.status(201).json({
+        success: true,
+        data: {
+          token,
+          user: { id: creator.lastInsertRowid, username, slug, display_name, sport, avatar_url: '', email },
+        },
+      });
     } catch (err) {
-      logger.error('auth.signup error', { message: err.message });
-      return res.status(500).json({ error: 'Internal server error' });
+      return res.status(500).json({ success: false, error: err.message });
     }
-  },
+  }
 );
 
-// POST /api/auth/login
 router.post(
   '/login',
+  authLimiter,
   [
-    body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
-    body('password').notEmpty().withMessage('Password required'),
+    body('email').notEmpty().withMessage('Email is required'),
+    body('password').notEmpty().withMessage('Password is required'),
   ],
-  validate,
+  validationErrorHandler,
   async (req, res) => {
     try {
       const { email, password } = req.body;
+      const account = db.prepare(
+        `SELECT ca.*, c.id as creator_id, c.username, c.slug, c.display_name, c.bio, c.avatar_url, c.sport, c.location
+         FROM creator_accounts ca
+         JOIN creators c ON c.id = ca.creator_id
+         WHERE ca.email = ?`
+      ).get(email);
 
-      const result = await db.query(
-        'SELECT id, username, email, password_hash, display_name, sport, slug, is_suspended FROM users WHERE email = $1',
-        [email],
-      );
-      const user = result.rows[0];
+      if (!account) return res.status(401).json({ success: false, error: 'Invalid credentials.' });
+      if (account.is_suspended) return res.status(403).json({ success: false, error: 'Account suspended.' });
 
-      if (!user || !(await bcrypt.compare(password, user.password_hash))) {
-        return res.status(401).json({ error: 'Invalid email or password' });
-      }
-      if (user.is_suspended) {
-        return res.status(403).json({ error: 'Account suspended' });
-      }
+      const valid = bcrypt.compareSync(password, account.password_hash);
+      if (!valid) return res.status(401).json({ success: false, error: 'Invalid credentials.' });
 
-      const { password_hash, ...safeUser } = user;
-      const token = signToken({ id: user.id, username: user.username, type: 'user' });
+      db.prepare('UPDATE creator_accounts SET last_login = CURRENT_TIMESTAMP WHERE id = ?').run(account.id);
+      const token = signToken({ sub: account.id, type: 'creator' });
 
-      auditLog({ actorId: user.id, actorType: 'user', action: 'auth.login', ip: req.ip });
-      return res.json({ token, user: safeUser });
+      return res.json({
+        success: true,
+        data: {
+          token,
+          user: {
+            id: account.creator_id, username: account.username, slug: account.slug,
+            display_name: account.display_name, bio: account.bio,
+            avatar_url: account.avatar_url, sport: account.sport,
+            location: account.location, email: account.email,
+          },
+        },
+      });
     } catch (err) {
-      logger.error('auth.login error', { message: err.message });
-      return res.status(500).json({ error: 'Internal server error' });
+      return res.status(500).json({ success: false, error: err.message });
     }
-  },
+  }
 );
 
-// GET /api/auth/me
-router.get('/me', requireAuth, async (req, res) => {
-  try {
-    const result = await db.query(
-      'SELECT id, username, email, display_name, bio, avatar_url, sport, slug, is_verified, follower_count, created_at FROM users WHERE id = $1',
-      [req.user.id],
-    );
-    if (!result.rows.length) return res.status(404).json({ error: 'User not found' });
-    return res.json({ user: result.rows[0] });
-  } catch (err) {
-    logger.error('auth.me error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
-  }
+router.get('/me', requireAuth, (req, res) => {
+  if (req.userType !== 'creator') return res.status(403).json({ success: false, error: 'Creator access only.' });
+  const { password_hash, ...safe } = req.user;
+  return res.json({ success: true, data: safe });
 });
 
 module.exports = router;

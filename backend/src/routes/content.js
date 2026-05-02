@@ -1,135 +1,126 @@
 'use strict';
-const express = require('express');
-const { body, query: qv, param } = require('express-validator');
-const router = express.Router();
-
+const { Router } = require('express');
+const { body } = require('express-validator');
 const db = require('../db/client');
-const { validate } = require('../middleware/validate');
 const { requireAuth } = require('../middleware/auth');
-const { auditLog } = require('../utils/auditLogger');
-const logger = require('../logger');
+const { validationErrorHandler } = require('../middleware/validate');
+const audit = require('../utils/auditLogger');
 
-// GET /api/content  — public approved feed
-router.get(
-  '/',
-  [qv('sport').optional().trim(), qv('page').optional().isInt({ min: 1 }), qv('limit').optional().isInt({ min: 1, max: 50 })],
-  validate,
-  async (req, res) => {
-    try {
-      const page  = parseInt(req.query.page  || '1',  10);
-      const limit = parseInt(req.query.limit || '20', 10);
-      const offset = (page - 1) * limit;
-      const sport = req.query.sport || null;
+const router = Router();
 
-      const params = ['approved'];
-      let where = 'WHERE c.status = $1';
-      if (sport) { where += ' AND c.sport = $2'; params.push(sport); }
-
-      const sql = `
-        SELECT c.id, c.title, c.body, c.media_url, c.media_type, c.sport, c.tags,
-               c.likes_count, c.comments_count, c.created_at,
-               u.id AS user_id, u.display_name, u.avatar_url, u.slug AS user_slug
-        FROM content c
-        JOIN users u ON u.id = c.user_id
-        ${where}
-        ORDER BY c.created_at DESC
-        LIMIT ${limit} OFFSET ${offset}`;
-
-      const result = await db.query(sql, params);
-      return res.json({ content: result.rows, page, limit });
-    } catch (err) {
-      logger.error('content.list error', { message: err.message });
-      return res.status(500).json({ error: 'Internal server error' });
-    }
-  },
-);
-
-// GET /api/content/:id
-router.get('/:id', [param('id').isInt()], validate, async (req, res) => {
+router.get('/', (req, res) => {
   try {
-    const result = await db.query(
-      `SELECT c.*, u.display_name, u.avatar_url, u.slug AS user_slug
-       FROM content c JOIN users u ON u.id = c.user_id
-       WHERE c.id = $1 AND c.status = 'approved'`,
-      [req.params.id],
-    );
-    if (!result.rows.length) return res.status(404).json({ error: 'Content not found' });
-    return res.json({ content: result.rows[0] });
+    const search = req.query.search || '';
+    const sport = req.query.sport || '';
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const offset = parseInt(req.query.offset) || 0;
+
+    const params = [];
+    let where = 'WHERE c.status = \'published\'';
+    if (search) {
+      where += ' AND (c.title LIKE ? OR c.body LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
+    }
+    if (sport) {
+      where += ' AND cr.sport = ?';
+      params.push(sport);
+    }
+
+    const posts = db.prepare(
+      `SELECT c.*, cr.display_name, cr.username, cr.slug as creator_slug, cr.avatar_url, cr.sport
+       FROM content c
+       JOIN creators cr ON cr.id = c.creator_id
+       ${where}
+       ORDER BY c.created_at DESC
+       LIMIT ? OFFSET ?`
+    ).all(...params, limit, offset);
+
+    const total = db.prepare(
+      `SELECT COUNT(*) as count FROM content c JOIN creators cr ON cr.id = c.creator_id ${where}`
+    ).get(...params).count;
+
+    return res.json({ success: true, data: { posts, total, limit, offset } });
   } catch (err) {
-    logger.error('content.get error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// POST /api/content  — creator creates post
+router.get('/:id', (req, res) => {
+  try {
+    const post = db.prepare(
+      `SELECT c.*, cr.display_name, cr.username, cr.slug as creator_slug, cr.avatar_url, cr.sport
+       FROM content c
+       JOIN creators cr ON cr.id = c.creator_id
+       WHERE c.id = ? AND c.status = 'published'`
+    ).get(req.params.id);
+    if (!post) return res.status(404).json({ success: false, error: 'Post not found.' });
+    db.prepare('UPDATE content SET view_count = view_count + 1 WHERE id = ?').run(req.params.id);
+    return res.json({ success: true, data: post });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.post(
   '/',
   requireAuth,
   [
-    body('title').trim().isLength({ min: 1, max: 300 }).withMessage('Title required'),
-    body('media_type').optional().isIn(['image', 'video', 'reel', 'short']),
-    body('sport').optional().trim().isLength({ max: 50 }),
-    body('tags').optional().isArray(),
+    body('title').notEmpty().withMessage('Title is required'),
+    body('media_type').optional().isIn(['image', 'video', 'none']).withMessage('Invalid media_type'),
   ],
-  validate,
-  async (req, res) => {
+  validationErrorHandler,
+  (req, res) => {
     try {
-      const { title, body: postBody, media_url, media_type, sport, tags } = req.body;
-      const result = await db.query(
-        `INSERT INTO content (user_id, title, body, media_url, media_type, sport, tags)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING *`,
-        [req.user.id, title, postBody || null, media_url || null, media_type || null, sport || null, tags || []],
-      );
-      auditLog({ actorId: req.user.id, actorType: 'user', action: 'content.create', targetType: 'content', targetId: result.rows[0].id, ip: req.ip });
-      return res.status(201).json({ content: result.rows[0] });
+      if (req.userType !== 'creator') return res.status(403).json({ success: false, error: 'Creator access only.' });
+      const { title, body: bodyText = '', media_url = '', media_type = 'none', tags = [] } = req.body;
+      const tagsJson = JSON.stringify(Array.isArray(tags) ? tags : []);
+      const result = db.prepare(
+        'INSERT INTO content (creator_id, title, body, media_url, media_type, tags, status) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      ).run(req.user.creator_id, title, bodyText, media_url, media_type, tagsJson, 'pending');
+      db.prepare('INSERT INTO moderation_queue (content_type, content_id) VALUES (?, ?)').run('creator_content', result.lastInsertRowid);
+      audit.log({ actor_type: 'creator', actor_id: req.user.id, action: 'CONTENT_CREATED', target_type: 'content', target_id: result.lastInsertRowid, ip_address: req.ip });
+      const row = db.prepare('SELECT * FROM content WHERE id = ?').get(result.lastInsertRowid);
+      return res.status(201).json({ success: true, data: row });
     } catch (err) {
-      logger.error('content.create error', { message: err.message });
-      return res.status(500).json({ error: 'Internal server error' });
+      return res.status(500).json({ success: false, error: err.message });
     }
-  },
+  }
 );
 
-// PATCH /api/content/:id
-router.patch(
-  '/:id',
-  requireAuth,
-  [param('id').isInt(), body('title').optional().trim().isLength({ min: 1, max: 300 })],
-  validate,
-  async (req, res) => {
-    try {
-      const result = await db.query('SELECT id, user_id FROM content WHERE id = $1', [req.params.id]);
-      if (!result.rows.length) return res.status(404).json({ error: 'Content not found' });
-      if (result.rows[0].user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
-
-      const { title, body: postBody, media_url, sport, tags } = req.body;
-      const updated = await db.query(
-        `UPDATE content SET title = COALESCE($1, title), body = COALESCE($2, body),
-         media_url = COALESCE($3, media_url), sport = COALESCE($4, sport),
-         tags = COALESCE($5, tags), updated_at = NOW()
-         WHERE id = $6 RETURNING *`,
-        [title, postBody, media_url, sport, tags, req.params.id],
-      );
-      return res.json({ content: updated.rows[0] });
-    } catch (err) {
-      logger.error('content.update error', { message: err.message });
-      return res.status(500).json({ error: 'Internal server error' });
-    }
-  },
-);
-
-// DELETE /api/content/:id
-router.delete('/:id', requireAuth, [param('id').isInt()], validate, async (req, res) => {
+router.put('/:id', requireAuth, (req, res) => {
   try {
-    const result = await db.query('SELECT id, user_id FROM content WHERE id = $1', [req.params.id]);
-    if (!result.rows.length) return res.status(404).json({ error: 'Content not found' });
-    if (result.rows[0].user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
-    await db.query('DELETE FROM content WHERE id = $1', [req.params.id]);
-    auditLog({ actorId: req.user.id, actorType: 'user', action: 'content.delete', targetType: 'content', targetId: parseInt(req.params.id, 10), ip: req.ip });
+    if (req.userType !== 'creator') return res.status(403).json({ success: false, error: 'Creator access only.' });
+    const row = db.prepare('SELECT * FROM content WHERE id = ?').get(req.params.id);
+    if (!row) return res.status(404).json({ success: false, error: 'Not found.' });
+    if (row.creator_id !== req.user.creator_id) return res.status(403).json({ success: false, error: 'Forbidden.' });
+    if (row.status === 'deleted' || row.status === 'rejected') return res.status(400).json({ success: false, error: 'Cannot edit deleted or rejected content.' });
+    const { title = row.title, body: bodyText = row.body, media_url = row.media_url, media_type = row.media_type, tags } = req.body;
+    const tagsJson = tags ? JSON.stringify(Array.isArray(tags) ? tags : []) : row.tags;
+    const contentChanged = title !== row.title || bodyText !== row.body;
+    const newStatus = contentChanged && row.status === 'published' ? 'pending' : row.status;
+    db.prepare('UPDATE content SET title=?, body=?, media_url=?, media_type=?, tags=?, status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?')
+      .run(title, bodyText, media_url, media_type, tagsJson, newStatus, row.id);
+    if (contentChanged && row.status === 'published') {
+      db.prepare('INSERT INTO moderation_queue (content_type, content_id) VALUES (?, ?)').run('creator_content', row.id);
+    }
+    const updated = db.prepare('SELECT * FROM content WHERE id = ?').get(row.id);
+    return res.json({ success: true, data: updated });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.delete('/:id', requireAuth, (req, res) => {
+  try {
+    if (req.userType !== 'creator') return res.status(403).json({ success: false, error: 'Creator access only.' });
+    const row = db.prepare('SELECT * FROM content WHERE id = ?').get(req.params.id);
+    if (!row) return res.status(404).json({ success: false, error: 'Not found.' });
+    if (row.creator_id !== req.user.creator_id) return res.status(403).json({ success: false, error: 'Forbidden.' });
+    db.prepare('UPDATE content SET status = ? WHERE id = ?').run('deleted', row.id);
+    audit.log({ actor_type: 'creator', actor_id: req.user.id, action: 'CONTENT_DELETED', target_type: 'content', target_id: row.id, ip_address: req.ip });
     return res.json({ success: true });
   } catch (err) {
-    logger.error('content.delete error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 

@@ -1,62 +1,28 @@
 'use strict';
 require('dotenv').config();
 
-const REQUIRED = [
-  'DATABASE_URL',
-  'JWT_SECRET',
-  'JWT_EXPIRES_IN',
-  'ADMIN_JWT_SECRET',
-];
-
-const missing = REQUIRED.filter((k) => !process.env[k]);
-if (missing.length) {
-  throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+function required(key) {
+  const val = process.env[key];
+  if (!val) throw new Error(`[config] Missing required environment variable: ${key}`);
+  return val;
 }
 
-module.exports = {
-  env: process.env.NODE_ENV || 'development',
-  port: parseInt(process.env.PORT || '3001', 10),
+function optional(key, defaultValue) {
+  return process.env[key] || defaultValue;
+}
 
-  db: {
-    url: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-    max: parseInt(process.env.DB_POOL_MAX || '10', 10),
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
-  },
+const jwtSecret = required('JWT_SECRET');
+if (jwtSecret.length < 32) {
+  throw new Error('[config] JWT_SECRET must be at least 32 characters long');
+}
 
-  jwt: {
-    secret: process.env.JWT_SECRET,
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-  },
+const config = Object.freeze({
+  PORT: parseInt(optional('PORT', '3011'), 10),
+  DATABASE_URL: required('DATABASE_URL'),
+  JWT_SECRET: jwtSecret,
+  JWT_EXPIRES_IN: optional('JWT_EXPIRES_IN', '7d'),
+  CORS_ORIGIN: required('CORS_ORIGIN'),
+  NODE_ENV: optional('NODE_ENV', 'development'),
+});
 
-  adminJwt: {
-    secret: process.env.ADMIN_JWT_SECRET,
-    expiresIn: process.env.ADMIN_JWT_EXPIRES_IN || '8h',
-  },
-
-  bcrypt: {
-    rounds: parseInt(process.env.BCRYPT_ROUNDS || '12', 10),
-  },
-
-  rateLimits: {
-    global: {
-      windowMs: 15 * 60 * 1000,
-      max: parseInt(process.env.RATE_LIMIT_GLOBAL || '100', 10),
-    },
-    auth: {
-      windowMs: 15 * 60 * 1000,
-      max: parseInt(process.env.RATE_LIMIT_AUTH || '10', 10),
-    },
-  },
-
-  cors: {
-    origins: (process.env.ALLOWED_ORIGINS || 'http://localhost:3012,http://localhost:8081')
-      .split(',')
-      .map((o) => o.trim()),
-  },
-
-  seed: {
-    autoRun: process.env.AUTO_SEED === 'true',
-  },
-};
+module.exports = config;

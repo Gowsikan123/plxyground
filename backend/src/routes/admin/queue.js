@@ -1,89 +1,84 @@
 'use strict';
-const express = require('express');
-const { param, body } = require('express-validator');
-const router = express.Router();
-
+const { Router } = require('express');
 const db = require('../../db/client');
-const { validate } = require('../../middleware/validate');
 const { requireAdmin } = require('../../middleware/auth');
-const { auditLog } = require('../../utils/auditLogger');
-const logger = require('../../logger');
+const audit = require('../../utils/auditLogger');
 
-// GET /api/admin/queue — pending + flagged content
-router.get('/', requireAdmin, async (req, res) => {
+const router = Router();
+
+router.get('/', requireAdmin, (req, res) => {
   try {
-    const result = await db.query(
-      `SELECT c.id, c.title, c.body, c.media_url, c.media_type, c.sport, c.tags, c.status, c.created_at,
-              u.id AS user_id, u.display_name, u.username, u.avatar_url
-       FROM content c
-       JOIN users u ON u.id = c.user_id
-       WHERE c.status IN ('pending', 'flagged')
-       ORDER BY c.created_at ASC`,
-    );
-    return res.json({ queue: result.rows });
+    const status = req.query.status || 'pending';
+    const contentType = req.query.content_type || '';
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const offset = parseInt(req.query.offset) || 0;
+
+    const params = [status];
+    let where = 'WHERE mq.status = ?';
+    if (contentType) {
+      where += ' AND mq.content_type = ?';
+      params.push(contentType);
+    }
+
+    const rows = db.prepare(
+      `SELECT mq.*,
+        CASE WHEN mq.content_type = 'creator_content'
+             THEN (SELECT c.title FROM content c WHERE c.id = mq.content_id)
+             ELSE (SELECT bc.title FROM business_content bc WHERE bc.id = mq.content_id)
+        END as content_title,
+        CASE WHEN mq.content_type = 'creator_content'
+             THEN (SELECT cr.display_name FROM content c JOIN creators cr ON cr.id = c.creator_id WHERE c.id = mq.content_id)
+             ELSE (SELECT b.company_name FROM business_content bc JOIN businesses b ON b.id = bc.business_id WHERE bc.id = mq.content_id)
+        END as poster_name
+       FROM moderation_queue mq
+       ${where}
+       ORDER BY mq.submitted_at DESC
+       LIMIT ? OFFSET ?`
+    ).all(...params, limit, offset);
+
+    const total = db.prepare(`SELECT COUNT(*) as count FROM moderation_queue mq ${where}`).get(...params).count;
+    return res.json({ success: true, data: { queue: rows, total, limit, offset } });
   } catch (err) {
-    logger.error('admin.queue.list error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// PATCH /api/admin/queue/:id — approve / reject / flag
-router.patch(
-  '/:id',
-  requireAdmin,
-  [
-    param('id').isInt(),
-    body('status').isIn(['approved', 'rejected', 'flagged']).withMessage('Invalid status'),
-    body('moderation_note').optional().trim().isLength({ max: 500 }),
-  ],
-  validate,
-  async (req, res) => {
-    try {
-      const { status, moderation_note } = req.body;
-      const result = await db.query(
-        `UPDATE content SET status = $1, moderation_note = $2, moderated_by = $3, moderated_at = NOW(), updated_at = NOW()
-         WHERE id = $4 RETURNING id, title, status`,
-        [status, moderation_note || null, req.admin.id, req.params.id],
-      );
-      if (!result.rows.length) return res.status(404).json({ error: 'Content not found' });
+router.post('/bulk-action', requireAdmin, (req, res) => {
+  try {
+    const { ids, action, note = '' } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ success: false, error: 'ids must be a non-empty array.' });
+    if (!['approve', 'reject', 'delete'].includes(action)) return res.status(400).json({ success: false, error: 'Invalid action.' });
 
-      auditLog({ actorId: req.admin.id, actorType: 'admin', action: `content.${status}`, targetType: 'content', targetId: parseInt(req.params.id, 10), meta: { note: moderation_note }, ip: req.ip });
-      return res.json({ content: result.rows[0] });
-    } catch (err) {
-      logger.error('admin.queue.update error', { message: err.message });
-      return res.status(500).json({ error: 'Internal server error' });
-    }
-  },
-);
+    const transact = db.transaction(() => {
+      for (const id of ids) {
+        const queueItem = db.prepare('SELECT * FROM moderation_queue WHERE id = ?').get(id);
+        if (!queueItem) continue;
 
-// POST /api/admin/queue/bulk — bulk moderate
-router.post(
-  '/bulk',
-  requireAdmin,
-  [
-    body('ids').isArray({ min: 1 }).withMessage('ids array required'),
-    body('status').isIn(['approved', 'rejected']).withMessage('Invalid status'),
-  ],
-  validate,
-  async (req, res) => {
-    try {
-      const { ids, status, moderation_note } = req.body;
-      const safeIds = ids.map(Number).filter((n) => Number.isInteger(n) && n > 0);
-      if (!safeIds.length) return res.status(400).json({ error: 'No valid IDs provided' });
-
-      await db.query(
-        `UPDATE content SET status = $1, moderation_note = $2, moderated_by = $3, moderated_at = NOW()
-         WHERE id = ANY($4::int[])`,
-        [status, moderation_note || null, req.admin.id, safeIds],
-      );
-
-      auditLog({ actorId: req.admin.id, actorType: 'admin', action: `content.bulk.${status}`, meta: { ids: safeIds, count: safeIds.length }, ip: req.ip });
-      return res.json({ success: true, updated: safeIds.length });
-    } catch (err) {
-      logger.error('admin.queue.bulk error', { message: err.message });
-      return res.status(500).json({ error: 'Internal server error' });
-    }
-  },
-);
+        const now = new Date().toISOString();
+        if (action === 'approve') {
+          db.prepare('UPDATE moderation_queue SET status=?,reviewed_by=?,reviewed_at=?,review_note=? WHERE id=?')
+            .run('approved', req.admin.id, now, note, id);
+          const table = queueItem.content_type === 'creator_content' ? 'content' : 'business_content';
+          db.prepare(`UPDATE ${table} SET status='published', updated_at=CURRENT_TIMESTAMP WHERE id=?`).run(queueItem.content_id);
+        } else if (action === 'reject') {
+          db.prepare('UPDATE moderation_queue SET status=?,reviewed_by=?,reviewed_at=?,review_note=? WHERE id=?')
+            .run('rejected', req.admin.id, now, note, id);
+          const table = queueItem.content_type === 'creator_content' ? 'content' : 'business_content';
+          db.prepare(`UPDATE ${table} SET status='rejected', updated_at=CURRENT_TIMESTAMP WHERE id=?`).run(queueItem.content_id);
+        } else if (action === 'delete') {
+          db.prepare('UPDATE moderation_queue SET status=?,reviewed_by=?,reviewed_at=?,review_note=? WHERE id=?')
+            .run('rejected', req.admin.id, now, note, id);
+          const table = queueItem.content_type === 'creator_content' ? 'content' : 'business_content';
+          db.prepare(`UPDATE ${table} SET status='deleted', updated_at=CURRENT_TIMESTAMP WHERE id=?`).run(queueItem.content_id);
+        }
+        audit.log({ actor_type: 'admin', actor_id: req.admin.id, action: `QUEUE_${action.toUpperCase()}`, target_type: queueItem.content_type, target_id: queueItem.content_id, metadata: { note }, ip_address: req.ip });
+      }
+    });
+    transact();
+    return res.json({ success: true, data: { processed: ids.length } });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 module.exports = router;

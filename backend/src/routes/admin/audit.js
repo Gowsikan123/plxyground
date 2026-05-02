@@ -1,45 +1,41 @@
 'use strict';
-const express = require('express');
-const { query: qv } = require('express-validator');
-const router = express.Router();
-
+const { Router } = require('express');
 const db = require('../../db/client');
-const { validate } = require('../../middleware/validate');
 const { requireAdmin } = require('../../middleware/auth');
-const logger = require('../../logger');
 
-// GET /api/admin/audit
-router.get(
-  '/',
-  requireAdmin,
-  [
-    qv('actor_type').optional().isIn(['user', 'business', 'admin', 'system']),
-    qv('action').optional().trim(),
-    qv('page').optional().isInt({ min: 1 }),
-    qv('limit').optional().isInt({ min: 1, max: 100 }),
-  ],
-  validate,
-  async (req, res) => {
-    try {
-      const page   = parseInt(req.query.page  || '1',  10);
-      const limit  = parseInt(req.query.limit || '50', 10);
-      const offset = (page - 1) * limit;
+const router = Router();
 
-      const params = [];
-      const conditions = [];
-      if (req.query.actor_type) conditions.push(`actor_type = $${params.push(req.query.actor_type)}`);
-      if (req.query.action)     conditions.push(`action ILIKE $${params.push('%' + req.query.action + '%')}`);
+router.get('/', requireAdmin, (req, res) => {
+  try {
+    const actor_type = req.query.actor_type || '';
+    const action = req.query.action || '';
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+    const offset = parseInt(req.query.offset) || 0;
 
-      const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
-      const sql   = `SELECT * FROM audit_logs ${where} ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+    const params = [];
+    let where = 'WHERE 1=1';
+    if (actor_type) { where += ' AND actor_type = ?'; params.push(actor_type); }
+    if (action) { where += ' AND action LIKE ?'; params.push(`%${action}%`); }
 
-      const result = await db.query(sql, params);
-      return res.json({ logs: result.rows, page, limit });
-    } catch (err) {
-      logger.error('admin.audit.list error', { message: err.message });
-      return res.status(500).json({ error: 'Internal server error' });
-    }
-  },
-);
+    const logs = db.prepare(
+      `SELECT * FROM audit_log ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+    ).all(...params, limit, offset);
+    const total = db.prepare(`SELECT COUNT(*) as count FROM audit_log ${where}`).get(...params).count;
+    return res.json({ success: true, data: { logs, total, limit, offset } });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/export', requireAdmin, (req, res) => {
+  try {
+    const logs = db.prepare('SELECT * FROM audit_log ORDER BY created_at DESC').all();
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename="audit-export.json"');
+    return res.send(JSON.stringify(logs, null, 2));
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 module.exports = router;

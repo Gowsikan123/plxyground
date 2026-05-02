@@ -1,153 +1,137 @@
 'use strict';
 const db = require('./client');
 const logger = require('../logger');
-const config = require('../config');
+const { seedDatabase } = require('./seed');
 
-async function setup() {
-  logger.info('Running DB setup…');
-
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id            SERIAL PRIMARY KEY,
-      username      VARCHAR(50)  UNIQUE NOT NULL,
-      email         VARCHAR(255) UNIQUE NOT NULL,
-      password_hash TEXT         NOT NULL,
-      display_name  VARCHAR(100),
-      bio           TEXT,
-      avatar_url    TEXT,
-      sport         VARCHAR(50),
-      slug          VARCHAR(100) UNIQUE,
-      is_verified   BOOLEAN      DEFAULT FALSE,
-      is_suspended  BOOLEAN      DEFAULT FALSE,
-      follower_count INT         DEFAULT 0,
-      created_at    TIMESTAMPTZ  DEFAULT NOW(),
-      updated_at    TIMESTAMPTZ  DEFAULT NOW()
-    );
-  `);
-
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS businesses (
-      id            SERIAL PRIMARY KEY,
-      name          VARCHAR(150) NOT NULL,
-      email         VARCHAR(255) UNIQUE NOT NULL,
-      password_hash TEXT         NOT NULL,
-      description   TEXT,
-      logo_url      TEXT,
-      website       TEXT,
-      industry      VARCHAR(100),
-      slug          VARCHAR(100) UNIQUE,
-      is_verified   BOOLEAN      DEFAULT FALSE,
-      is_suspended  BOOLEAN      DEFAULT FALSE,
-      created_at    TIMESTAMPTZ  DEFAULT NOW(),
-      updated_at    TIMESTAMPTZ  DEFAULT NOW()
-    );
-  `);
-
-  await db.query(`
+function setupDatabase() {
+  db.exec(`
     CREATE TABLE IF NOT EXISTS admins (
-      id            SERIAL PRIMARY KEY,
-      username      VARCHAR(50)  UNIQUE NOT NULL,
-      email         VARCHAR(255) UNIQUE NOT NULL,
-      password_hash TEXT         NOT NULL,
-      role          VARCHAR(30)  DEFAULT 'admin',
-      is_active     BOOLEAN      DEFAULT TRUE,
-      last_login_at TIMESTAMPTZ,
-      created_at    TIMESTAMPTZ  DEFAULT NOW()
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
-  `);
 
-  await db.query(`
+    CREATE TABLE IF NOT EXISTS creators (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,
+      slug TEXT UNIQUE NOT NULL,
+      display_name TEXT NOT NULL,
+      bio TEXT DEFAULT '',
+      avatar_url TEXT DEFAULT '',
+      sport TEXT DEFAULT '',
+      location TEXT DEFAULT '',
+      follower_count INTEGER DEFAULT 0,
+      is_verified INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS creator_accounts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      creator_id INTEGER NOT NULL REFERENCES creators(id) ON DELETE CASCADE,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      role TEXT DEFAULT 'creator' CHECK(role IN ('creator','admin')),
+      is_suspended INTEGER DEFAULT 0,
+      is_email_verified INTEGER DEFAULT 0,
+      last_login DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS businesses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      company_name TEXT NOT NULL,
+      slug TEXT UNIQUE NOT NULL,
+      bio TEXT DEFAULT '',
+      logo_url TEXT DEFAULT '',
+      industry TEXT DEFAULT '',
+      website TEXT DEFAULT '',
+      location TEXT DEFAULT '',
+      is_suspended INTEGER DEFAULT 0,
+      is_email_verified INTEGER DEFAULT 0,
+      last_login DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS content (
-      id            SERIAL PRIMARY KEY,
-      user_id       INT          REFERENCES users(id) ON DELETE CASCADE,
-      title         TEXT         NOT NULL,
-      body          TEXT,
-      media_url     TEXT,
-      media_type    VARCHAR(20)  CHECK (media_type IN ('image','video','reel','short')),
-      sport         VARCHAR(50),
-      tags          TEXT[]       DEFAULT '{}',
-      likes_count   INT          DEFAULT 0,
-      comments_count INT         DEFAULT 0,
-      status        VARCHAR(20)  DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected','flagged')),
-      moderation_note TEXT,
-      moderated_by  INT          REFERENCES admins(id) ON DELETE SET NULL,
-      moderated_at  TIMESTAMPTZ,
-      created_at    TIMESTAMPTZ  DEFAULT NOW(),
-      updated_at    TIMESTAMPTZ  DEFAULT NOW()
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      creator_id INTEGER NOT NULL REFERENCES creators(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      body TEXT DEFAULT '',
+      media_url TEXT DEFAULT '',
+      media_type TEXT DEFAULT 'none' CHECK(media_type IN ('image','video','none')),
+      tags TEXT DEFAULT '[]',
+      status TEXT DEFAULT 'pending' CHECK(status IN ('pending','published','rejected','deleted')),
+      view_count INTEGER DEFAULT 0,
+      like_count INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
-  `);
 
-  await db.query(`
+    CREATE TABLE IF NOT EXISTS business_content (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      body TEXT DEFAULT '',
+      media_url TEXT DEFAULT '',
+      budget_range TEXT DEFAULT '',
+      target_sport TEXT DEFAULT '',
+      status TEXT DEFAULT 'pending' CHECK(status IN ('pending','published','rejected','deleted')),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS opportunities (
-      id              SERIAL PRIMARY KEY,
-      business_id     INT          REFERENCES businesses(id) ON DELETE CASCADE,
-      title           VARCHAR(200) NOT NULL,
-      description     TEXT         NOT NULL,
-      sport           VARCHAR(50),
-      type            VARCHAR(50)  CHECK (type IN ('sponsorship','collab','ambassador','appearance','other')),
-      budget_min      NUMERIC(12,2),
-      budget_max      NUMERIC(12,2),
-      deadline        DATE,
-      location        VARCHAR(150),
-      remote_ok       BOOLEAN      DEFAULT FALSE,
-      status          VARCHAR(20)  DEFAULT 'open' CHECK (status IN ('open','closed','draft')),
-      applications_count INT       DEFAULT 0,
-      created_at      TIMESTAMPTZ  DEFAULT NOW(),
-      updated_at      TIMESTAMPTZ  DEFAULT NOW()
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      posted_by_type TEXT NOT NULL CHECK(posted_by_type IN ('creator','business')),
+      posted_by_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      sport TEXT DEFAULT '',
+      location TEXT DEFAULT '',
+      budget TEXT DEFAULT '',
+      deadline TEXT DEFAULT '',
+      status TEXT DEFAULT 'published' CHECK(status IN ('published','closed','deleted')),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS moderation_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      content_type TEXT NOT NULL CHECK(content_type IN ('creator_content','business_content')),
+      content_id INTEGER NOT NULL,
+      status TEXT DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')),
+      reviewed_by INTEGER REFERENCES admins(id),
+      review_note TEXT DEFAULT '',
+      submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      reviewed_at DATETIME
+    );
+
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      actor_type TEXT NOT NULL CHECK(actor_type IN ('admin','creator','business','system')),
+      actor_id INTEGER,
+      action TEXT NOT NULL,
+      target_type TEXT DEFAULT '',
+      target_id INTEGER,
+      metadata TEXT DEFAULT '{}',
+      ip_address TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
 
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS applications (
-      id              SERIAL PRIMARY KEY,
-      opportunity_id  INT          REFERENCES opportunities(id) ON DELETE CASCADE,
-      user_id         INT          REFERENCES users(id) ON DELETE CASCADE,
-      message         TEXT,
-      status          VARCHAR(20)  DEFAULT 'pending' CHECK (status IN ('pending','accepted','rejected','withdrawn')),
-      created_at      TIMESTAMPTZ  DEFAULT NOW(),
-      updated_at      TIMESTAMPTZ  DEFAULT NOW(),
-      UNIQUE(opportunity_id, user_id)
-    );
-  `);
+  logger.info('Database schema applied.');
+  autoSeed();
+}
 
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS follows (
-      follower_id   INT REFERENCES users(id) ON DELETE CASCADE,
-      following_id  INT REFERENCES users(id) ON DELETE CASCADE,
-      created_at    TIMESTAMPTZ DEFAULT NOW(),
-      PRIMARY KEY (follower_id, following_id)
-    );
-  `);
-
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS audit_logs (
-      id          BIGSERIAL    PRIMARY KEY,
-      actor_id    INT,
-      actor_type  VARCHAR(20)  CHECK (actor_type IN ('user','business','admin','system')),
-      action      VARCHAR(100) NOT NULL,
-      target_type VARCHAR(50),
-      target_id   INT,
-      meta        JSONB        DEFAULT '{}',
-      ip          INET,
-      created_at  TIMESTAMPTZ  DEFAULT NOW()
-    );
-  `);
-
-  await db.query(`CREATE INDEX IF NOT EXISTS idx_content_user_id      ON content(user_id);`);
-  await db.query(`CREATE INDEX IF NOT EXISTS idx_content_status        ON content(status);`);
-  await db.query(`CREATE INDEX IF NOT EXISTS idx_content_sport         ON content(sport);`);
-  await db.query(`CREATE INDEX IF NOT EXISTS idx_opportunities_business ON opportunities(business_id);`);
-  await db.query(`CREATE INDEX IF NOT EXISTS idx_opportunities_status  ON opportunities(status);`);
-  await db.query(`CREATE INDEX IF NOT EXISTS idx_applications_user     ON applications(user_id);`);
-  await db.query(`CREATE INDEX IF NOT EXISTS idx_audit_actor           ON audit_logs(actor_id, actor_type);`);
-  await db.query(`CREATE INDEX IF NOT EXISTS idx_audit_created         ON audit_logs(created_at DESC);`);
-
-  logger.info('DB setup complete');
-
-  if (config.seed.autoRun) {
-    const { seed } = require('./seed');
-    await seed();
+function autoSeed() {
+  const row = db.prepare('SELECT COUNT(*) as count FROM admins').get();
+  if (row.count === 0) {
+    logger.info('Empty database detected — running seed...');
+    seedDatabase();
   }
 }
 
-module.exports = { setup };
+module.exports = { setupDatabase };

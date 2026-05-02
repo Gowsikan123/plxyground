@@ -1,15 +1,13 @@
 'use strict';
 const { validationResult } = require('express-validator');
 
-function validate(req, res, next) {
+function validationErrorHandler(req, res, next) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(422).json({
-      error: 'Validation failed',
-      fields: errors.array().map((e) => ({ field: e.path, message: e.msg })),
-    });
+    const formatted = errors.array().map((e) => ({ field: e.path, message: e.msg }));
+    return res.status(400).json({ success: false, errors: formatted });
   }
   next();
 }
 
-module.exports = { validate };
+module.exports = { validationErrorHandler };

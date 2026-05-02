@@ -1,175 +1,115 @@
 'use strict';
-const express = require('express');
-const { body, param, query: qv } = require('express-validator');
-const router = express.Router();
-
+const { Router } = require('express');
+const { body } = require('express-validator');
 const db = require('../db/client');
-const { validate } = require('../middleware/validate');
-const { requireAuth, requireBusiness } = require('../middleware/auth');
-const { auditLog } = require('../utils/auditLogger');
-const logger = require('../logger');
+const { requireAuth } = require('../middleware/auth');
+const { validationErrorHandler } = require('../middleware/validate');
 
-// GET /api/opportunities  — public
-router.get(
-  '/',
-  [qv('sport').optional().trim(), qv('type').optional().trim(), qv('page').optional().isInt({ min: 1 })],
-  validate,
-  async (req, res) => {
-    try {
-      const page   = parseInt(req.query.page || '1', 10);
-      const limit  = 20;
-      const offset = (page - 1) * limit;
+const router = Router();
 
-      const params = ['open'];
-      let where = 'WHERE o.status = $1';
-      if (req.query.sport) { where += ` AND o.sport = $${params.push(req.query.sport)}`; }
-      if (req.query.type)  { where += ` AND o.type  = $${params.push(req.query.type)}`; }
+function attachPoster(opp) {
+  if (opp.posted_by_type === 'creator') {
+    const c = db.prepare('SELECT display_name, avatar_url, username, slug FROM creators WHERE id = ?').get(opp.posted_by_id);
+    return { ...opp, poster: c || null };
+  }
+  const b = db.prepare('SELECT company_name as display_name, logo_url as avatar_url, slug FROM businesses WHERE id = ?').get(opp.posted_by_id);
+  return { ...opp, poster: b || null };
+}
 
-      const sql = `
-        SELECT o.id, o.title, o.description, o.sport, o.type, o.budget_min, o.budget_max,
-               o.deadline, o.location, o.remote_ok, o.applications_count, o.created_at,
-               b.id AS business_id, b.name AS business_name, b.logo_url, b.slug AS business_slug
-        FROM opportunities o
-        JOIN businesses b ON b.id = o.business_id
-        ${where}
-        ORDER BY o.created_at DESC
-        LIMIT ${limit} OFFSET ${offset}`;
-
-      const result = await db.query(sql, params);
-      return res.json({ opportunities: result.rows, page, limit });
-    } catch (err) {
-      logger.error('opportunities.list error', { message: err.message });
-      return res.status(500).json({ error: 'Internal server error' });
-    }
-  },
-);
-
-// GET /api/opportunities/:id
-router.get('/:id', [param('id').isInt()], validate, async (req, res) => {
+router.get('/', (req, res) => {
   try {
-    const result = await db.query(
-      `SELECT o.*, b.name AS business_name, b.logo_url, b.slug AS business_slug
-       FROM opportunities o JOIN businesses b ON b.id = o.business_id
-       WHERE o.id = $1`,
-      [req.params.id],
-    );
-    if (!result.rows.length) return res.status(404).json({ error: 'Opportunity not found' });
-    return res.json({ opportunity: result.rows[0] });
+    const search = req.query.search || '';
+    const sport = req.query.sport || '';
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const offset = parseInt(req.query.offset) || 0;
+
+    const params = [];
+    let where = "WHERE o.status = 'published'";
+    if (search) {
+      where += ' AND (o.title LIKE ? OR o.description LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
+    }
+    if (sport) {
+      where += ' AND o.sport = ?';
+      params.push(sport);
+    }
+
+    const opps = db.prepare(
+      `SELECT * FROM opportunities o ${where} ORDER BY o.created_at DESC LIMIT ? OFFSET ?`
+    ).all(...params, limit, offset);
+    const total = db.prepare(`SELECT COUNT(*) as count FROM opportunities o ${where}`).get(...params).count;
+
+    const data = opps.map(attachPoster);
+    return res.json({ success: true, data: { opportunities: data, total, limit, offset } });
   } catch (err) {
-    logger.error('opportunities.get error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// POST /api/opportunities  — business creates
+router.get('/:id', (req, res) => {
+  try {
+    const opp = db.prepare('SELECT * FROM opportunities WHERE id = ? AND status != ?').get(req.params.id, 'deleted');
+    if (!opp) return res.status(404).json({ success: false, error: 'Not found.' });
+    return res.json({ success: true, data: attachPoster(opp) });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.post(
   '/',
-  requireBusiness,
+  requireAuth,
   [
-    body('title').trim().isLength({ min: 1, max: 200 }).withMessage('Title required'),
-    body('description').trim().isLength({ min: 1 }).withMessage('Description required'),
-    body('type').isIn(['sponsorship', 'collab', 'ambassador', 'appearance', 'other']).withMessage('Invalid type'),
-    body('sport').optional().trim(),
-    body('budget_min').optional().isFloat({ min: 0 }),
-    body('budget_max').optional().isFloat({ min: 0 }),
-    body('deadline').optional().isDate(),
-    body('remote_ok').optional().isBoolean(),
+    body('title').notEmpty().withMessage('Title is required'),
+    body('description').notEmpty().withMessage('Description is required'),
   ],
-  validate,
-  async (req, res) => {
+  validationErrorHandler,
+  (req, res) => {
     try {
-      const { title, description, type, sport, budget_min, budget_max, deadline, location, remote_ok } = req.body;
-      const result = await db.query(
-        `INSERT INTO opportunities (business_id, title, description, type, sport, budget_min, budget_max, deadline, location, remote_ok)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-        [req.business.id, title, description, type, sport || null, budget_min || null, budget_max || null, deadline || null, location || null, remote_ok ?? false],
-      );
-      auditLog({ actorId: req.business.id, actorType: 'business', action: 'opportunity.create', targetType: 'opportunity', targetId: result.rows[0].id, ip: req.ip });
-      return res.status(201).json({ opportunity: result.rows[0] });
+      const { title, description, sport = '', location = '', budget = '', deadline = '' } = req.body;
+      const posterId = req.userType === 'creator' ? req.user.creator_id : req.user.id;
+      const result = db.prepare(
+        'INSERT INTO opportunities (posted_by_type, posted_by_id, title, description, sport, location, budget, deadline) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      ).run(req.userType, posterId, title, description, sport, location, budget, deadline);
+      const row = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(result.lastInsertRowid);
+      return res.status(201).json({ success: true, data: attachPoster(row) });
     } catch (err) {
-      logger.error('opportunities.create error', { message: err.message });
-      return res.status(500).json({ error: 'Internal server error' });
+      return res.status(500).json({ success: false, error: err.message });
     }
-  },
+  }
 );
 
-// PATCH /api/opportunities/:id
-router.patch(
-  '/:id',
-  requireBusiness,
-  [param('id').isInt(), body('status').optional().isIn(['open', 'closed', 'draft'])],
-  validate,
-  async (req, res) => {
-    try {
-      const own = await db.query('SELECT id, business_id FROM opportunities WHERE id = $1', [req.params.id]);
-      if (!own.rows.length) return res.status(404).json({ error: 'Opportunity not found' });
-      if (own.rows[0].business_id !== req.business.id) return res.status(403).json({ error: 'Forbidden' });
-
-      const { title, description, sport, budget_min, budget_max, deadline, location, remote_ok, status } = req.body;
-      const result = await db.query(
-        `UPDATE opportunities SET
-           title       = COALESCE($1, title),
-           description = COALESCE($2, description),
-           sport       = COALESCE($3, sport),
-           budget_min  = COALESCE($4, budget_min),
-           budget_max  = COALESCE($5, budget_max),
-           deadline    = COALESCE($6, deadline),
-           location    = COALESCE($7, location),
-           remote_ok   = COALESCE($8, remote_ok),
-           status      = COALESCE($9, status),
-           updated_at  = NOW()
-         WHERE id = $10 RETURNING *`,
-        [title, description, sport, budget_min, budget_max, deadline, location, remote_ok, status, req.params.id],
-      );
-      return res.json({ opportunity: result.rows[0] });
-    } catch (err) {
-      logger.error('opportunities.update error', { message: err.message });
-      return res.status(500).json({ error: 'Internal server error' });
-    }
-  },
-);
-
-// DELETE /api/opportunities/:id
-router.delete('/:id', requireBusiness, [param('id').isInt()], validate, async (req, res) => {
+router.put('/:id', requireAuth, (req, res) => {
   try {
-    const own = await db.query('SELECT id, business_id FROM opportunities WHERE id = $1', [req.params.id]);
-    if (!own.rows.length) return res.status(404).json({ error: 'Opportunity not found' });
-    if (own.rows[0].business_id !== req.business.id) return res.status(403).json({ error: 'Forbidden' });
-    await db.query('DELETE FROM opportunities WHERE id = $1', [req.params.id]);
-    auditLog({ actorId: req.business.id, actorType: 'business', action: 'opportunity.delete', targetType: 'opportunity', targetId: parseInt(req.params.id, 10), ip: req.ip });
+    const opp = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(req.params.id);
+    if (!opp) return res.status(404).json({ success: false, error: 'Not found.' });
+    const posterId = req.userType === 'creator' ? req.user.creator_id : req.user.id;
+    if (opp.posted_by_type !== req.userType || opp.posted_by_id !== posterId) {
+      return res.status(403).json({ success: false, error: 'Forbidden.' });
+    }
+    const { title = opp.title, description = opp.description, sport = opp.sport, location = opp.location, budget = opp.budget, deadline = opp.deadline, status = opp.status } = req.body;
+    db.prepare('UPDATE opportunities SET title=?,description=?,sport=?,location=?,budget=?,deadline=?,status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?')
+      .run(title, description, sport, location, budget, deadline, status, opp.id);
+    const updated = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(opp.id);
+    return res.json({ success: true, data: attachPoster(updated) });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.delete('/:id', requireAuth, (req, res) => {
+  try {
+    const opp = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(req.params.id);
+    if (!opp) return res.status(404).json({ success: false, error: 'Not found.' });
+    const posterId = req.userType === 'creator' ? req.user.creator_id : req.user.id;
+    if (opp.posted_by_type !== req.userType || opp.posted_by_id !== posterId) {
+      return res.status(403).json({ success: false, error: 'Forbidden.' });
+    }
+    db.prepare('UPDATE opportunities SET status = ? WHERE id = ?').run('deleted', opp.id);
     return res.json({ success: true });
   } catch (err) {
-    logger.error('opportunities.delete error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
-
-// POST /api/opportunities/:id/apply  — creator applies
-router.post(
-  '/:id/apply',
-  requireAuth,
-  [param('id').isInt(), body('message').optional().trim().isLength({ max: 1000 })],
-  validate,
-  async (req, res) => {
-    try {
-      const opp = await db.query("SELECT id FROM opportunities WHERE id = $1 AND status = 'open'", [req.params.id]);
-      if (!opp.rows.length) return res.status(404).json({ error: 'Opportunity not found or closed' });
-
-      const result = await db.query(
-        `INSERT INTO applications (opportunity_id, user_id, message) VALUES ($1, $2, $3)
-         ON CONFLICT (opportunity_id, user_id) DO NOTHING RETURNING *`,
-        [req.params.id, req.user.id, req.body.message || null],
-      );
-      if (!result.rows.length) return res.status(409).json({ error: 'Already applied' });
-
-      await db.query('UPDATE opportunities SET applications_count = applications_count + 1 WHERE id = $1', [req.params.id]);
-      auditLog({ actorId: req.user.id, actorType: 'user', action: 'opportunity.apply', targetType: 'opportunity', targetId: parseInt(req.params.id, 10), ip: req.ip });
-      return res.status(201).json({ application: result.rows[0] });
-    } catch (err) {
-      logger.error('opportunities.apply error', { message: err.message });
-      return res.status(500).json({ error: 'Internal server error' });
-    }
-  },
-);
 
 module.exports = router;

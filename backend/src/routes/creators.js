@@ -1,111 +1,82 @@
 'use strict';
-const express = require('express');
-const { param, body, query: qv } = require('express-validator');
-const router = express.Router();
-
+const { Router } = require('express');
 const db = require('../db/client');
-const { validate } = require('../middleware/validate');
 const { requireAuth } = require('../middleware/auth');
-const { slugify, uniqueSlug } = require('../utils/slugify');
-const logger = require('../logger');
 
-// GET /api/creators
-router.get(
-  '/',
-  [qv('sport').optional().trim(), qv('page').optional().isInt({ min: 1 })],
-  validate,
-  async (req, res) => {
-    try {
-      const page  = parseInt(req.query.page  || '1', 10);
-      const limit = 20;
-      const offset = (page - 1) * limit;
-      const sport = req.query.sport || null;
+const router = Router();
 
-      const params = [];
-      let where = 'WHERE is_suspended = FALSE';
-      if (sport) { where += ' AND sport = $1'; params.push(sport); }
-
-      const sql = `SELECT id, username, display_name, bio, avatar_url, sport, slug, is_verified, follower_count
-                   FROM users ${where}
-                   ORDER BY follower_count DESC LIMIT ${limit} OFFSET ${offset}`;
-      const result = await db.query(sql, params);
-      return res.json({ creators: result.rows, page, limit });
-    } catch (err) {
-      logger.error('creators.list error', { message: err.message });
-      return res.status(500).json({ error: 'Internal server error' });
-    }
-  },
-);
-
-// GET /api/creators/:slug
-router.get('/slug/:slug', [param('slug').trim()], validate, async (req, res) => {
+router.get('/', (req, res) => {
   try {
-    const result = await db.query(
-      `SELECT id, username, display_name, bio, avatar_url, sport, slug, is_verified, follower_count, created_at
-       FROM users WHERE slug = $1 AND is_suspended = FALSE`,
-      [req.params.slug],
-    );
-    if (!result.rows.length) return res.status(404).json({ error: 'Creator not found' });
-    return res.json({ creator: result.rows[0] });
+    const search = req.query.search || '';
+    const sport = req.query.sport || '';
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const offset = parseInt(req.query.offset) || 0;
+
+    const params = [];
+    let where = 'WHERE 1=1';
+    if (search) {
+      where += ' AND (c.display_name LIKE ? OR c.username LIKE ? OR c.bio LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    }
+    if (sport) {
+      where += ' AND c.sport = ?';
+      params.push(sport);
+    }
+
+    const creators = db.prepare(
+      `SELECT c.id, c.username, c.slug, c.display_name, c.bio, c.avatar_url, c.sport, c.location, c.follower_count, c.is_verified, c.created_at
+       FROM creators c ${where}
+       ORDER BY c.created_at DESC
+       LIMIT ? OFFSET ?`
+    ).all(...params, limit, offset);
+
+    const total = db.prepare(`SELECT COUNT(*) as count FROM creators c ${where}`).get(...params).count;
+    return res.json({ success: true, data: { creators, total, limit, offset } });
   } catch (err) {
-    logger.error('creators.bySlug error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// GET /api/creators/:id
-router.get('/:id', [param('id').isInt()], validate, async (req, res) => {
+router.get('/slug/:slug', (req, res) => {
   try {
-    const result = await db.query(
-      `SELECT id, username, display_name, bio, avatar_url, sport, slug, is_verified, follower_count, created_at
-       FROM users WHERE id = $1 AND is_suspended = FALSE`,
-      [req.params.id],
-    );
-    if (!result.rows.length) return res.status(404).json({ error: 'Creator not found' });
-    return res.json({ creator: result.rows[0] });
+    const creator = db.prepare('SELECT * FROM creators WHERE slug = ?').get(req.params.slug);
+    if (!creator) return res.status(404).json({ success: false, error: 'Creator not found.' });
+    const posts = db.prepare(
+      'SELECT * FROM content WHERE creator_id = ? AND status = \'published\' ORDER BY created_at DESC LIMIT 20'
+    ).all(creator.id);
+    return res.json({ success: true, data: { creator, posts } });
   } catch (err) {
-    logger.error('creators.byId error', { message: err.message });
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// PATCH /api/creators/me
-router.patch(
-  '/me',
-  requireAuth,
-  [
-    body('display_name').optional().trim().isLength({ max: 100 }),
-    body('bio').optional().trim().isLength({ max: 500 }),
-    body('sport').optional().trim().isLength({ max: 50 }),
-    body('avatar_url').optional().isURL(),
-  ],
-  validate,
-  async (req, res) => {
-    try {
-      const { display_name, bio, sport, avatar_url } = req.body;
-      let slug = undefined;
-      if (display_name) {
-        const base = slugify(display_name);
-        slug = await uniqueSlug(base, 'users', req.user.id);
-      }
-      const result = await db.query(
-        `UPDATE users SET
-           display_name = COALESCE($1, display_name),
-           bio          = COALESCE($2, bio),
-           sport        = COALESCE($3, sport),
-           avatar_url   = COALESCE($4, avatar_url),
-           slug         = COALESCE($5, slug),
-           updated_at   = NOW()
-         WHERE id = $6
-         RETURNING id, username, email, display_name, bio, avatar_url, sport, slug, is_verified, follower_count`,
-        [display_name, bio, sport, avatar_url, slug || null, req.user.id],
-      );
-      return res.json({ creator: result.rows[0] });
-    } catch (err) {
-      logger.error('creators.update error', { message: err.message });
-      return res.status(500).json({ error: 'Internal server error' });
-    }
-  },
-);
+router.get('/:id', (req, res) => {
+  try {
+    const creator = db.prepare('SELECT * FROM creators WHERE id = ?').get(req.params.id);
+    if (!creator) return res.status(404).json({ success: false, error: 'Creator not found.' });
+    const posts = db.prepare(
+      'SELECT * FROM content WHERE creator_id = ? AND status = \'published\' ORDER BY created_at DESC LIMIT 20'
+    ).all(creator.id);
+    return res.json({ success: true, data: { creator, posts } });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.put('/:id', requireAuth, (req, res) => {
+  try {
+    if (req.userType !== 'creator') return res.status(403).json({ success: false, error: 'Creator access only.' });
+    if (req.user.creator_id !== parseInt(req.params.id)) return res.status(403).json({ success: false, error: 'Forbidden.' });
+    const current = db.prepare('SELECT * FROM creators WHERE id = ?').get(req.params.id);
+    if (!current) return res.status(404).json({ success: false, error: 'Not found.' });
+    const { display_name = current.display_name, bio = current.bio, avatar_url = current.avatar_url, sport = current.sport, location = current.location } = req.body;
+    db.prepare('UPDATE creators SET display_name=?, bio=?, avatar_url=?, sport=?, location=? WHERE id=?')
+      .run(display_name, bio, avatar_url, sport, location, current.id);
+    const updated = db.prepare('SELECT * FROM creators WHERE id = ?').get(current.id);
+    return res.json({ success: true, data: updated });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 module.exports = router;
