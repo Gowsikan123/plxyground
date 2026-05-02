@@ -1,114 +1,87 @@
 'use strict';
 const { Router } = require('express');
-const { body } = require('express-validator');
+const { body, query } = require('express-validator');
 const db = require('../db/client');
 const { requireAuth } = require('../middleware/auth');
-const { validationErrorHandler } = require('../middleware/validate');
+const { validate } = require('../middleware/validate');
+const { logAudit } = require('../utils/auditLogger');
+const logger = require('../logger');
 
 const router = Router();
 
-function attachPoster(opp) {
-  if (opp.posted_by_type === 'creator') {
-    const c = db.prepare('SELECT display_name, avatar_url, username, slug FROM creators WHERE id = ?').get(opp.posted_by_id);
-    return { ...opp, poster: c || null };
-  }
-  const b = db.prepare('SELECT company_name as display_name, logo_url as avatar_url, slug FROM businesses WHERE id = ?').get(opp.posted_by_id);
-  return { ...opp, poster: b || null };
-}
-
-router.get('/', (req, res) => {
+router.get('/', [
+  query('page').optional().isInt({ min: 1 }),
+  query('limit').optional().isInt({ min: 1, max: 50 }),
+  query('sport').optional().trim(),
+], validate, (req, res) => {
   try {
-    const search = req.query.search || '';
-    const sport = req.query.sport || '';
-    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
-    const offset = parseInt(req.query.offset) || 0;
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 20;
+    const offset = (page - 1) * limit;
+    const sport = req.query.sport;
 
+    let sql = `SELECT * FROM opportunities WHERE status = 'published'`;
     const params = [];
-    let where = "WHERE o.status = 'published'";
-    if (search) {
-      where += ' AND (o.title LIKE ? OR o.description LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`);
-    }
-    if (sport) {
-      where += ' AND o.sport = ?';
-      params.push(sport);
-    }
+    if (sport) { sql += ' AND sport = ?'; params.push(sport); }
+    sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
 
-    const opps = db.prepare(
-      `SELECT * FROM opportunities o ${where} ORDER BY o.created_at DESC LIMIT ? OFFSET ?`
-    ).all(...params, limit, offset);
-    const total = db.prepare(`SELECT COUNT(*) as count FROM opportunities o ${where}`).get(...params).count;
+    const rows = db.prepare(sql).all(...params);
+    const total = db.prepare(`SELECT COUNT(*) as n FROM opportunities WHERE status = 'published'${sport ? ' AND sport = ?' : ''}`).get(...(sport ? [sport] : []));
 
-    const data = opps.map(attachPoster);
-    return res.json({ success: true, data: { opportunities: data, total, limit, offset } });
+    res.json({ data: rows, meta: { page, limit, total: total.n } });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    logger.error('Opportunities list error', { message: err.message });
+    res.status(500).json({ error: 'Could not load opportunities.' });
   }
 });
 
 router.get('/:id', (req, res) => {
   try {
-    const opp = db.prepare('SELECT * FROM opportunities WHERE id = ? AND status != ?').get(req.params.id, 'deleted');
-    if (!opp) return res.status(404).json({ success: false, error: 'Not found.' });
-    return res.json({ success: true, data: attachPoster(opp) });
+    const opp = db.prepare(`SELECT * FROM opportunities WHERE id = ? AND status = 'published'`).get(req.params.id);
+    if (!opp) return res.status(404).json({ error: 'Opportunity not found.' });
+    res.json({ data: opp });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    logger.error('Opportunity fetch error', { message: err.message });
+    res.status(500).json({ error: 'Could not load opportunity.' });
   }
 });
 
-router.post(
-  '/',
-  requireAuth,
-  [
-    body('title').notEmpty().withMessage('Title is required'),
-    body('description').notEmpty().withMessage('Description is required'),
-  ],
-  validationErrorHandler,
-  (req, res) => {
-    try {
-      const { title, description, sport = '', location = '', budget = '', deadline = '' } = req.body;
-      const posterId = req.userType === 'creator' ? req.user.creator_id : req.user.id;
-      const result = db.prepare(
-        'INSERT INTO opportunities (posted_by_type, posted_by_id, title, description, sport, location, budget, deadline) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-      ).run(req.userType, posterId, title, description, sport, location, budget, deadline);
-      const row = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(result.lastInsertRowid);
-      return res.status(201).json({ success: true, data: attachPoster(row) });
-    } catch (err) {
-      return res.status(500).json({ success: false, error: err.message });
-    }
-  }
-);
-
-router.put('/:id', requireAuth, (req, res) => {
+router.post('/', requireAuth(), [
+  body('title').trim().isLength({ min: 1, max: 200 }),
+  body('description').trim().isLength({ min: 1 }),
+  body('sport').optional().trim(),
+  body('location').optional().trim(),
+  body('budget').optional().trim(),
+  body('deadline').optional().trim(),
+], validate, (req, res) => {
   try {
-    const opp = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(req.params.id);
-    if (!opp) return res.status(404).json({ success: false, error: 'Not found.' });
-    const posterId = req.userType === 'creator' ? req.user.creator_id : req.user.id;
-    if (opp.posted_by_type !== req.userType || opp.posted_by_id !== posterId) {
-      return res.status(403).json({ success: false, error: 'Forbidden.' });
-    }
-    const { title = opp.title, description = opp.description, sport = opp.sport, location = opp.location, budget = opp.budget, deadline = opp.deadline, status = opp.status } = req.body;
-    db.prepare('UPDATE opportunities SET title=?,description=?,sport=?,location=?,budget=?,deadline=?,status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?')
-      .run(title, description, sport, location, budget, deadline, status, opp.id);
-    const updated = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(opp.id);
-    return res.json({ success: true, data: attachPoster(updated) });
+    const { title, description, sport = '', location = '', budget = '', deadline = '' } = req.body;
+    const postedByType = req.user.role;
+    const result = db.prepare(
+      'INSERT INTO opportunities (posted_by_type, posted_by_id, title, description, sport, location, budget, deadline) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(postedByType, req.user.id, title, description, sport, location, budget, deadline);
+
+    logAudit({ actorType: postedByType, actorId: req.user.id, action: 'opportunity_created', targetType: 'opportunity', targetId: result.lastInsertRowid, ipAddress: req.ip });
+
+    const opp = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(result.lastInsertRowid);
+    res.status(201).json({ data: opp });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    logger.error('Opportunity create error', { message: err.message });
+    res.status(500).json({ error: 'Could not create opportunity.' });
   }
 });
 
-router.delete('/:id', requireAuth, (req, res) => {
+router.delete('/:id', requireAuth(), (req, res) => {
   try {
-    const opp = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(req.params.id);
-    if (!opp) return res.status(404).json({ success: false, error: 'Not found.' });
-    const posterId = req.userType === 'creator' ? req.user.creator_id : req.user.id;
-    if (opp.posted_by_type !== req.userType || opp.posted_by_id !== posterId) {
-      return res.status(403).json({ success: false, error: 'Forbidden.' });
-    }
-    db.prepare('UPDATE opportunities SET status = ? WHERE id = ?').run('deleted', opp.id);
-    return res.json({ success: true });
+    const opp = db.prepare('SELECT * FROM opportunities WHERE id = ? AND posted_by_id = ? AND posted_by_type = ?').get(req.params.id, req.user.id, req.user.role);
+    if (!opp) return res.status(404).json({ error: 'Opportunity not found or not yours.' });
+    db.prepare(`UPDATE opportunities SET status = 'deleted' WHERE id = ?`).run(opp.id);
+    logAudit({ actorType: req.user.role, actorId: req.user.id, action: 'opportunity_deleted', targetType: 'opportunity', targetId: opp.id, ipAddress: req.ip });
+    res.json({ message: 'Opportunity deleted.' });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    logger.error('Opportunity delete error', { message: err.message });
+    res.status(500).json({ error: 'Could not delete opportunity.' });
   }
 });
 

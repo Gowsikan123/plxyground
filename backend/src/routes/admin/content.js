@@ -1,86 +1,51 @@
 'use strict';
 const { Router } = require('express');
+const { query } = require('express-validator');
 const db = require('../../db/client');
-const { requireAdmin } = require('../../middleware/auth');
-const audit = require('../../utils/auditLogger');
+const { requireAuth } = require('../../middleware/auth');
+const { validate } = require('../../middleware/validate');
+const { logAudit } = require('../../utils/auditLogger');
+const logger = require('../../logger');
 
 const router = Router();
+const adminOnly = requireAuth('admin');
 
-router.get('/', requireAdmin, (req, res) => {
+router.get('/', adminOnly, [
+  query('status').optional().isIn(['pending', 'published', 'rejected', 'deleted']),
+  query('type').optional().isIn(['creator_content', 'business_content']),
+  query('page').optional().isInt({ min: 1 }),
+], validate, (req, res) => {
   try {
-    const status = req.query.status || '';
-    const search = req.query.search || '';
-    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
-    const offset = parseInt(req.query.offset) || 0;
-
-    const buildWhere = (extraField) => {
-      const p = [];
-      let w = `WHERE 1=1`;
-      if (status) { w += ` AND status = ?`; p.push(status); }
-      if (search) { w += ` AND (title LIKE ? OR body LIKE ?)`; p.push(`%${search}%`, `%${search}%`); }
-      return { w, p };
-    };
-
-    const { w: w1, p: p1 } = buildWhere();
-    const { w: w2, p: p2 } = buildWhere();
-
-    const creatorRows = db.prepare(
-      `SELECT id, title, body, status, view_count, like_count, created_at, 'creator' as type FROM content ${w1}`
-    ).all(...p1);
-    const bizRows = db.prepare(
-      `SELECT id, title, body, status, 0 as view_count, 0 as like_count, created_at, 'business' as type FROM business_content ${w2}`
-    ).all(...p2);
-
-    const all = [...creatorRows, ...bizRows].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    const total = all.length;
-    const sliced = all.slice(offset, offset + limit);
-    return res.json({ success: true, data: { content: sliced, total, limit, offset } });
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = 20;
+    const offset = (page - 1) * limit;
+    const status = req.query.status || 'published';
+    const type = req.query.type || 'creator_content';
+    const table = type === 'creator_content' ? 'content' : 'business_content';
+    const rows = db.prepare(`SELECT * FROM ${table} WHERE status = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(status, limit, offset);
+    const total = db.prepare(`SELECT COUNT(*) as n FROM ${table} WHERE status = ?`).get(status);
+    res.json({ data: rows, meta: { page, limit, total: total.n } });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    logger.error('Admin content list error', { message: err.message });
+    res.status(500).json({ error: 'Could not load content.' });
   }
 });
 
-router.put('/:id', requireAdmin, (req, res) => {
+router.delete('/:type/:id', adminOnly, (req, res) => {
   try {
-    const type = req.query.type || 'creator';
-    const table = type === 'business' ? 'business_content' : 'content';
-    const row = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(req.params.id);
-    if (!row) return res.status(404).json({ success: false, error: 'Not found.' });
-    const updates = req.body;
-    const allowed = type === 'business'
-      ? ['title', 'body', 'media_url', 'budget_range', 'target_sport', 'status']
-      : ['title', 'body', 'media_url', 'media_type', 'tags', 'status'];
-    const setClauses = [];
-    const params = [];
-    for (const field of allowed) {
-      if (updates[field] !== undefined) {
-        setClauses.push(`${field} = ?`);
-        params.push(updates[field]);
-      }
+    const { type, id } = req.params;
+    if (!['creator_content', 'business_content'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid content type.' });
     }
-    if (setClauses.length === 0) return res.status(400).json({ success: false, error: 'No valid fields to update.' });
-    setClauses.push('updated_at = CURRENT_TIMESTAMP');
-    params.push(req.params.id);
-    db.prepare(`UPDATE ${table} SET ${setClauses.join(', ')} WHERE id = ?`).run(...params);
-    audit.log({ actor_type: 'admin', actor_id: req.admin.id, action: 'ADMIN_CONTENT_UPDATED', target_type: table, target_id: parseInt(req.params.id), ip_address: req.ip });
-    const updated = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(req.params.id);
-    return res.json({ success: true, data: updated });
+    const table = type === 'creator_content' ? 'content' : 'business_content';
+    const row = db.prepare(`SELECT id FROM ${table} WHERE id = ?`).get(id);
+    if (!row) return res.status(404).json({ error: 'Content not found.' });
+    db.prepare(`UPDATE ${table} SET status = 'deleted', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(id);
+    logAudit({ actorType: 'admin', actorId: req.user.id, action: 'admin_content_deleted', targetType: type, targetId: parseInt(id, 10), ipAddress: req.ip });
+    res.json({ message: 'Content deleted.' });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-router.delete('/:id', requireAdmin, (req, res) => {
-  try {
-    const type = req.query.type || 'creator';
-    const table = type === 'business' ? 'business_content' : 'content';
-    const row = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(req.params.id);
-    if (!row) return res.status(404).json({ success: false, error: 'Not found.' });
-    db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(req.params.id);
-    audit.log({ actor_type: 'admin', actor_id: req.admin.id, action: 'ADMIN_CONTENT_DELETED', target_type: table, target_id: parseInt(req.params.id), ip_address: req.ip });
-    return res.json({ success: true });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    logger.error('Admin content delete error', { message: err.message });
+    res.status(500).json({ error: 'Could not delete.' });
   }
 });
 

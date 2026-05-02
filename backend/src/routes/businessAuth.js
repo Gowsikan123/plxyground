@@ -4,137 +4,134 @@ const { body } = require('express-validator');
 const bcrypt = require('bcryptjs');
 const db = require('../db/client');
 const { signToken } = require('../utils/jwt');
-const { slugify, ensureUniqueSlug } = require('../utils/slugify');
-const { validationErrorHandler } = require('../middleware/validate');
-const { requireAuth } = require('../middleware/auth');
-const audit = require('../utils/auditLogger');
+const { slugify } = require('../utils/slugify');
+const { validate } = require('../middleware/validate');
 const { authLimiter } = require('../middleware/rateLimiter');
+const { logAudit } = require('../utils/auditLogger');
+const logger = require('../logger');
+const { v4: uuidv4 } = require('uuid');
 
 const router = Router();
 
 router.post(
-  '/auth/signup',
+  '/signup',
   authLimiter,
   [
-    body('email').isEmail().withMessage('Valid email required'),
-    body('password')
-      .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
-      .matches(/[A-Z]/).withMessage('Password must contain an uppercase letter')
-      .matches(/[0-9]/).withMessage('Password must contain a digit'),
-    body('company_name').trim().isLength({ min: 1, max: 80 }).withMessage('Company name is required (max 80 chars)'),
+    body('email').isEmail().normalizeEmail(),
+    body('password').isLength({ min: 8 }),
+    body('company_name').trim().isLength({ min: 1, max: 100 }),
   ],
-  validationErrorHandler,
+  validate,
   async (req, res) => {
     try {
-      const { email, password, company_name, industry = '', website = '', location = '' } = req.body;
+      const { email, password, company_name, industry = '', website = '', location = '', bio = '' } = req.body;
       const existing = db.prepare('SELECT id FROM businesses WHERE email = ?').get(email);
-      if (existing) return res.status(409).json({ success: false, error: 'Email already registered.' });
+      if (existing) return res.status(409).json({ error: 'Email already registered.' });
 
-      const hash = bcrypt.hashSync(password, 12);
-      let slug = slugify(company_name);
-      slug = ensureUniqueSlug(db, 'businesses', slug);
+      const hash = await bcrypt.hash(password, 12);
+      const slug = slugify(company_name) + '-' + uuidv4().slice(0, 6);
 
-      const result = db.prepare(
-        'INSERT INTO businesses (email, password_hash, company_name, slug, industry, website, location) VALUES (?, ?, ?, ?, ?, ?, ?)'
-      ).run(email, hash, company_name, slug, industry, website, location);
+      const biz = db.prepare(
+        'INSERT INTO businesses (email, password_hash, company_name, slug, bio, industry, website, location) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      ).run(email, hash, company_name, slug, bio, industry, website, location);
 
-      const token = signToken({ sub: result.lastInsertRowid, type: 'business' });
-      audit.log({ actor_type: 'business', actor_id: result.lastInsertRowid, action: 'BUSINESS_SIGNUP', ip_address: req.ip });
+      const b = db.prepare('SELECT * FROM businesses WHERE id = ?').get(biz.lastInsertRowid);
+      const token = signToken({ id: b.id, role: 'business', slug: b.slug });
 
-      return res.status(201).json({
-        success: true,
-        data: {
-          token,
-          business: { id: result.lastInsertRowid, company_name, slug, industry, logo_url: '', email },
-        },
-      });
+      logAudit({ actorType: 'business', actorId: b.id, action: 'signup', ipAddress: req.ip });
+
+      res.status(201).json({ token, business: sanitizeBusiness(b) });
     } catch (err) {
-      return res.status(500).json({ success: false, error: err.message });
+      logger.error('Business signup error', { message: err.message });
+      res.status(500).json({ error: 'Signup failed.' });
     }
   }
 );
 
 router.post(
-  '/auth/login',
+  '/login',
   authLimiter,
   [
-    body('email').notEmpty().withMessage('Email is required'),
-    body('password').notEmpty().withMessage('Password is required'),
+    body('email').isEmail().normalizeEmail(),
+    body('password').notEmpty(),
   ],
-  validationErrorHandler,
+  validate,
   async (req, res) => {
     try {
       const { email, password } = req.body;
-      const business = db.prepare('SELECT * FROM businesses WHERE email = ?').get(email);
-      if (!business) return res.status(401).json({ success: false, error: 'Invalid credentials.' });
-      if (business.is_suspended) return res.status(403).json({ success: false, error: 'Account suspended.' });
-      const valid = bcrypt.compareSync(password, business.password_hash);
-      if (!valid) return res.status(401).json({ success: false, error: 'Invalid credentials.' });
-      db.prepare('UPDATE businesses SET last_login = CURRENT_TIMESTAMP WHERE id = ?').run(business.id);
-      const token = signToken({ sub: business.id, type: 'business' });
-      const { password_hash, ...safe } = business;
-      return res.json({ success: true, data: { token, business: safe } });
+      const biz = db.prepare('SELECT * FROM businesses WHERE email = ?').get(email);
+      if (!biz) return res.status(401).json({ error: 'Invalid credentials.' });
+      if (biz.is_suspended) return res.status(403).json({ error: 'Account suspended.' });
+
+      const valid = await bcrypt.compare(password, biz.password_hash);
+      if (!valid) return res.status(401).json({ error: 'Invalid credentials.' });
+
+      db.prepare('UPDATE businesses SET last_login = CURRENT_TIMESTAMP WHERE id = ?').run(biz.id);
+      const token = signToken({ id: biz.id, role: 'business', slug: biz.slug });
+
+      logAudit({ actorType: 'business', actorId: biz.id, action: 'login', ipAddress: req.ip });
+
+      res.json({ token, business: sanitizeBusiness(biz) });
     } catch (err) {
-      return res.status(500).json({ success: false, error: err.message });
+      logger.error('Business login error', { message: err.message });
+      res.status(500).json({ error: 'Login failed.' });
     }
   }
 );
 
-router.get('/auth/me', requireAuth, (req, res) => {
-  if (req.userType !== 'business') return res.status(403).json({ success: false, error: 'Business access only.' });
-  const { password_hash, ...safe } = req.user;
-  return res.json({ success: true, data: safe });
-});
-
-router.post(
-  '/content',
-  requireAuth,
-  [
-    body('title').notEmpty().withMessage('Title is required'),
-  ],
-  validationErrorHandler,
-  async (req, res) => {
-    try {
-      if (req.userType !== 'business') return res.status(403).json({ success: false, error: 'Business access only.' });
-      const { title, body: bodyText = '', media_url = '', budget_range = '', target_sport = '' } = req.body;
-      const result = db.prepare(
-        'INSERT INTO business_content (business_id, title, body, media_url, budget_range, target_sport, status) VALUES (?, ?, ?, ?, ?, ?, ?)'
-      ).run(req.user.id, title, bodyText, media_url, budget_range, target_sport, 'pending');
-      db.prepare('INSERT INTO moderation_queue (content_type, content_id) VALUES (?, ?)').run('business_content', result.lastInsertRowid);
-      audit.log({ actor_type: 'business', actor_id: req.user.id, action: 'BUSINESS_CONTENT_CREATED', target_type: 'business_content', target_id: result.lastInsertRowid, ip_address: req.ip });
-      const row = db.prepare('SELECT * FROM business_content WHERE id = ?').get(result.lastInsertRowid);
-      return res.status(201).json({ success: true, data: row });
-    } catch (err) {
-      return res.status(500).json({ success: false, error: err.message });
-    }
-  }
-);
-
-router.get('/content/mine', requireAuth, (req, res) => {
-  if (req.userType !== 'business') return res.status(403).json({ success: false, error: 'Business access only.' });
-  const rows = db.prepare('SELECT * FROM business_content WHERE business_id = ? ORDER BY created_at DESC').all(req.user.id);
-  return res.json({ success: true, data: rows });
-});
-
-router.put('/content/:id', requireAuth, async (req, res) => {
+router.get('/me', require('../middleware/auth').requireAuth('business'), (req, res) => {
   try {
-    if (req.userType !== 'business') return res.status(403).json({ success: false, error: 'Business access only.' });
-    const row = db.prepare('SELECT * FROM business_content WHERE id = ?').get(req.params.id);
-    if (!row) return res.status(404).json({ success: false, error: 'Not found.' });
-    if (row.business_id !== req.user.id) return res.status(403).json({ success: false, error: 'Forbidden.' });
-    const { title = row.title, body: bodyText = row.body, media_url = row.media_url, budget_range = row.budget_range, target_sport = row.target_sport } = req.body;
-    const contentChanged = (title !== row.title || bodyText !== row.body);
-    const newStatus = contentChanged && row.status === 'published' ? 'pending' : row.status;
-    db.prepare('UPDATE business_content SET title=?, body=?, media_url=?, budget_range=?, target_sport=?, status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?')
-      .run(title, bodyText, media_url, budget_range, target_sport, newStatus, row.id);
-    if (contentChanged && row.status === 'published') {
-      db.prepare('INSERT INTO moderation_queue (content_type, content_id) VALUES (?, ?)').run('business_content', row.id);
-    }
-    const updated = db.prepare('SELECT * FROM business_content WHERE id = ?').get(row.id);
-    return res.json({ success: true, data: updated });
+    const biz = db.prepare('SELECT * FROM businesses WHERE id = ?').get(req.user.id);
+    if (!biz) return res.status(404).json({ error: 'Business not found.' });
+    res.json({ business: sanitizeBusiness(biz) });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    logger.error('Business /me error', { message: err.message });
+    res.status(500).json({ error: 'Could not fetch profile.' });
   }
 });
+
+router.patch('/me', require('../middleware/auth').requireAuth('business'), [
+  body('company_name').optional().trim().isLength({ min: 1 }),
+  body('bio').optional().trim(),
+  body('industry').optional().trim(),
+  body('website').optional().trim().isURL({ require_protocol: false }),
+  body('location').optional().trim(),
+  body('logo_url').optional().trim(),
+], validate, (req, res) => {
+  try {
+    const { company_name, bio, industry, website, location, logo_url } = req.body;
+    const fields = [];
+    const values = [];
+    if (company_name !== undefined) { fields.push('company_name = ?'); values.push(company_name); }
+    if (bio !== undefined) { fields.push('bio = ?'); values.push(bio); }
+    if (industry !== undefined) { fields.push('industry = ?'); values.push(industry); }
+    if (website !== undefined) { fields.push('website = ?'); values.push(website); }
+    if (location !== undefined) { fields.push('location = ?'); values.push(location); }
+    if (logo_url !== undefined) { fields.push('logo_url = ?'); values.push(logo_url); }
+    if (fields.length === 0) return res.status(400).json({ error: 'No fields to update.' });
+    values.push(req.user.id);
+    db.prepare(`UPDATE businesses SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+    const biz = db.prepare('SELECT * FROM businesses WHERE id = ?').get(req.user.id);
+    res.json({ business: sanitizeBusiness(biz) });
+  } catch (err) {
+    logger.error('Business patch error', { message: err.message });
+    res.status(500).json({ error: 'Update failed.' });
+  }
+});
+
+function sanitizeBusiness(b) {
+  return {
+    id: b.id,
+    email: b.email,
+    company_name: b.company_name,
+    slug: b.slug,
+    bio: b.bio,
+    logo_url: b.logo_url,
+    industry: b.industry,
+    website: b.website,
+    location: b.location,
+    created_at: b.created_at,
+  };
+}
 
 module.exports = router;
