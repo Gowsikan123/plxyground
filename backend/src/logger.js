@@ -1,25 +1,31 @@
 'use strict';
 
-const LEVELS = { info: 'INFO', warn: 'WARN', error: 'ERROR' };
+const { nodeEnv } = require('./config');
+
+const LEVELS = { error: 0, warn: 1, info: 2, debug: 3 };
+const currentLevel = LEVELS[process.env.LOG_LEVEL] ?? (nodeEnv === 'production' ? LEVELS.info : LEVELS.debug);
 
 function format(level, message, meta) {
   const ts = new Date().toISOString();
-  const base = `[${ts}] [${LEVELS[level]}] ${message}`;
-  if (meta && Object.keys(meta).length > 0) {
+  const base = `[${ts}] [${level.toUpperCase()}] ${message}`;
+  if (meta && Object.keys(meta).length) {
     return `${base} ${JSON.stringify(meta)}`;
   }
   return base;
 }
 
 const logger = {
-  info(message, meta = {}) {
-    process.stdout.write(format('info', message, meta) + '\n');
+  error(message, meta = {}) {
+    if (currentLevel >= LEVELS.error) console.error(format('error', message, meta));
   },
   warn(message, meta = {}) {
-    process.stdout.write(format('warn', message, meta) + '\n');
+    if (currentLevel >= LEVELS.warn) console.warn(format('warn', message, meta));
   },
-  error(message, meta = {}) {
-    process.stderr.write(format('error', message, meta) + '\n');
+  info(message, meta = {}) {
+    if (currentLevel >= LEVELS.info) console.info(format('info', message, meta));
+  },
+  debug(message, meta = {}) {
+    if (currentLevel >= LEVELS.debug) console.debug(format('debug', message, meta));
   },
 };
 

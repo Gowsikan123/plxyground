@@ -1,11 +1,11 @@
 'use strict';
+
 require('dotenv').config();
 
 const required = [
   'DATABASE_URL',
   'JWT_SECRET',
-  'JWT_EXPIRES_IN',
-  'PORT',
+  'ADMIN_JWT_SECRET',
 ];
 
 for (const key of required) {
@@ -14,18 +14,16 @@ for (const key of required) {
   }
 }
 
-if (process.env.JWT_SECRET.length < 32) {
-  throw new Error('[config] JWT_SECRET must be at least 32 characters long.');
-}
-
 module.exports = {
-  port: parseInt(process.env.PORT, 10) || 3011,
+  port: parseInt(process.env.PORT || '3001', 10),
+  nodeEnv: process.env.NODE_ENV || 'development',
   databaseUrl: process.env.DATABASE_URL,
   jwtSecret: process.env.JWT_SECRET,
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN,
-  corsOrigin: process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(',')
-    : ['http://localhost:19006', 'http://localhost:3012'],
-  nodeEnv: process.env.NODE_ENV || 'development',
-  isDev: process.env.NODE_ENV !== 'production',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  adminJwtSecret: process.env.ADMIN_JWT_SECRET,
+  adminJwtExpiresIn: process.env.ADMIN_JWT_EXPIRES_IN || '4h',
+  bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS || '12', 10),
+  uploadDir: process.env.UPLOAD_DIR || './uploads',
+  maxUploadSizeMb: parseInt(process.env.MAX_UPLOAD_SIZE_MB || '50', 10),
+  corsOrigins: (process.env.CORS_ORIGINS || '*').split(','),
 };
