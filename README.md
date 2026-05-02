@@ -1,4 +1,4 @@
-<![CDATA[<div align="center">
+<div align="center">
 
 # PLXYGROUND
 
@@ -42,7 +42,7 @@ plxyground/
 │       ├── db/
 │       │   ├── client.js         # Singleton pg.Pool
 │       │   ├── setup.js          # CREATE TABLE IF NOT EXISTS + autoSeed
-│       │   └── seed.js           # Dev seed: 1 admin, 5 creators, 3 businesses…
+│       │   └── seed.js           # Dev seed: 1 admin, 5 creators, 3 businesses
 │       ├── middleware/
 │       │   ├── auth.js           # requireAuth, requireAdmin
 │       │   ├── validate.js       # express-validator error handler
@@ -71,11 +71,11 @@ plxyground/
 │
 ├── frontend/
 │   ├── app/
-│   │   ├── _layout.jsx           # Root: fonts, hydration, auth redirect
-│   │   ├── index.jsx             # Splash/redirect screen
+│   │   ├── _layout.jsx
+│   │   ├── index.jsx
 │   │   ├── auth/                 # login, signup, business-login, business-signup
 │   │   ├── creator/              # feed, create, opportunities, profile, settings
-│   │   ├── business/             # dashboard, my-content, search-creators, opportunities…
+│   │   ├── business/             # dashboard, my-content, search-creators, opportunities
 │   │   ├── post/[id].jsx
 │   │   ├── creator/[id].jsx
 │   │   ├── terms.jsx
@@ -86,10 +86,10 @@ plxyground/
 │   │   ├── opportunities/        # OpportunityCard
 │   │   └── layout/               # Header, TabBar
 │   ├── store/
-│   │   ├── authStore.js          # Zustand: user, userType, token, hydrate, login, logout
-│   │   └── feedStore.js          # Zustand: posts, search, sport filter, pagination
+│   │   ├── authStore.js
+│   │   └── feedStore.js
 │   ├── services/
-│   │   ├── api.js                # Axios instance + auth interceptors
+│   │   ├── api.js
 │   │   ├── authService.js
 │   │   ├── contentService.js
 │   │   ├── creatorService.js
@@ -99,27 +99,27 @@ plxyground/
 │   │   ├── useFeed.js
 │   │   └── useOpportunities.js
 │   ├── constants/
-│   │   ├── colors.js             # Dark palette — primary #FF3C3C, bg #0A0A0A
-│   │   ├── typography.js         # Syne (headings) + DM Sans (body), full scale
-│   │   └── spacing.js            # 4-base spacing scale + border radii
-│   ├── app.json                  # bundle ID: com.basketballnxtion.plxyground
+│   │   ├── colors.js
+│   │   ├── typography.js
+│   │   └── spacing.js
+│   ├── app.json
 │   ├── .env.example
 │   └── package.json
 │
 ├── admin-panel/
-│   ├── index.html                # Full dark-theme SPA — all 6 sections
-│   ├── server.js                 # Tiny Node.js http-server on port 3012
+│   ├── index.html
+│   ├── server.js
 │   └── package.json
 │
 ├── docs/
-│   └── openapi.yaml              # Full OpenAPI 3.0 spec
+│   └── openapi.yaml
 │
 ├── .github/
 │   └── workflows/
-│       └── smoke.yml             # CI: runs smoke.js on push
+│       └── smoke.yml
 │
-├── start-all.sh                  # Linux/macOS/WSL — all 3 services
-├── start-all.ps1                 # Windows PowerShell — all 3 services
+├── start-all.sh
+├── start-all.ps1
 └── .gitignore
 ```
 
@@ -133,7 +133,6 @@ plxyground/
 ```powershell
 .\start-all.ps1
 ```
-Opens three separate PowerShell windows for backend, admin panel, and frontend simultaneously.
 
 **Linux / macOS / WSL:**
 ```bash
@@ -149,24 +148,27 @@ chmod +x start-all.sh && ./start-all.sh
 cd backend
 npm install
 cp .env.example .env        # fill in DATABASE_URL and JWT_SECRET (32+ chars)
-node src/db/setup.js        # creates tables + auto-seeds on first run
-npm run dev                 # → http://localhost:3011
+npm run dev                 # starts on http://localhost:3011
 ```
+
+On first run the server auto-creates all tables and seeds the database.
 
 #### 2. Admin Panel
 ```bash
 cd admin-panel
 npm install
-npm start                   # → http://localhost:3012
+npm start                   # starts on http://localhost:3012
 ```
+
 Log in with the seeded admin credentials — see `backend/src/db/seed.js`.
 
 #### 3. Frontend (Expo)
 ```bash
 cd frontend
 npm install
-npx expo start              # → Expo DevTools http://localhost:19006
+npx expo start              # opens Expo DevTools → http://localhost:19006
 ```
+
 Scan the QR code with Expo Go, or press `i` / `a` for iOS/Android simulators.
 
 ---
@@ -174,6 +176,7 @@ Scan the QR code with Expo Go, or press `i` / `a` for iOS/Android simulators.
 ## Environment Variables
 
 ### `backend/.env.example`
+
 ```env
 PORT=3011
 DATABASE_URL=postgresql://postgres:password@localhost:5432/plxyground
@@ -182,9 +185,11 @@ JWT_EXPIRES_IN=7d
 CORS_ORIGIN=http://localhost:19006,http://localhost:3012
 NODE_ENV=development
 ```
-> ⚠️ The server **throws at startup** if any required variable is missing or if `JWT_SECRET` is under 32 characters.
+
+> The server throws at startup if any variable is missing or if `JWT_SECRET` is under 32 characters.
 
 ### `frontend/.env.example`
+
 ```env
 EXPO_PUBLIC_API_BASE_URL=http://localhost:3011
 ```
@@ -193,18 +198,18 @@ EXPO_PUBLIC_API_BASE_URL=http://localhost:3011
 
 ## Database Schema
 
-9 tables — all created automatically on first startup via `backend/src/db/setup.js`.
+All 9 tables are created automatically on first startup via `backend/src/db/setup.js`.
 
 | Table | Purpose |
 |---|---|
 | `admins` | Admin accounts |
-| `creators` | Creator profiles (slug, sport, followerCount…) |
+| `creators` | Creator profiles (slug, sport, follower count) |
 | `creator_accounts` | Creator auth (email, passwordHash, role, isSuspended) |
-| `businesses` | Business profiles + auth |
+| `businesses` | Business profiles and auth |
 | `content` | Creator posts — status: `pending → published / rejected` |
-| `business_content` | Business posts with budget range + target sport |
+| `business_content` | Business posts with budget range and target sport |
 | `opportunities` | Job/collab listings posted by creators or businesses |
-| `moderation_queue` | Review queue linking to content/business_content |
+| `moderation_queue` | Review queue linked to content and business_content |
 | `audit_log` | Immutable action log for all admin operations |
 
 ---
@@ -215,41 +220,41 @@ EXPO_PUBLIC_API_BASE_URL=http://localhost:3011
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/health` | Health check — returns `{ status: "ok", uptime }` |
-| `GET` | `/api/content` | Public feed with `?search=&sport=&limit=&offset=` |
+| `GET` | `/health` | Health check |
+| `GET` | `/api/content` | Public feed (`?search=&sport=&limit=&offset=`) |
 | `GET` | `/api/content/:id` | Single post |
-| `GET` | `/api/creators` | List creators with filters |
+| `GET` | `/api/creators` | List creators |
 | `GET` | `/api/creators/:id` | Creator by ID |
 | `GET` | `/api/creators/slug/:slug` | Creator by slug |
 | `GET` | `/api/opportunities` | List opportunities |
 | `GET` | `/api/opportunities/:id` | Single opportunity |
 
-### Creator Auth (JWT)
+### Creator (JWT)
 
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/api/auth/signup` | Register creator |
-| `POST` | `/api/auth/login` | Creator login → returns `{ token, creator }` |
+| `POST` | `/api/auth/login` | Login — returns `{ token, creator }` |
 | `GET` | `/api/auth/me` | Current creator profile |
-| `POST` | `/api/content` | Create post (goes to moderation queue) |
+| `POST` | `/api/content` | Create post (enters moderation queue) |
 | `PATCH` | `/api/content/:id` | Update own post |
 | `DELETE` | `/api/content/:id` | Delete own post |
-| `PATCH` | `/api/creators/:id` | Update own creator profile |
+| `PATCH` | `/api/creators/:id` | Update own profile |
 | `POST` | `/api/opportunities` | Create opportunity |
 | `PATCH` | `/api/opportunities/:id` | Update own opportunity |
 | `DELETE` | `/api/opportunities/:id` | Delete own opportunity |
 
-### Business Auth (JWT)
+### Business (JWT)
 
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/api/business/auth/signup` | Register business |
-| `POST` | `/api/business/auth/login` | Business login → returns `{ token, business }` |
+| `POST` | `/api/business/auth/login` | Login — returns `{ token, business }` |
 | `GET` | `/api/business/auth/me` | Current business profile |
 | `GET` | `/api/business/content` | Own business content |
 | `POST` | `/api/business/content` | Create business post |
-| `PATCH` | `/api/business/content/:id` | Update own business post |
-| `DELETE` | `/api/business/content/:id` | Delete own business post |
+| `PATCH` | `/api/business/content/:id` | Update own post |
+| `DELETE` | `/api/business/content/:id` | Delete own post |
 | `POST` | `/api/opportunities` | Create opportunity |
 
 ### Admin (Admin JWT)
@@ -257,74 +262,44 @@ EXPO_PUBLIC_API_BASE_URL=http://localhost:3011
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/api/admin/auth/login` | Admin login |
-| `POST` | `/api/admin/auth/change-password` | Change admin password |
-| `GET` | `/api/admin/analytics` | KPIs + weekly signup chart data |
-| `GET` | `/api/admin/queue` | Moderation queue with `?status=pending` |
-| `POST` | `/api/admin/queue/bulk-action` | Approve / reject / delete multiple items |
-| `GET` | `/api/admin/content` | All content with search + status filter |
+| `POST` | `/api/admin/auth/change-password` | Change password |
+| `GET` | `/api/admin/analytics` | KPIs + weekly signup data |
+| `GET` | `/api/admin/queue` | Moderation queue (`?status=pending`) |
+| `POST` | `/api/admin/queue/bulk-action` | Bulk approve/reject/delete |
+| `GET` | `/api/admin/content` | All content with filters |
 | `PATCH` | `/api/admin/content/:id` | Publish or delete content |
-| `GET` | `/api/admin/users` | All creators and businesses |
+| `GET` | `/api/admin/users` | All users |
 | `PATCH` | `/api/admin/users/:id/suspend` | Suspend user |
 | `PATCH` | `/api/admin/users/:id/reactivate` | Reactivate user |
 | `PATCH` | `/api/admin/users/:id/role` | Change role |
 | `PATCH` | `/api/admin/users/:id/verify-email` | Mark email verified |
-| `GET` | `/api/admin/audit` | Audit log with `?actorType=` filter |
+| `GET` | `/api/admin/audit` | Audit log (`?actorType=` filter) |
 | `GET` | `/api/admin/audit/export` | Download audit log as JSON |
 
 ---
 
 ## Admin Panel
 
-Access at **http://localhost:3012** — log in with seeded admin credentials.
+Access at **http://localhost:3012**. Six sections:
 
-Six sections, all fully functional:
-
-- **Dashboard** — KPI cards (creators, businesses, content, pending queue), pure-CSS weekly signups bar chart, alert feed
-- **Moderation Queue** — pending items table, checkbox multi-select, bulk approve/reject/delete with review notes
-- **Content** — all platform content with status filter, search, publish/delete actions
-- **Users** — creators and businesses table, suspend/reactivate, change role, verify email
-- **Audit Log** — full log with actor-type filter, pagination, one-click JSON export
-- **Settings** — change admin password (current → new → confirm)
-
----
-
-## Frontend Design System
-
-| Token | Value |
-|---|---|
-| Primary red | `#FF3C3C` |
-| Background | `#0A0A0A` |
-| Surface | `#141414` |
-| Text primary | `#FFFFFF` |
-| Text muted | `#999999` |
-| Heading font | Syne 700 Bold (Google Fonts) |
-| Body font | DM Sans 400/500 (Google Fonts) |
-| Tab bar inactive | `#555555` |
-
-All lists use **FlashList** (Shopify) — never FlatList. Tokens are in `frontend/constants/`.
+- **Dashboard** — KPI cards, weekly signups bar chart, alert feed
+- **Moderation Queue** — pending items, multi-select, bulk approve/reject/delete with notes
+- **Content** — all platform content, status filter, search, publish/delete
+- **Users** — suspend/reactivate, change role, verify email
+- **Audit Log** — full log, actor-type filter, one-click JSON export
+- **Settings** — change admin password
 
 ---
 
 ## Testing
 
-**Smoke tests** (requires backend running on port 3011):
 ```bash
-cd backend
-npm run smoke
+# Smoke tests (requires backend running)
+cd backend && npm run smoke
+
+# Unit tests
+cd backend && npm test
 ```
-Covers: health check, creator signup/login/me, business signup/login/me, content CRUD, admin login, queue, analytics.
-
-**Unit tests:**
-```bash
-cd backend
-npm test
-```
-
----
-
-## CI
-
-GitHub Actions runs the smoke suite on every push to `main`. See `.github/workflows/smoke.yml`.
 
 ---
 
@@ -332,22 +307,10 @@ GitHub Actions runs the smoke suite on every push to `main`. See `.github/workfl
 
 | Service | Target |
 |---|---|
-| Backend + DB | Railway or Render — set all env vars from `.env.example` |
-| Admin Panel | Railway static service or same Render app on port 3012 |
-| Mobile | Expo EAS Build → App Store (`com.basketballnxtion.plxyground`) + Google Play |
+| Backend + DB | Railway or Render |
+| Mobile | Expo EAS → App Store + Google Play (`com.basketballnxtion.plxyground`) |
 
-Update `EXPO_PUBLIC_API_BASE_URL` in frontend `.env` to your deployed backend URL before building for production. No hardcoded `localhost` in any production file.
-
----
-
-## Contributing
-
-1. Branch off `main`
-2. Write every function in full — no TODOs, no stubs, no empty bodies
-3. All SQL must use parameterised queries (zero string interpolation)
-4. No `console.log` anywhere — use `logger` from `backend/src/logger.js`
-5. All async Express handlers wrapped in `try/catch`
-6. Run smoke tests before opening a PR
+Set `EXPO_PUBLIC_API_BASE_URL` to your deployed backend URL before building for production.
 
 ---
 
@@ -356,4 +319,3 @@ Update `EXPO_PUBLIC_API_BASE_URL` in frontend `.env` to your deployed backend UR
 Built with 🏀 by [Basketball Nxtion](https://github.com/Gowsikan123)
 
 </div>
-]]>
