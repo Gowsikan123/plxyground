@@ -1,34 +1,67 @@
 'use strict';
+
 const express = require('express');
-const pool = require('../../db/client');
+const { getPool } = require('../../db/client');
 const { requireAdmin } = require('../../middleware/auth');
 
 const router = express.Router();
 
-router.use(requireAdmin);
-
-router.get('/overview', async (req, res) => {
+router.get('/overview', requireAdmin, async (req, res) => {
+  const pool = getPool();
   try {
-    const [creators, businesses, content, pending, opportunities, recentAudit] = await Promise.all([
-      pool.query('SELECT COUNT(*) FROM creators'),
-      pool.query('SELECT COUNT(*) FROM businesses'),
-      pool.query("SELECT COUNT(*) FROM content WHERE status='published'"),
-      pool.query("SELECT COUNT(*) FROM moderation_queue WHERE status='pending'"),
-      pool.query("SELECT COUNT(*) FROM opportunities WHERE status='published'"),
-      pool.query('SELECT action, COUNT(*) AS count FROM audit_log GROUP BY action ORDER BY count DESC LIMIT 10'),
+    const [creatorsRes, businessesRes, contentRes, pendingRes, oppsRes] = await Promise.all([
+      pool.query(`SELECT COUNT(*) FROM creators`),
+      pool.query(`SELECT COUNT(*) FROM businesses`),
+      pool.query(`SELECT COUNT(*) FROM content WHERE status = 'published'`),
+      pool.query(`SELECT COUNT(*) FROM moderation_queue WHERE status = 'pending'`),
+      pool.query(`SELECT COUNT(*) FROM opportunities WHERE status = 'published'`),
     ]);
     return res.json({
-      totals: {
-        creators: parseInt(creators.rows[0].count, 10),
-        businesses: parseInt(businesses.rows[0].count, 10),
-        published_content: parseInt(content.rows[0].count, 10),
-        pending_moderation: parseInt(pending.rows[0].count, 10),
-        opportunities: parseInt(opportunities.rows[0].count, 10),
-      },
-      recent_audit_actions: recentAudit.rows,
+      total_creators: parseInt(creatorsRes.rows[0].count, 10),
+      total_businesses: parseInt(businessesRes.rows[0].count, 10),
+      published_content: parseInt(contentRes.rows[0].count, 10),
+      pending_moderation: parseInt(pendingRes.rows[0].count, 10),
+      active_opportunities: parseInt(oppsRes.rows[0].count, 10),
     });
-  } catch {
-    return res.status(500).json({ error: 'Failed to fetch analytics' });
+  } catch (err) {
+    throw err;
+  }
+});
+
+router.get('/signups', requireAdmin, async (req, res) => {
+  const pool = getPool();
+  const { days = 30 } = req.query;
+  const safeDays = Math.min(parseInt(days, 10) || 30, 365);
+  try {
+    const [creatorsRes, businessesRes] = await Promise.all([
+      pool.query(
+        `SELECT DATE(created_at) AS date, COUNT(*) AS count FROM creators WHERE created_at >= NOW() - INTERVAL '${safeDays} days' GROUP BY DATE(created_at) ORDER BY date ASC`
+      ),
+      pool.query(
+        `SELECT DATE(created_at) AS date, COUNT(*) AS count FROM businesses WHERE created_at >= NOW() - INTERVAL '${safeDays} days' GROUP BY DATE(created_at) ORDER BY date ASC`
+      ),
+    ]);
+    return res.json({
+      creators: creatorsRes.rows,
+      businesses: businessesRes.rows,
+    });
+  } catch (err) {
+    throw err;
+  }
+});
+
+router.get('/content-stats', requireAdmin, async (req, res) => {
+  const pool = getPool();
+  try {
+    const { rows } = await pool.query(
+      `SELECT status, COUNT(*) AS count FROM content GROUP BY status ORDER BY count DESC`
+    );
+    const { rows: topContent } = await pool.query(
+      `SELECT c.id, c.title, c.view_count, cr.display_name, cr.username FROM content c JOIN creators cr ON cr.id = c.creator_id WHERE c.status = 'published' ORDER BY c.view_count DESC LIMIT 10`
+    );
+    return res.json({ by_status: rows, top_content: topContent });
+  } catch (err) {
+    throw err;
   }
 });
 
