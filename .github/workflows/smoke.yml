@@ -40,11 +40,7 @@ jobs:
 
       - name: Install backend dependencies
         working-directory: backend
-        run: npm ci
-
-      - name: Install admin-panel dependencies
-        working-directory: admin-panel
-        run: npm ci
+        run: npm install
 
       - name: Run backend smoke suite
         working-directory: backend
