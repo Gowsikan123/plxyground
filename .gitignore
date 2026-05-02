@@ -1,9 +1,25 @@
 node_modules/
 .env
 *.db
+*.db-shm
+*.db-wal
 dist/
 .expo/
 android/
 ios/
 *.log
 .DS_Store
+
+# Local Vercel config
+.vercel/
+.frontend-vercel-env
+backend/.backend-vercel-env
+backend/.vercel-env
+
+# Local dev runtime artefacts
+.postgres-local/
+.run-logs/
+
+# Test output
+test-results/
+coverage/
