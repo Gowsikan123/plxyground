@@ -1,82 +1,65 @@
 'use strict';
-
 const express = require('express');
 const bcrypt = require('bcrypt');
 const { body } = require('express-validator');
 const router = express.Router();
 
 const db = require('../../db/client');
-const { signAccessToken } = require('../../utils/jwt');
-const auditLog = require('../../utils/auditLogger');
-const { requireAuth, requireAdmin } = require('../../middleware/auth');
+const { signToken } = require('../../utils/jwt');
 const { validate } = require('../../middleware/validate');
-const { authLimiter } = require('../../middleware/rateLimiter');
-const config = require('../../config');
+const { requireAdmin } = require('../../middleware/auth');
+const { auditLog } = require('../../utils/auditLogger');
 const logger = require('../../logger');
 
 // POST /api/admin/auth/login
 router.post(
   '/login',
-  authLimiter,
   [
-    body('email').isEmail().normalizeEmail(),
-    body('password').notEmpty(),
+    body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
+    body('password').notEmpty().withMessage('Password required'),
   ],
   validate,
   async (req, res) => {
     try {
       const { email, password } = req.body;
-
-      const { rows } = await db.query(
-        `SELECT id, email, username, password_hash, role FROM users WHERE email = $1 AND role = 'admin'`,
-        [email]
+      const result = await db.query(
+        'SELECT id, username, email, password_hash, role, is_active FROM admins WHERE email = $1',
+        [email],
       );
-      if (!rows.length) return res.status(401).json({ error: 'Invalid credentials' });
+      const admin = result.rows[0];
 
-      const admin = rows[0];
-      const match = await bcrypt.compare(password, admin.password_hash);
-      if (!match) return res.status(401).json({ error: 'Invalid credentials' });
+      if (!admin || !(await bcrypt.compare(password, admin.password_hash))) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+      if (!admin.is_active) {
+        return res.status(403).json({ error: 'Account deactivated' });
+      }
 
-      const accessToken = signAccessToken({ sub: admin.id, role: admin.role, type: 'creator' });
-      delete admin.password_hash;
+      await db.query('UPDATE admins SET last_login_at = NOW() WHERE id = $1', [admin.id]);
+      const token = signToken({ id: admin.id, username: admin.username, role: admin.role, type: 'admin' }, true);
 
       auditLog({ actorId: admin.id, actorType: 'admin', action: 'admin.login', ip: req.ip });
-      res.json({ admin, accessToken });
+      return res.json({ token, admin: { id: admin.id, username: admin.username, email: admin.email, role: admin.role } });
     } catch (err) {
-      logger.error('admin.auth.login error', { message: err.message });
-      res.status(500).json({ error: 'Login failed' });
+      logger.error('admin.login error', { message: err.message });
+      return res.status(500).json({ error: 'Internal server error' });
     }
-  }
+  },
 );
 
-// POST /api/admin/auth/change-password
-router.post(
-  '/change-password',
-  requireAuth,
-  requireAdmin,
-  [
-    body('current_password').notEmpty(),
-    body('new_password').isLength({ min: 8 }),
-  ],
-  validate,
-  async (req, res) => {
-    try {
-      const { current_password, new_password } = req.body;
-      const { rows } = await db.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
-
-      const match = await bcrypt.compare(current_password, rows[0].password_hash);
-      if (!match) return res.status(401).json({ error: 'Current password incorrect' });
-
-      const newHash = await bcrypt.hash(new_password, config.bcrypt.rounds);
-      await db.query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [newHash, req.user.id]);
-
-      auditLog({ actorId: req.user.id, actorType: 'admin', action: 'admin.password.changed', ip: req.ip });
-      res.json({ message: 'Password updated successfully' });
-    } catch (err) {
-      logger.error('admin.auth.changePassword error', { message: err.message });
-      res.status(500).json({ error: 'Failed to change password' });
-    }
+// GET /api/admin/auth/me
+router.get('/me', requireAdmin, async (req, res) => {
+  try {
+    const result = await db.query(
+      'SELECT id, username, email, role, last_login_at FROM admins WHERE id = $1',
+      [req.admin.id],
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Admin not found' });
+    return res.json({ admin: result.rows[0] });
+  } catch (err) {
+    logger.error('admin.me error', { message: err.message });
+    return res.status(500).json({ error: 'Internal server error' });
   }
-);
+});
 
 module.exports = router;

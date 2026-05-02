@@ -1,152 +1,113 @@
 'use strict';
-
 const express = require('express');
 const bcrypt = require('bcrypt');
 const { body } = require('express-validator');
 const router = express.Router();
 
 const db = require('../db/client');
-const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/jwt');
-const { uniqueUserSlug } = require('../utils/slugify');
-const auditLog = require('../utils/auditLogger');
-const { requireAuth } = require('../middleware/auth');
+const { signToken } = require('../utils/jwt');
 const { validate } = require('../middleware/validate');
-const { authLimiter } = require('../middleware/rateLimiter');
+const { requireAuth } = require('../middleware/auth');
+const { auditLog } = require('../utils/auditLogger');
+const { slugify, uniqueSlug } = require('../utils/slugify');
 const config = require('../config');
 const logger = require('../logger');
 
 // POST /api/auth/signup
 router.post(
   '/signup',
-  authLimiter,
   [
-    body('username').trim().isLength({ min: 3, max: 50 }).matches(/^[a-zA-Z0-9_]+$/),
-    body('email').isEmail().normalizeEmail(),
-    body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+    body('username').trim().isLength({ min: 3, max: 50 }).withMessage('Username must be 3-50 chars'),
+    body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
+    body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 chars'),
     body('display_name').optional().trim().isLength({ max: 100 }),
     body('sport').optional().trim().isLength({ max: 50 }),
   ],
   validate,
   async (req, res) => {
     try {
-      const { username, email, password, display_name, sport, position, location } = req.body;
+      const { username, email, password, display_name, sport } = req.body;
 
-      const { rows: existing } = await db.query(
+      const existing = await db.query(
         'SELECT id FROM users WHERE email = $1 OR username = $2',
-        [email, username]
+        [email, username],
       );
-      if (existing.length) {
-        return res.status(409).json({ error: 'Email or username already in use' });
+      if (existing.rows.length) {
+        return res.status(409).json({ error: 'Email or username already taken' });
       }
 
       const password_hash = await bcrypt.hash(password, config.bcrypt.rounds);
-      const slug = await uniqueUserSlug(username);
+      const baseSlug = slugify(display_name || username);
+      const slug = await uniqueSlug(baseSlug, 'users');
 
-      const { rows } = await db.query(
-        `INSERT INTO users (username, email, password_hash, display_name, sport, position, location, slug, role)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'creator')
-         RETURNING id, username, email, display_name, slug, role, created_at`,
-        [username, email, password_hash, display_name || username, sport || null, position || null, location || null, slug]
+      const result = await db.query(
+        `INSERT INTO users (username, email, password_hash, display_name, sport, slug)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id, username, email, display_name, sport, slug, created_at`,
+        [username, email, password_hash, display_name || username, sport || null, slug],
       );
 
-      const user = rows[0];
-      const accessToken = signAccessToken({ sub: user.id, role: user.role, type: 'creator' });
-      const refreshToken = signRefreshToken({ sub: user.id, type: 'creator' });
+      const user = result.rows[0];
+      const token = signToken({ id: user.id, username: user.username, type: 'user' });
 
-      auditLog({ actorId: user.id, actorType: 'creator', action: 'creator.signup', ip: req.ip });
-
-      res.status(201).json({ user, accessToken, refreshToken });
+      auditLog({ actorId: user.id, actorType: 'user', action: 'auth.signup', ip: req.ip });
+      return res.status(201).json({ token, user });
     } catch (err) {
       logger.error('auth.signup error', { message: err.message });
-      res.status(500).json({ error: 'Signup failed' });
+      return res.status(500).json({ error: 'Internal server error' });
     }
-  }
+  },
 );
 
 // POST /api/auth/login
 router.post(
   '/login',
-  authLimiter,
   [
-    body('email').isEmail().normalizeEmail(),
-    body('password').notEmpty(),
+    body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
+    body('password').notEmpty().withMessage('Password required'),
   ],
   validate,
   async (req, res) => {
     try {
       const { email, password } = req.body;
 
-      const { rows } = await db.query(
-        'SELECT id, username, email, password_hash, display_name, slug, role, is_suspended FROM users WHERE email = $1',
-        [email]
+      const result = await db.query(
+        'SELECT id, username, email, password_hash, display_name, sport, slug, is_suspended FROM users WHERE email = $1',
+        [email],
       );
-      if (!rows.length) {
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
+      const user = result.rows[0];
 
-      const user = rows[0];
-      const match = await bcrypt.compare(password, user.password_hash);
-      if (!match) {
-        return res.status(401).json({ error: 'Invalid credentials' });
+      if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+        return res.status(401).json({ error: 'Invalid email or password' });
       }
       if (user.is_suspended) {
         return res.status(403).json({ error: 'Account suspended' });
       }
 
-      const accessToken = signAccessToken({ sub: user.id, role: user.role, type: 'creator' });
-      const refreshToken = signRefreshToken({ sub: user.id, type: 'creator' });
+      const { password_hash, ...safeUser } = user;
+      const token = signToken({ id: user.id, username: user.username, type: 'user' });
 
-      delete user.password_hash;
-      auditLog({ actorId: user.id, actorType: 'creator', action: 'creator.login', ip: req.ip });
-
-      res.json({ user, accessToken, refreshToken });
+      auditLog({ actorId: user.id, actorType: 'user', action: 'auth.login', ip: req.ip });
+      return res.json({ token, user: safeUser });
     } catch (err) {
       logger.error('auth.login error', { message: err.message });
-      res.status(500).json({ error: 'Login failed' });
+      return res.status(500).json({ error: 'Internal server error' });
     }
-  }
+  },
 );
-
-// POST /api/auth/refresh
-router.post('/refresh', async (req, res) => {
-  try {
-    const { refreshToken } = req.body;
-    if (!refreshToken) return res.status(400).json({ error: 'Refresh token required' });
-
-    const payload = verifyRefreshToken(refreshToken);
-    if (!payload) return res.status(401).json({ error: 'Invalid or expired refresh token' });
-
-    const { rows } = await db.query(
-      'SELECT id, role, is_suspended FROM users WHERE id = $1',
-      [payload.sub]
-    );
-    if (!rows.length || rows[0].is_suspended) {
-      return res.status(401).json({ error: 'Account not found or suspended' });
-    }
-
-    const user = rows[0];
-    const accessToken = signAccessToken({ sub: user.id, role: user.role, type: 'creator' });
-    res.json({ accessToken });
-  } catch (err) {
-    logger.error('auth.refresh error', { message: err.message });
-    res.status(500).json({ error: 'Token refresh failed' });
-  }
-});
 
 // GET /api/auth/me
 router.get('/me', requireAuth, async (req, res) => {
   try {
-    const { rows } = await db.query(
-      `SELECT id, username, email, display_name, bio, avatar_url, sport, position, location,
-              follower_count, following_count, is_verified, slug, role, created_at
-       FROM users WHERE id = $1`,
-      [req.user.id]
+    const result = await db.query(
+      'SELECT id, username, email, display_name, bio, avatar_url, sport, slug, is_verified, follower_count, created_at FROM users WHERE id = $1',
+      [req.user.id],
     );
-    if (!rows.length) return res.status(404).json({ error: 'User not found' });
-    res.json({ user: rows[0] });
+    if (!result.rows.length) return res.status(404).json({ error: 'User not found' });
+    return res.json({ user: result.rows[0] });
   } catch (err) {
     logger.error('auth.me error', { message: err.message });
-    res.status(500).json({ error: 'Failed to fetch profile' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 

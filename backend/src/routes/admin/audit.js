@@ -1,69 +1,45 @@
 'use strict';
-
 const express = require('express');
 const { query: qv } = require('express-validator');
 const router = express.Router();
 
 const db = require('../../db/client');
-const { requireAuth, requireAdmin } = require('../../middleware/auth');
 const { validate } = require('../../middleware/validate');
+const { requireAdmin } = require('../../middleware/auth');
 const logger = require('../../logger');
 
 // GET /api/admin/audit
 router.get(
   '/',
-  requireAuth,
   requireAdmin,
   [
-    qv('page').optional().isInt({ min: 1 }).toInt(),
-    qv('limit').optional().isInt({ min: 1, max: 200 }).toInt(),
-    qv('actor_type').optional().isIn(['creator', 'business', 'admin', 'system']),
+    qv('actor_type').optional().isIn(['user', 'business', 'admin', 'system']),
     qv('action').optional().trim(),
+    qv('page').optional().isInt({ min: 1 }),
+    qv('limit').optional().isInt({ min: 1, max: 100 }),
   ],
   validate,
   async (req, res) => {
     try {
-      const page = req.query.page || 1;
-      const limit = req.query.limit || 50;
+      const page   = parseInt(req.query.page  || '1',  10);
+      const limit  = parseInt(req.query.limit || '50', 10);
       const offset = (page - 1) * limit;
 
-      const params = [limit, offset];
-      const clauses = [];
+      const params = [];
+      const conditions = [];
+      if (req.query.actor_type) conditions.push(`actor_type = $${params.push(req.query.actor_type)}`);
+      if (req.query.action)     conditions.push(`action ILIKE $${params.push('%' + req.query.action + '%')}`);
 
-      if (req.query.actor_type) {
-        params.push(req.query.actor_type);
-        clauses.push(`actor_type = $${params.length}`);
-      }
-      if (req.query.action) {
-        params.push(`%${req.query.action}%`);
-        clauses.push(`action ILIKE $${params.length}`);
-      }
+      const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+      const sql   = `SELECT * FROM audit_logs ${where} ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
 
-      const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-
-      const { rows } = await db.query(
-        `SELECT id, actor_id, actor_type, action, target_type, target_id, meta, ip, created_at
-         FROM audit_log
-         ${where}
-         ORDER BY created_at DESC
-         LIMIT $1 OFFSET $2`,
-        params
-      );
-
-      const { rows: countRows } = await db.query(
-        `SELECT COUNT(*) AS total FROM audit_log ${where}`,
-        params.slice(2)
-      );
-
-      res.json({
-        logs: rows,
-        pagination: { page, limit, total: parseInt(countRows[0].total, 10) },
-      });
+      const result = await db.query(sql, params);
+      return res.json({ logs: result.rows, page, limit });
     } catch (err) {
       logger.error('admin.audit.list error', { message: err.message });
-      res.status(500).json({ error: 'Failed to fetch audit log' });
+      return res.status(500).json({ error: 'Internal server error' });
     }
-  }
+  },
 );
 
 module.exports = router;

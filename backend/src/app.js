@@ -1,67 +1,53 @@
 'use strict';
-
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const morgan = require('morgan');
-
 const config = require('./config');
 const logger = require('./logger');
 const { globalLimiter } = require('./middleware/rateLimiter');
-
-const authRoutes         = require('./routes/auth');
-const businessAuthRoutes = require('./routes/businessAuth');
-const contentRoutes      = require('./routes/content');
-const creatorsRoutes     = require('./routes/creators');
-const oppsRoutes         = require('./routes/opportunities');
-
-const adminAuthRoutes      = require('./routes/admin/auth');
-const adminQueueRoutes     = require('./routes/admin/queue');
-const adminUsersRoutes     = require('./routes/admin/users');
-const adminContentRoutes   = require('./routes/admin/content');
-const adminAnalyticsRoutes = require('./routes/admin/analytics');
-const adminAuditRoutes     = require('./routes/admin/audit');
+const { authLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
 
-app.set('trust proxy', 1);
-
+// Security
 app.use(helmet());
 app.use(cors({
   origin: config.cors.origins,
-  credentials: true,
-  methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
 }));
+
+// Body parsing
 app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true }));
-app.use(morgan('combined', { stream: { write: (msg) => logger.http(msg.trim()) } }));
+app.use(express.urlencoded({ extended: false }));
+
+// Logging
+app.use(logger.requestMiddleware);
+
+// Rate limiting
 app.use(globalLimiter);
 
-// Health check — no auth, no rate limit
-app.get('/healthz', (_req, res) => {
-  res.json({ status: 'ok', service: 'plxyground-api', ts: new Date().toISOString() });
-});
+// Health
+app.get('/healthz', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
 
-// API routes
-app.use('/api/auth',        authRoutes);
-app.use('/api/business',    businessAuthRoutes);
-app.use('/api/content',     contentRoutes);
-app.use('/api/creators',    creatorsRoutes);
-app.use('/api/opportunities', oppsRoutes);
+// Routes
+app.use('/api/auth',         authLimiter, require('./routes/auth'));
+app.use('/api/business',     authLimiter, require('./routes/businessAuth'));
+app.use('/api/content',      require('./routes/content'));
+app.use('/api/creators',     require('./routes/creators'));
+app.use('/api/opportunities',require('./routes/opportunities'));
 
 // Admin routes
-app.use('/api/admin/auth',      adminAuthRoutes);
-app.use('/api/admin/queue',     adminQueueRoutes);
-app.use('/api/admin/users',     adminUsersRoutes);
-app.use('/api/admin/content',   adminContentRoutes);
-app.use('/api/admin/analytics', adminAnalyticsRoutes);
-app.use('/api/admin/audit',     adminAuditRoutes);
+app.use('/api/admin/auth',      authLimiter, require('./routes/admin/auth'));
+app.use('/api/admin/queue',     require('./routes/admin/queue'));
+app.use('/api/admin/users',     require('./routes/admin/users'));
+app.use('/api/admin/analytics', require('./routes/admin/analytics'));
+app.use('/api/admin/audit',     require('./routes/admin/audit'));
+app.use('/api/admin/settings',  require('./routes/admin/settings'));
 
-// 404 catch-all
-app.use((_req, res) => {
-  res.status(404).json({ error: 'Route not found' });
-});
+// 404
+app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
 
 // Global error handler
 app.use((err, _req, res, _next) => {

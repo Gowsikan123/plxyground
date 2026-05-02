@@ -1,61 +1,48 @@
 'use strict';
-
-const { verifyAccessToken } = require('../utils/jwt');
-const db = require('../db/client');
+const { verifyToken } = require('../utils/jwt');
 const logger = require('../logger');
 
-async function requireAuth(req, res, next) {
+function requireAuth(req, res, next) {
   try {
-    const header = req.headers.authorization;
-    if (!header || !header.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'No token provided' });
-    }
-
-    const token = header.slice(7);
-    const payload = verifyAccessToken(token);
-    if (!payload) {
-      return res.status(401).json({ error: 'Invalid or expired token' });
-    }
-
-    if (payload.type === 'business') {
-      const { rows } = await db.query(
-        'SELECT id, email, company_name, is_suspended FROM businesses WHERE id = $1',
-        [payload.sub]
-      );
-      if (!rows.length) return res.status(401).json({ error: 'Account not found' });
-      if (rows[0].is_suspended) return res.status(403).json({ error: 'Account suspended' });
-      req.business = rows[0];
-      req.actorType = 'business';
-    } else {
-      const { rows } = await db.query(
-        'SELECT id, username, email, role, is_suspended FROM users WHERE id = $1',
-        [payload.sub]
-      );
-      if (!rows.length) return res.status(401).json({ error: 'Account not found' });
-      if (rows[0].is_suspended) return res.status(403).json({ error: 'Account suspended' });
-      req.user = rows[0];
-      req.actorType = rows[0].role;
-    }
-
+    const header = req.headers.authorization || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+    if (!token) return res.status(401).json({ error: 'No token provided' });
+    const payload = verifyToken(token, false);
+    req.user = payload;
     next();
   } catch (err) {
-    logger.error('requireAuth error', { message: err.message });
-    res.status(500).json({ error: 'Authentication error' });
+    logger.warn('requireAuth failed', { message: err.message });
+    return res.status(401).json({ error: 'Invalid or expired token' });
   }
 }
 
 function requireAdmin(req, res, next) {
-  if (!req.user || req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin access required' });
+  try {
+    const header = req.headers.authorization || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+    if (!token) return res.status(401).json({ error: 'No token provided' });
+    const payload = verifyToken(token, true);
+    req.admin = payload;
+    next();
+  } catch (err) {
+    logger.warn('requireAdmin failed', { message: err.message });
+    return res.status(401).json({ error: 'Invalid or expired admin token' });
   }
-  next();
 }
 
 function requireBusiness(req, res, next) {
-  if (!req.business) {
-    return res.status(403).json({ error: 'Business account required' });
+  try {
+    const header = req.headers.authorization || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+    if (!token) return res.status(401).json({ error: 'No token provided' });
+    const payload = verifyToken(token, false);
+    if (payload.type !== 'business') return res.status(403).json({ error: 'Business account required' });
+    req.business = payload;
+    next();
+  } catch (err) {
+    logger.warn('requireBusiness failed', { message: err.message });
+    return res.status(401).json({ error: 'Invalid or expired token' });
   }
-  next();
 }
 
 module.exports = { requireAuth, requireAdmin, requireBusiness };

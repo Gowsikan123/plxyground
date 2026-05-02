@@ -1,109 +1,89 @@
 'use strict';
-
 const express = require('express');
-const { body } = require('express-validator');
+const { param, body } = require('express-validator');
 const router = express.Router();
 
 const db = require('../../db/client');
-const auditLog = require('../../utils/auditLogger');
-const { requireAuth, requireAdmin } = require('../../middleware/auth');
 const { validate } = require('../../middleware/validate');
+const { requireAdmin } = require('../../middleware/auth');
+const { auditLog } = require('../../utils/auditLogger');
 const logger = require('../../logger');
 
-// GET /api/admin/queue  — pending content
-router.get('/', requireAuth, requireAdmin, async (req, res) => {
+// GET /api/admin/queue — pending + flagged content
+router.get('/', requireAdmin, async (req, res) => {
   try {
-    const { rows } = await db.query(
-      `SELECT c.id, c.title, c.body, c.media_url, c.media_type, c.sport, c.tags, c.created_at,
-              u.id AS author_id, u.username, u.display_name, u.avatar_url
+    const result = await db.query(
+      `SELECT c.id, c.title, c.body, c.media_url, c.media_type, c.sport, c.tags, c.status, c.created_at,
+              u.id AS user_id, u.display_name, u.username, u.avatar_url
        FROM content c
        JOIN users u ON u.id = c.user_id
-       WHERE c.status = 'pending'
-       ORDER BY c.created_at ASC`
+       WHERE c.status IN ('pending', 'flagged')
+       ORDER BY c.created_at ASC`,
     );
-    res.json({ queue: rows, total: rows.length });
+    return res.json({ queue: result.rows });
   } catch (err) {
     logger.error('admin.queue.list error', { message: err.message });
-    res.status(500).json({ error: 'Failed to fetch queue' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// POST /api/admin/queue/:id/approve
-router.post('/:id/approve', requireAuth, requireAdmin, async (req, res) => {
-  try {
-    const { rows } = await db.query(
-      `UPDATE content SET status = 'approved', rejection_reason = NULL, updated_at = NOW()
-       WHERE id = $1 AND status = 'pending' RETURNING id, title, status`,
-      [req.params.id]
-    );
-    if (!rows.length) return res.status(404).json({ error: 'Content not found or not pending' });
-
-    auditLog({ actorId: req.user.id, actorType: 'admin', action: 'content.approved', targetType: 'content', targetId: req.params.id, ip: req.ip });
-    res.json({ content: rows[0] });
-  } catch (err) {
-    logger.error('admin.queue.approve error', { message: err.message });
-    res.status(500).json({ error: 'Failed to approve content' });
-  }
-});
-
-// POST /api/admin/queue/:id/reject
-router.post(
-  '/:id/reject',
-  requireAuth,
-  requireAdmin,
-  [body('reason').optional().trim().isLength({ max: 500 })],
-  validate,
-  async (req, res) => {
-    try {
-      const reason = req.body.reason || null;
-      const { rows } = await db.query(
-        `UPDATE content SET status = 'rejected', rejection_reason = $1, updated_at = NOW()
-         WHERE id = $2 AND status = 'pending' RETURNING id, title, status`,
-        [reason, req.params.id]
-      );
-      if (!rows.length) return res.status(404).json({ error: 'Content not found or not pending' });
-
-      auditLog({ actorId: req.user.id, actorType: 'admin', action: 'content.rejected', targetType: 'content', targetId: req.params.id, meta: { reason }, ip: req.ip });
-      res.json({ content: rows[0] });
-    } catch (err) {
-      logger.error('admin.queue.reject error', { message: err.message });
-      res.status(500).json({ error: 'Failed to reject content' });
-    }
-  }
-);
-
-// POST /api/admin/queue/bulk  — bulk approve/reject
-router.post(
-  '/bulk',
-  requireAuth,
+// PATCH /api/admin/queue/:id — approve / reject / flag
+router.patch(
+  '/:id',
   requireAdmin,
   [
-    body('ids').isArray({ min: 1 }),
-    body('action').isIn(['approve', 'reject']),
-    body('reason').optional().trim(),
+    param('id').isInt(),
+    body('status').isIn(['approved', 'rejected', 'flagged']).withMessage('Invalid status'),
+    body('moderation_note').optional().trim().isLength({ max: 500 }),
   ],
   validate,
   async (req, res) => {
     try {
-      const { ids, action, reason } = req.body;
-      const status = action === 'approve' ? 'approved' : 'rejected';
+      const { status, moderation_note } = req.body;
+      const result = await db.query(
+        `UPDATE content SET status = $1, moderation_note = $2, moderated_by = $3, moderated_at = NOW(), updated_at = NOW()
+         WHERE id = $4 RETURNING id, title, status`,
+        [status, moderation_note || null, req.admin.id, req.params.id],
+      );
+      if (!result.rows.length) return res.status(404).json({ error: 'Content not found' });
 
-      const { rowCount } = await db.query(
-        `UPDATE content
-         SET status = $1,
-             rejection_reason = $2,
-             updated_at = NOW()
-         WHERE id = ANY($3::uuid[]) AND status = 'pending'`,
-        [status, reason || null, ids]
+      auditLog({ actorId: req.admin.id, actorType: 'admin', action: `content.${status}`, targetType: 'content', targetId: parseInt(req.params.id, 10), meta: { note: moderation_note }, ip: req.ip });
+      return res.json({ content: result.rows[0] });
+    } catch (err) {
+      logger.error('admin.queue.update error', { message: err.message });
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+);
+
+// POST /api/admin/queue/bulk — bulk moderate
+router.post(
+  '/bulk',
+  requireAdmin,
+  [
+    body('ids').isArray({ min: 1 }).withMessage('ids array required'),
+    body('status').isIn(['approved', 'rejected']).withMessage('Invalid status'),
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const { ids, status, moderation_note } = req.body;
+      const safeIds = ids.map(Number).filter((n) => Number.isInteger(n) && n > 0);
+      if (!safeIds.length) return res.status(400).json({ error: 'No valid IDs provided' });
+
+      await db.query(
+        `UPDATE content SET status = $1, moderation_note = $2, moderated_by = $3, moderated_at = NOW()
+         WHERE id = ANY($4::int[])`,
+        [status, moderation_note || null, req.admin.id, safeIds],
       );
 
-      auditLog({ actorId: req.user.id, actorType: 'admin', action: `content.bulk.${action}`, meta: { ids, count: rowCount }, ip: req.ip });
-      res.json({ updated: rowCount });
+      auditLog({ actorId: req.admin.id, actorType: 'admin', action: `content.bulk.${status}`, meta: { ids: safeIds, count: safeIds.length }, ip: req.ip });
+      return res.json({ success: true, updated: safeIds.length });
     } catch (err) {
       logger.error('admin.queue.bulk error', { message: err.message });
-      res.status(500).json({ error: 'Bulk action failed' });
+      return res.status(500).json({ error: 'Internal server error' });
     }
-  }
+  },
 );
 
 module.exports = router;
