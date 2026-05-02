@@ -3,7 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const { generalLimiter } = require('./middleware/rateLimiter');
+const { globalLimiter } = require('./middleware/rateLimiter');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('./logger');
 
@@ -16,7 +16,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json({ limit: '2mb' }));
-app.use(generalLimiter);
+app.use(globalLimiter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: Date.now() }));
 
