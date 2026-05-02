@@ -1,100 +1,112 @@
 'use strict';
 
 const express = require('express');
+const { param, body, query } = require('express-validator');
 const { getPool } = require('../db/client');
 const { requireAuth } = require('../middleware/auth');
+const { validate } = require('../middleware/validate');
+const { uniqueSlug } = require('../utils/slugify');
+const logger = require('../logger');
 
 const router = express.Router();
 
-router.get('/', async (req, res) => {
-  const pool = getPool();
-  const { search, sport, limit = 20, offset = 0 } = req.query;
-  const safeLimit = Math.min(parseInt(limit, 10) || 20, 100);
-  const safeOffset = parseInt(offset, 10) || 0;
-  try {
-    const conditions = [];
-    const params = [];
-    let idx = 1;
-    if (search) {
-      conditions.push(`(display_name ILIKE $${idx} OR username ILIKE $${idx} OR bio ILIKE $${idx})`);
-      params.push(`%${search}%`);
-      idx++;
+// GET /api/creators — list all (public)
+router.get(
+  '/',
+  [query('sport').optional().trim(), query('search').optional().trim(), query('page').optional().isInt({ min: 1 }).toInt(), query('limit').optional().isInt({ min: 1, max: 50 }).toInt()],
+  validate,
+  async (req, res) => {
+    try {
+      const page = req.query.page || 1;
+      const limit = req.query.limit || 20;
+      const offset = (page - 1) * limit;
+      const conditions = ['is_suspended = FALSE'];
+      const params = [];
+
+      if (req.query.sport) { params.push(req.query.sport); conditions.push(`sport = $${params.length}`); }
+      if (req.query.search) { params.push(`%${req.query.search}%`); conditions.push(`(username ILIKE $${params.length} OR display_name ILIKE $${params.length})`); }
+
+      params.push(limit, offset);
+      const { rows } = await getPool().query(
+        `SELECT id, username, display_name, bio, sport, avatar_url, slug, follower_count, is_verified, created_at
+         FROM creators WHERE ${conditions.join(' AND ')}
+         ORDER BY follower_count DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
+        params,
+      );
+      return res.json({ creators: rows, page, limit });
+    } catch (err) {
+      logger.error('list creators error', { message: err.message });
+      return res.status(500).json({ error: 'Internal server error' });
     }
-    if (sport) {
-      conditions.push(`sport ILIKE $${idx}`);
-      params.push(`%${sport}%`);
-      idx++;
-    }
-    const where = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
-    const countRes = await pool.query(`SELECT COUNT(*) FROM creators ${where}`, params);
-    const total = parseInt(countRes.rows[0].count, 10);
-    params.push(safeLimit);
-    params.push(safeOffset);
-    const { rows } = await pool.query(
-      `SELECT id, username, slug, display_name, bio, avatar_url, sport, location, follower_count, is_verified, created_at FROM creators ${where} ORDER BY created_at DESC LIMIT $${idx} OFFSET $${idx + 1}`,
-      params
-    );
-    return res.json({ data: rows, total, limit: safeLimit, offset: safeOffset });
-  } catch (err) {
-    throw err;
-  }
-});
+  },
+);
 
-router.get('/slug/:slug', async (req, res) => {
-  const pool = getPool();
-  const { slug } = req.params;
+// GET /api/creators/:id
+router.get('/:id', [param('id').isInt().toInt()], validate, async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      `SELECT id, username, slug, display_name, bio, avatar_url, sport, location, follower_count, is_verified, created_at FROM creators WHERE slug = $1`,
-      [slug]
+    const { rows } = await getPool().query(
+      'SELECT id, username, display_name, bio, sport, avatar_url, slug, follower_count, is_verified, created_at FROM creators WHERE id = $1 AND is_suspended = FALSE',
+      [req.params.id],
     );
-    if (rows.length === 0) return res.status(404).json({ error: 'Creator not found' });
-    const creator = rows[0];
-    const { rows: posts } = await pool.query(
-      `SELECT * FROM content WHERE creator_id = $1 AND status = 'published' ORDER BY created_at DESC LIMIT 20`,
-      [creator.id]
-    );
-    return res.json({ creator, posts });
-  } catch (err) {
-    throw err;
-  }
-});
-
-router.get('/:id', async (req, res) => {
-  const pool = getPool();
-  const { id } = req.params;
-  try {
-    const { rows } = await pool.query(
-      `SELECT id, username, slug, display_name, bio, avatar_url, sport, location, follower_count, is_verified, created_at FROM creators WHERE id = $1`,
-      [id]
-    );
-    if (rows.length === 0) return res.status(404).json({ error: 'Creator not found' });
-    const creator = rows[0];
-    const { rows: posts } = await pool.query(
-      `SELECT * FROM content WHERE creator_id = $1 AND status = 'published' ORDER BY created_at DESC LIMIT 20`,
-      [creator.id]
-    );
-    return res.json({ creator, posts });
-  } catch (err) {
-    throw err;
-  }
-});
-
-router.put('/:id', requireAuth, async (req, res) => {
-  if (req.userType !== 'creator') return res.status(403).json({ error: 'Creator auth required' });
-  const { id } = req.params;
-  if (req.user.creator_id !== parseInt(id, 10)) return res.status(403).json({ error: 'Not authorised to update this profile' });
-  const pool = getPool();
-  const { display_name, bio, avatar_url, sport, location } = req.body;
-  try {
-    const { rows } = await pool.query(
-      `UPDATE creators SET display_name = COALESCE($1, display_name), bio = COALESCE($2, bio), avatar_url = COALESCE($3, avatar_url), sport = COALESCE($4, sport), location = COALESCE($5, location) WHERE id = $6 RETURNING *`,
-      [display_name || null, bio || null, avatar_url || null, sport || null, location || null, id]
-    );
+    if (!rows.length) return res.status(404).json({ error: 'Creator not found' });
     return res.json({ creator: rows[0] });
   } catch (err) {
-    throw err;
+    logger.error('get creator error', { message: err.message });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// GET /api/creators/slug/:slug
+router.get('/slug/:slug', async (req, res) => {
+  try {
+    const { rows } = await getPool().query(
+      'SELECT id, username, display_name, bio, sport, avatar_url, slug, follower_count, is_verified, created_at FROM creators WHERE slug = $1 AND is_suspended = FALSE',
+      [req.params.slug],
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Creator not found' });
+    return res.json({ creator: rows[0] });
+  } catch (err) {
+    logger.error('get creator by slug error', { message: err.message });
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/creators/me — update own profile
+router.patch(
+  '/me',
+  requireAuth,
+  [
+    body('display_name').optional().trim().isLength({ max: 100 }),
+    body('bio').optional().trim().isLength({ max: 500 }),
+    body('sport').optional().trim().isLength({ max: 50 }),
+    body('avatar_url').optional().isURL(),
+  ],
+  validate,
+  async (req, res) => {
+    if (req.user.type !== 'creator') return res.status(403).json({ error: 'Not a creator account' });
+    try {
+      const { display_name, bio, sport, avatar_url } = req.body;
+      let slug = undefined;
+      if (display_name) slug = await uniqueSlug(display_name, 'creators', 'slug', req.user.id);
+
+      const { rows } = await getPool().query(
+        `UPDATE creators SET
+           display_name = COALESCE($1, display_name),
+           bio = COALESCE($2, bio),
+           sport = COALESCE($3, sport),
+           avatar_url = COALESCE($4, avatar_url),
+           slug = COALESCE($5, slug),
+           updated_at = NOW()
+         WHERE id = $6
+         RETURNING id, username, display_name, bio, sport, avatar_url, slug`,
+        [display_name || null, bio || null, sport || null, avatar_url || null, slug || null, req.user.id],
+      );
+      return res.json({ creator: rows[0] });
+    } catch (err) {
+      logger.error('update creator error', { message: err.message });
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  },
+);
 
 module.exports = router;
