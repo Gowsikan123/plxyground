@@ -1,107 +1,120 @@
 'use strict';
 const express = require('express');
-const { body } = require('express-validator');
+const { body, query } = require('express-validator');
 const pool = require('../db/client');
+const { validate } = require('../middleware/validate');
 const { requireAuth } = require('../middleware/auth');
-const { handleValidation } = require('../middleware/validate');
-const logger = require('../logger');
+const audit = require('../utils/auditLogger');
 
 const router = express.Router();
 
-async function getPosterId(type, id, client) {
-  const db = client || pool;
-  if (type === 'creator') {
-    const { rows } = await db.query('SELECT display_name, username, slug FROM creators WHERE id = $1', [id]);
-    return rows[0] ? { poster_name: rows[0].display_name, poster_username: rows[0].username, poster_slug: rows[0].slug } : {};
-  }
-  const { rows } = await db.query('SELECT company_name, slug FROM businesses WHERE id = $1', [id]);
-  return rows[0] ? { poster_name: rows[0].company_name, poster_slug: rows[0].slug } : {};
-}
+router.get(
+  '/',
+  [
+    query('page').optional().isInt({ min: 1 }),
+    query('limit').optional().isInt({ min: 1, max: 50 }),
+    query('sport').optional().trim(),
+    query('type').optional().isIn(['creator', 'business']),
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const page = parseInt(req.query.page || '1', 10);
+      const limit = parseInt(req.query.limit || '20', 10);
+      const offset = (page - 1) * limit;
+      const sport = req.query.sport || null;
+      const type = req.query.type || null;
 
-router.get('/', async (req, res) => {
-  try {
-    const { search, sport, limit = 20, offset = 0 } = req.query;
-    const lim = Math.min(parseInt(limit, 10) || 20, 100);
-    const off = parseInt(offset, 10) || 0;
-    const conditions = [`o.status = 'published'`];
-    const params = [];
-    let idx = 1;
-    if (search) { conditions.push(`(o.title ILIKE $${idx} OR o.description ILIKE $${idx})`); params.push(`%${search}%`); idx++; }
-    if (sport) { conditions.push(`o.sport ILIKE $${idx}`); params.push(sport); idx++; }
-    const where = 'WHERE ' + conditions.join(' AND ');
-    const countRes = await pool.query(`SELECT COUNT(*)::int AS total FROM opportunities o ${where}`, params);
-    params.push(lim, off);
-    const { rows } = await pool.query(
-      `SELECT * FROM opportunities o ${where} ORDER BY o.created_at DESC LIMIT $${idx} OFFSET $${idx + 1}`,
-      params
-    );
-    const data = await Promise.all(rows.map(async (opp) => ({ ...opp, ...(await getPosterId(opp.posted_by_type, opp.posted_by_id)) })));
-    return res.json({ data, total: countRes.rows[0].total, limit: lim, offset: off });
-  } catch (err) {
-    logger.error('GET /api/opportunities', { message: err.message });
-    return res.status(500).json({ error: 'Failed to fetch opportunities.' });
+      const conditions = ["o.status='published'"];
+      const params = [];
+      let idx = 1;
+
+      if (sport) { conditions.push(`o.sport ILIKE $${idx++}`); params.push(`%${sport}%`); }
+      if (type) { conditions.push(`o.posted_by_type=$${idx++}`); params.push(type); }
+
+      const where = conditions.join(' AND ');
+      const countRes = await pool.query(`SELECT COUNT(*) FROM opportunities o WHERE ${where}`, params);
+      const total = parseInt(countRes.rows[0].count, 10);
+
+      params.push(limit, offset);
+      const result = await pool.query(`SELECT o.* FROM opportunities o WHERE ${where} ORDER BY o.created_at DESC LIMIT $${idx++} OFFSET $${idx++}`, params);
+
+      const enriched = await Promise.all(result.rows.map(async (opp) => {
+        if (opp.posted_by_type === 'business') {
+          const b = await pool.query('SELECT company_name, slug, logo_url FROM businesses WHERE id=$1', [opp.posted_by_id]);
+          return { ...opp, poster: b.rows[0] || null };
+        } else {
+          const c = await pool.query('SELECT display_name, username, slug, avatar_url FROM creators WHERE id=$1', [opp.posted_by_id]);
+          return { ...opp, poster: c.rows[0] || null };
+        }
+      }));
+
+      return res.json({ data: enriched, meta: { page, limit, total, pages: Math.ceil(total / limit) } });
+    } catch {
+      return res.status(500).json({ error: 'Failed to fetch opportunities' });
+    }
   }
-});
+);
 
 router.get('/:id', async (req, res) => {
   try {
-    const { rows } = await pool.query("SELECT * FROM opportunities WHERE id = $1 AND status = 'published'", [req.params.id]);
-    if (!rows[0]) return res.status(404).json({ error: 'Opportunity not found.' });
-    const opp = { ...rows[0], ...(await getPosterId(rows[0].posted_by_type, rows[0].posted_by_id)) };
-    return res.json({ opportunity: opp });
-  } catch (err) {
-    logger.error('GET /api/opportunities/:id', { message: err.message });
-    return res.status(500).json({ error: 'Failed to fetch opportunity.' });
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID' });
+    const result = await pool.query("SELECT * FROM opportunities WHERE id=$1 AND status='published'", [id]);
+    if (!result.rows.length) return res.status(404).json({ error: 'Opportunity not found' });
+    const opp = result.rows[0];
+    let poster = null;
+    if (opp.posted_by_type === 'business') {
+      const b = await pool.query('SELECT id, company_name, slug, logo_url, bio, location FROM businesses WHERE id=$1', [opp.posted_by_id]);
+      poster = b.rows[0] || null;
+    } else {
+      const c = await pool.query('SELECT id, display_name, username, slug, avatar_url, bio, sport, location FROM creators WHERE id=$1', [opp.posted_by_id]);
+      poster = c.rows[0] || null;
+    }
+    return res.json({ ...opp, poster });
+  } catch {
+    return res.status(500).json({ error: 'Failed to fetch opportunity' });
   }
 });
 
-router.post('/', requireAuth, [
-  body('title').trim().notEmpty().withMessage('Title is required.'),
-  body('description').trim().notEmpty().withMessage('Description is required.'),
-], handleValidation, async (req, res) => {
-  try {
-    const { title, description, sport, location, budget, deadline } = req.body;
-    const posterId = req.userType === 'creator' ? req.user.creator_id : req.user.id;
-    const { rows } = await pool.query(
-      'INSERT INTO opportunities (posted_by_type, posted_by_id, title, description, sport, location, budget, deadline) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
-      [req.userType, posterId, title, description, sport || null, location || null, budget || null, deadline || null]
-    );
-    return res.status(201).json({ opportunity: rows[0] });
-  } catch (err) {
-    logger.error('POST /api/opportunities', { message: err.message });
-    return res.status(500).json({ error: 'Failed to create opportunity.' });
+router.post(
+  '/',
+  requireAuth,
+  [
+    body('title').trim().isLength({ min: 10, max: 200 }),
+    body('description').trim().isLength({ min: 30 }),
+    body('sport').optional().trim(),
+    body('location').optional().trim(),
+    body('budget').optional().trim(),
+    body('deadline').optional().trim(),
+  ],
+  validate,
+  async (req, res) => {
+    try {
+      const { title, description, sport, location, budget, deadline } = req.body;
+      const posterId = req.userType === 'business' ? req.user.id : req.user.creator_id;
+      const result = await pool.query(
+        'INSERT INTO opportunities (posted_by_type, posted_by_id, title, description, sport, location, budget, deadline) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
+        [req.userType, posterId, title, description, sport || null, location || null, budget || null, deadline || null]
+      );
+      await audit.log({ actor_type: req.userType, actor_id: posterId, action: 'CREATE_OPPORTUNITY', target_id: result.rows[0].id, ip_address: req.ip });
+      return res.status(201).json(result.rows[0]);
+    } catch {
+      return res.status(500).json({ error: 'Failed to create opportunity' });
+    }
   }
-});
-
-router.put('/:id', requireAuth, async (req, res) => {
-  try {
-    const { rows } = await pool.query('SELECT * FROM opportunities WHERE id = $1', [req.params.id]);
-    if (!rows[0]) return res.status(404).json({ error: 'Not found.' });
-    const posterId = req.userType === 'creator' ? req.user.creator_id : req.user.id;
-    if (rows[0].posted_by_type !== req.userType || rows[0].posted_by_id !== posterId) return res.status(403).json({ error: 'Not your opportunity.' });
-    const { title, description, sport, location, budget, deadline, status } = req.body;
-    const { rows: updated } = await pool.query(
-      'UPDATE opportunities SET title=COALESCE($1,title), description=COALESCE($2,description), sport=COALESCE($3,sport), location=COALESCE($4,location), budget=COALESCE($5,budget), deadline=COALESCE($6,deadline), status=COALESCE($7,status), updated_at=NOW() WHERE id=$8 RETURNING *',
-      [title || null, description || null, sport || null, location || null, budget || null, deadline || null, status || null, req.params.id]
-    );
-    return res.json({ opportunity: updated[0] });
-  } catch (err) {
-    logger.error('PUT /api/opportunities/:id', { message: err.message });
-    return res.status(500).json({ error: 'Failed to update opportunity.' });
-  }
-});
+);
 
 router.delete('/:id', requireAuth, async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT * FROM opportunities WHERE id = $1', [req.params.id]);
-    if (!rows[0]) return res.status(404).json({ error: 'Not found.' });
-    const posterId = req.userType === 'creator' ? req.user.creator_id : req.user.id;
-    if (rows[0].posted_by_type !== req.userType || rows[0].posted_by_id !== posterId) return res.status(403).json({ error: 'Not your opportunity.' });
-    await pool.query("UPDATE opportunities SET status = 'deleted' WHERE id = $1", [req.params.id]);
-    return res.json({ success: true });
-  } catch (err) {
-    logger.error('DELETE /api/opportunities/:id', { message: err.message });
-    return res.status(500).json({ error: 'Failed to delete opportunity.' });
+    const id = parseInt(req.params.id, 10);
+    const posterId = req.userType === 'business' ? req.user.id : req.user.creator_id;
+    const result = await pool.query('SELECT * FROM opportunities WHERE id=$1 AND posted_by_type=$2 AND posted_by_id=$3', [id, req.userType, posterId]);
+    if (!result.rows.length) return res.status(404).json({ error: 'Opportunity not found or not yours' });
+    await pool.query("UPDATE opportunities SET status='deleted' WHERE id=$1", [id]);
+    return res.json({ message: 'Opportunity removed' });
+  } catch {
+    return res.status(500).json({ error: 'Failed to delete opportunity' });
   }
 });
 
