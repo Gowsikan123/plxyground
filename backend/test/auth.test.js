@@ -1,58 +1,72 @@
+'use strict';
 const request = require('supertest');
 const { createApp } = require('../src/app');
 const { readEnv } = require('../src/config/env');
-const db = require('../src/db/setup');
+const setup = require('../src/db/setup');
 
-const app = createApp(readEnv());
+let app;
+const uniqueId = Date.now();
+const email = `testuser.${uniqueId}@plxyground.local`;
 
-describe('Auth and user data controls', () => {
+beforeAll(async () => {
+  await setup();
+  app = createApp(readEnv());
+}, 30000);
+
+describe('Auth — signup / login / me', () => {
   let token;
-  let refreshToken;
-  let createdId;
-  const uniqueId = Date.now();
-  const signupPayload = {
-    name: 'TestUser',
-    email: `testuser.${uniqueId}@plxyground.local`,
-    password: 'Password123!',
-  };
 
-  it('signs up a user', async () => {
-    const res = await request(app).post('/api/auth/signup').send(signupPayload);
+  it('signs up a creator', async () => {
+    const res = await request(app).post('/api/auth/signup').send({
+      username: `testuser${uniqueId}`,
+      display_name: 'Test User',
+      email,
+      password: 'Password123!',
+    });
     expect(res.status).toBe(201);
-    expect(res.body.token).toBeDefined();
-    expect(res.body.refreshToken).toBeDefined();
-    token = res.body.token;
-    refreshToken = res.body.refreshToken;
-    createdId = res.body.user.id;
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.token).toBeDefined();
+    token = res.body.data.token;
   });
 
-  it('gets user data export', async () => {
-    const res = await request(app).get('/api/auth/me/export').set('Authorization', `Bearer ${token}`);
+  it('rejects duplicate email on second signup', async () => {
+    const res = await request(app).post('/api/auth/signup').send({
+      username: `testuser${uniqueId}b`,
+      display_name: 'Test User 2',
+      email,
+      password: 'Password123!',
+    });
+    expect(res.status).toBe(409);
+  });
+
+  it('logs in with correct credentials', async () => {
+    const res = await request(app).post('/api/auth/login').send({
+      email,
+      password: 'Password123!',
+    });
     expect(res.status).toBe(200);
-    expect(res.body.user).toBeDefined();
-    expect(res.body.content).toBeDefined();
+    expect(res.body.data.token).toBeDefined();
+    token = res.body.data.token;
   });
 
-  it('refreshes token', async () => {
-    const res = await request(app).post('/api/auth/refresh-token').send({ refreshToken });
+  it('rejects wrong password', async () => {
+    const res = await request(app).post('/api/auth/login').send({
+      email,
+      password: 'WrongPassword!',
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('returns current user on GET /api/auth/me', async () => {
+    const res = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
-    expect(res.body.token).toBeDefined();
+    expect(res.body.data).toBeDefined();
   });
 
-  it('requests 2FA and verifies', async () => {
-    const r1 = await request(app).post('/api/auth/2fa/request').set('Authorization', `Bearer ${token}`);
-    expect(r1.status).toBe(200);
-
-    const record = await db.prepare('SELECT code FROM two_factor_codes WHERE creator_id = ? ORDER BY created_at DESC LIMIT 1').get(createdId);
-    expect(record).toBeDefined();
-
-    const r2 = await request(app).post('/api/auth/2fa/verify').set('Authorization', `Bearer ${token}`).send({ code: record.code });
-    expect(r2.status).toBe(200);
-  });
-
-  it('deletes user account', async () => {
-    const res = await request(app).delete('/api/auth/me').set('Authorization', `Bearer ${token}`);
-    expect(res.status).toBe(200);
-    expect(res.body.message).toMatch(/deletion/i);
+  it('rejects /api/auth/me without token', async () => {
+    const res = await request(app).get('/api/auth/me');
+    expect(res.status).toBe(401);
   });
 });

@@ -1,9 +1,8 @@
+'use strict';
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
-
-require('./db/setup');
+const { rateLimit } = require('express-rate-limit');
 
 function createApp(config) {
   const app = express();
@@ -13,7 +12,8 @@ function createApp(config) {
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
       if (config.nodeEnv === 'development' || config.nodeEnv === 'test') return cb(null, true);
-      if (config.corsOrigins.includes(origin)) return cb(null, true);
+      const allowed = Array.isArray(config.corsOrigins) ? config.corsOrigins : [config.corsOrigins];
+      if (allowed.includes(origin)) return cb(null, true);
       return cb(new Error('Not allowed by CORS'));
     },
     credentials: true,
@@ -28,14 +28,11 @@ function createApp(config) {
   const contentCreateLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 30,
-    keyGenerator: (req) => (req.user ? `user:${req.user.id}` : ipKeyGenerator(req.ip)),
-    handler: (req, res) => res.status(429).json({ error: 'Too many content creation requests. Try again later.' }),
+    handler: (req, res) => res.status(429).json({ error: 'Too many requests.' }),
   });
 
   app.use('/api/content', (req, res, next) => {
-    if (req.method === 'POST') {
-      return contentCreateLimiter(req, res, next);
-    }
+    if (req.method === 'POST') return contentCreateLimiter(req, res, next);
     next();
   });
 
@@ -46,8 +43,7 @@ function createApp(config) {
   app.get('/', (req, res) => res.json({ name: 'PLXYGROUND API', version: '1.0.0' }));
 
   app.use('/api/auth', require('./routes/auth'));
-  // NOTE: /api/business/content must be mounted BEFORE /api/business to prevent
-  // Express shadowing the more-specific path with the less-specific one.
+  // NOTE: /api/business/content must be mounted BEFORE /api/business
   app.use('/api/business/content', require('./routes/businessContent'));
   app.use('/api/business', require('./routes/business'));
   app.use('/api/content', require('./routes/content'));
@@ -62,28 +58,7 @@ function createApp(config) {
   app.use('/api/admin/analytics', require('./routes/admin/adminAnalytics'));
   app.use('/api/admin/alerts', require('./routes/admin/adminAlerts'));
 
-  app.get('/terms', (req, res) => res.send(`
-  <html><body style="font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 20px">
-  <h1>Terms of Service</h1>
-  <p>By using PLXYGROUND you agree to our community guidelines. You must not post harmful, misleading, or inappropriate content. We reserve the right to suspend accounts that violate these terms.</p>
-  <p>Content you post remains yours but you grant PLXYGROUND a licence to display it on the platform.</p>
-  </body></html>
-`));
-
-  app.get('/privacy', (req, res) => res.send(`
-  <html><body style="font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 20px">
-  <h1>Privacy Policy</h1>
-  <p>PLXYGROUND collects only the data necessary to provide the service. This includes your name, email address, and content you post.</p>
-  <p>We do not sell your data to third parties. Your password is stored as a secure hash and never in plain text.</p>
-  </body></html>
-`));
-
-  app.get('/support', (req, res) => res.send(`
-  <html><body style="font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 20px">
-  <h1>Support</h1>
-  <p>For help, contact us at support@plxyground.local</p>
-  </body></html>
-`));
+  app.use((req, res) => res.status(404).json({ success: false, error: 'Route not found' }));
 
   app.use((err, req, res, next) => {
     console.error(err);
