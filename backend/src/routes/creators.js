@@ -1,75 +1,96 @@
 'use strict';
 const express = require('express');
-const { body } = require('express-validator');
-const db = require('../db/client');
+const pool = require('../db/client');
 const { requireAuth } = require('../middleware/auth');
-const validate = require('../middleware/validate');
 
 const router = express.Router();
 
-// GET /api/creators
 router.get('/', async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit || '20', 10);
-    const offset = parseInt(req.query.offset || '0', 10);
-    const search = req.query.search || '';
-    const sport = req.query.sport || '';
-    let sql = 'SELECT * FROM creators WHERE 1=1';
+    const { search, sport, limit = 20, offset = 0 } = req.query;
+    const lim = Math.min(parseInt(limit, 10) || 20, 100);
+    const off = parseInt(offset, 10) || 0;
     const params = [];
-    let idx = 1;
-    if (search) { sql += ` AND (display_name ILIKE $${idx} OR username ILIKE $${idx+1})`; params.push(`%${search}%`, `%${search}%`); idx += 2; }
-    if (sport) { sql += ` AND sport = $${idx}`; params.push(sport); idx++; }
-    sql += ` ORDER BY follower_count DESC LIMIT $${idx} OFFSET $${idx+1}`;
-    params.push(limit, offset);
-    const rows = await db.prepare(sql).all(...params);
-    const total = (await db.prepare('SELECT COUNT(*) as c FROM creators').get()).c;
-    return res.json({ success: true, data: { items: rows, total, limit, offset } });
+    const conditions = [];
+    if (search) {
+      params.push(`%${search}%`);
+      conditions.push(`(c.display_name ILIKE $${params.length} OR c.username ILIKE $${params.length} OR c.bio ILIKE $${params.length})`);
+    }
+    if (sport) {
+      params.push(sport);
+      conditions.push(`c.sport = $${params.length}`);
+    }
+    const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+    params.push(lim, off);
+    const [dataRes, countRes] = await Promise.all([
+      pool.query(
+        `SELECT id, username, slug, display_name, bio, avatar_url, sport, location, follower_count, is_verified FROM creators c ${where} ORDER BY follower_count DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
+        params
+      ),
+      pool.query(`SELECT COUNT(*) FROM creators c ${where}`, params.slice(0, -2)),
+    ]);
+    return res.json({ data: dataRes.rows, total: parseInt(countRes.rows[0].count, 10), limit: lim, offset: off });
   } catch (err) {
-    return res.status(500).json({ success: false, error: 'Server error' });
+    return res.status(500).json({ error: 'Server error.' });
   }
 });
 
-// GET /api/creators/slug/:slug
 router.get('/slug/:slug', async (req, res) => {
   try {
-    const creator = await db.prepare('SELECT * FROM creators WHERE slug = $1').get(req.params.slug);
-    if (!creator) return res.status(404).json({ success: false, error: 'Not found' });
-    const posts = await db.prepare(`SELECT * FROM content WHERE creator_id = $1 AND status = 'published' ORDER BY created_at DESC LIMIT 20`).all(creator.id);
-    return res.json({ success: true, data: { creator, posts } });
+    const { rows } = await pool.query(
+      'SELECT id, username, slug, display_name, bio, avatar_url, sport, location, follower_count, is_verified FROM creators WHERE slug = $1',
+      [req.params.slug]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Creator not found.' });
+    const creator = rows[0];
+    const { rows: posts } = await pool.query(
+      "SELECT * FROM content WHERE creator_id = $1 AND status = 'published' ORDER BY created_at DESC LIMIT 20",
+      [creator.id]
+    );
+    return res.json({ creator, posts });
   } catch (err) {
-    return res.status(500).json({ success: false, error: 'Server error' });
+    return res.status(500).json({ error: 'Server error.' });
   }
 });
 
-// GET /api/creators/:id
 router.get('/:id', async (req, res) => {
   try {
-    const creator = await db.prepare('SELECT * FROM creators WHERE id = $1').get(req.params.id);
-    if (!creator) return res.status(404).json({ success: false, error: 'Not found' });
-    const posts = await db.prepare(`SELECT * FROM content WHERE creator_id = $1 AND status = 'published' ORDER BY created_at DESC LIMIT 20`).all(creator.id);
-    return res.json({ success: true, data: { creator, posts } });
+    const { rows } = await pool.query(
+      'SELECT id, username, slug, display_name, bio, avatar_url, sport, location, follower_count, is_verified FROM creators WHERE id = $1',
+      [req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Creator not found.' });
+    const creator = rows[0];
+    const { rows: posts } = await pool.query(
+      "SELECT * FROM content WHERE creator_id = $1 AND status = 'published' ORDER BY created_at DESC LIMIT 20",
+      [creator.id]
+    );
+    return res.json({ creator, posts });
   } catch (err) {
-    return res.status(500).json({ success: false, error: 'Server error' });
+    return res.status(500).json({ error: 'Server error.' });
   }
 });
 
-// PUT /api/creators/:id
-router.put('/:id', requireAuth, [
-  body('display_name').optional().trim().isLength({ min: 1, max: 60 }),
-], validate, async (req, res) => {
+router.put('/:id', requireAuth, async (req, res) => {
   try {
-    if (req.userType !== 'creator') return res.status(403).json({ success: false, error: 'Forbidden' });
-    if (parseInt(req.params.id, 10) !== req.user.sub) return res.status(403).json({ success: false, error: 'Forbidden' });
+    if (req.userType !== 'creator') return res.status(403).json({ error: 'Creator access only.' });
+    if (req.user.creator_id !== parseInt(req.params.id, 10)) {
+      return res.status(403).json({ error: 'Cannot update another creator\'s profile.' });
+    }
     const { display_name, bio, avatar_url, sport, location } = req.body;
-    const creator = await db.prepare('SELECT * FROM creators WHERE id = $1').get(req.user.sub);
-    if (!creator) return res.status(404).json({ success: false, error: 'Not found' });
-    await db.prepare(
-      `UPDATE creators SET display_name = $1, bio = $2, avatar_url = $3, sport = $4, location = $5 WHERE id = $6`
-    ).run(display_name ?? creator.display_name, bio ?? creator.bio, avatar_url ?? creator.avatar_url, sport ?? creator.sport, location ?? creator.location, creator.id);
-    const updated = await db.prepare('SELECT * FROM creators WHERE id = $1').get(creator.id);
-    return res.json({ success: true, data: updated });
+    const { rows } = await pool.query(
+      `UPDATE creators SET
+        display_name = COALESCE($1, display_name),
+        bio = COALESCE($2, bio),
+        avatar_url = COALESCE($3, avatar_url),
+        sport = COALESCE($4, sport),
+        location = COALESCE($5, location)
+       WHERE id = $6 RETURNING *`,
+      [display_name || null, bio || null, avatar_url || null, sport || null, location || null, req.params.id]
+    );
+    return res.json({ creator: rows[0] });
   } catch (err) {
-    return res.status(500).json({ success: false, error: 'Server error' });
+    return res.status(500).json({ error: 'Server error.' });
   }
 });
 
