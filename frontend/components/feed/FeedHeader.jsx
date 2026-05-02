@@ -1,41 +1,38 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/colors';
 import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING } from '../../constants/spacing';
 import Avatar from '../ui/Avatar';
-import useAuthStore from '../../store/authStore';
 
-export default function FeedHeader({ onSearchPress }) {
+export default function FeedHeader({ user, onNotificationsPress }) {
   const router = useRouter();
-  const { user } = useAuthStore();
 
   return (
     <View style={styles.container}>
       <View style={styles.left}>
-        <Text style={styles.logo}>PLXYGROUND</Text>
-        <Text style={styles.subtitle}>Basketball Nxtion</Text>
-      </View>
-      <View style={styles.right}>
-        <TouchableOpacity
-          style={styles.searchBtn}
-          onPress={onSearchPress}
-          accessibilityLabel="Search"
-        >
-          <Text style={styles.searchIcon}>🔍</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => router.push('/profile')}
-          accessibilityLabel="Your profile"
-        >
+        <TouchableOpacity onPress={() => router.push('/profile')} activeOpacity={0.8}>
           <Avatar
             uri={user?.avatar_url}
-            name={user?.display_name || user?.username || 'U'}
-            size={34}
+            initials={user?.username?.[0]?.toUpperCase() ?? 'P'}
+            size={36}
           />
         </TouchableOpacity>
+        <View style={styles.titleBlock}>
+          <Text style={styles.appName}>PLXYGROUND</Text>
+          <Text style={styles.greeting}>Hey {user?.username ?? 'Creator'} 👋</Text>
+        </View>
       </View>
+      <TouchableOpacity
+        style={styles.iconBtn}
+        onPress={onNotificationsPress}
+        accessibilityLabel="Notifications"
+        activeOpacity={0.7}
+      >
+        <Ionicons name="notifications-outline" size={22} color={COLORS.text} />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -51,21 +48,30 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
-  left: { flexDirection: 'column' },
-  logo: {
-    fontFamily: TYPOGRAPHY.fonts.display,
-    fontSize: TYPOGRAPHY.sizes.lg,
-    fontWeight: '800',
-    color: COLORS.text,
+  left: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  titleBlock: {
+    justifyContent: 'center',
+  },
+  appName: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.primary,
     letterSpacing: 1.5,
+    fontWeight: '800',
   },
-  subtitle: {
-    fontFamily: TYPOGRAPHY.fonts.body,
-    fontSize: TYPOGRAPHY.sizes.xs,
+  greeting: {
+    ...TYPOGRAPHY.bodySm,
     color: COLORS.textMuted,
-    letterSpacing: 0.5,
   },
-  right: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  searchBtn: { padding: SPACING.xs },
-  searchIcon: { fontSize: 18 },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surface,
+  },
 });

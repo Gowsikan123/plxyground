@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { COLORS } from '../../constants/colors';
 import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING } from '../../constants/spacing';
@@ -7,9 +7,9 @@ import { SPACING } from '../../constants/spacing';
 const FILTERS = [
   { key: 'all', label: 'All' },
   { key: 'video', label: 'Video' },
-  { key: 'image', label: 'Photo' },
-  { key: 'text', label: 'Article' },
-  { key: 'highlight', label: 'Highlight' },
+  { key: 'photo', label: 'Photo' },
+  { key: 'blog', label: 'Blog' },
+  { key: 'podcast', label: 'Podcast' },
 ];
 
 export default function FeedFilter({ active, onChange }) {
@@ -17,18 +17,19 @@ export default function FeedFilter({ active, onChange }) {
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.row}
       style={styles.scroll}
-      contentContainerStyle={styles.content}
     >
       {FILTERS.map((f) => (
         <TouchableOpacity
           key={f.key}
-          style={[styles.chip, active === f.key && styles.chipActive]}
+          style={[styles.pill, active === f.key && styles.pillActive]}
           onPress={() => onChange(f.key)}
+          activeOpacity={0.75}
           accessibilityRole="button"
           accessibilityState={{ selected: active === f.key }}
         >
-          <Text style={[styles.chipText, active === f.key && styles.chipTextActive]}>
+          <Text style={[styles.label, active === f.key && styles.labelActive]}>
             {f.label}
           </Text>
         </TouchableOpacity>
@@ -38,14 +39,18 @@ export default function FeedFilter({ active, onChange }) {
 }
 
 const styles = StyleSheet.create({
-  scroll: { flexGrow: 0 },
-  content: {
+  scroll: {
+    backgroundColor: COLORS.background,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  row: {
+    flexDirection: 'row',
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     gap: SPACING.xs,
-    flexDirection: 'row',
   },
-  chip: {
+  pill: {
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs,
     borderRadius: 999,
@@ -53,15 +58,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  chipActive: {
+  pillActive: {
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
   },
-  chipText: {
-    fontFamily: TYPOGRAPHY.fonts.body,
-    fontSize: TYPOGRAPHY.sizes.sm,
+  label: {
+    ...TYPOGRAPHY.labelSm,
     color: COLORS.textMuted,
-    fontWeight: '500',
   },
-  chipTextActive: { color: '#fff' },
+  labelActive: {
+    color: '#fff',
+    fontWeight: '700',
+  },
 });

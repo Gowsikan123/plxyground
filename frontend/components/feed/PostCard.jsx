@@ -1,82 +1,165 @@
-import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  StyleSheet,
+  Dimensions,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import Card from '../ui/Card';
+import { COLORS } from '../../constants/colors';
+import { TYPOGRAPHY } from '../../constants/typography';
+import { SPACING } from '../../constants/spacing';
 import Avatar from '../ui/Avatar';
 import Badge from '../ui/Badge';
-import { colors } from '../../constants/colors';
-import { fontFamilies, fontSizes } from '../../constants/typography';
-import { spacing, borderRadius } from '../../constants/spacing';
 
-function timeAgo(dateStr) {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
+const { width: SCREEN_W } = Dimensions.get('window');
 
-const PostCard = React.memo(({ post }) => {
+export default function PostCard({ post, onLike }) {
   const router = useRouter();
-  const creator = post.creator || {};
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(post?.likes ?? 0);
+
+  function handleLike() {
+    const next = !liked;
+    setLiked(next);
+    setLikeCount((c) => c + (next ? 1 : -1));
+    onLike?.(post.id, next);
+  }
+
+  if (!post) return null;
 
   return (
-    <Card onPress={() => router.push(`/post/${post.id}`)} style={styles.card}>
-      <View style={styles.creatorRow}>
-        <Avatar uri={creator.avatar_url} name={creator.display_name || creator.username} size="sm" />
-        <View style={styles.creatorInfo}>
-          <Text style={styles.creatorName} numberOfLines={1}>
-            {creator.display_name || creator.username}
-          </Text>
-          {creator.sport ? (
-            <Badge label={creator.sport} variant="info" size="xs" />
-          ) : null}
-        </View>
-        <Text style={styles.time}>{timeAgo(post.created_at)}</Text>
-      </View>
-
-      <Text style={styles.title} numberOfLines={2}>{post.title}</Text>
-
-      {post.body ? (
-        <Text style={styles.body} numberOfLines={3}>{post.body}</Text>
-      ) : null}
-
-      {post.media_url && post.media_type !== 'none' ? (
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.95}
+      onPress={() => router.push(`/post/${post.id}`)}
+      accessibilityRole="button"
+      accessibilityLabel={`View post: ${post.title}`}
+    >
+      {post.media_url ? (
         <Image
           source={{ uri: post.media_url }}
-          style={styles.media}
+          style={styles.thumbnail}
           resizeMode="cover"
+          accessibilityLabel={post.title}
         />
       ) : null}
 
-      <View style={styles.footer}>
-        <Text style={styles.stat}>👁 {post.view_count ?? 0}</Text>
-        <Text style={styles.stat}>❤️ {post.like_count ?? 0}</Text>
-        <View style={styles.tags}>
-          {(post.tags || []).slice(0, 2).map((tag, i) => (
-            <Badge key={i} label={`#${tag}`} variant="default" size="xs" style={styles.tagChip} />
-          ))}
+      <View style={styles.body}>
+        <View style={styles.metaRow}>
+          <TouchableOpacity
+            style={styles.authorRow}
+            onPress={() => router.push(`/creator/${post.creator_slug}`)}
+            activeOpacity={0.8}
+          >
+            <Avatar uri={post.creator_avatar} initials={post.creator_name?.[0] ?? 'C'} size={28} />
+            <Text style={styles.authorName}>{post.creator_name}</Text>
+          </TouchableOpacity>
+          {post.content_type ? (
+            <Badge label={post.content_type} variant="outline" />
+          ) : null}
+        </View>
+
+        <Text style={styles.title} numberOfLines={2}>
+          {post.title}
+        </Text>
+
+        {post.description ? (
+          <Text style={styles.description} numberOfLines={2}>
+            {post.description}
+          </Text>
+        ) : null}
+
+        <View style={styles.actions}>
+          <TouchableOpacity style={styles.actionBtn} onPress={handleLike} activeOpacity={0.7}>
+            <Ionicons
+              name={liked ? 'heart' : 'heart-outline'}
+              size={18}
+              color={liked ? COLORS.error : COLORS.textMuted}
+            />
+            <Text style={styles.actionCount}>{likeCount}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() => router.push(`/post/${post.id}#comments`)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="chatbubble-outline" size={18} color={COLORS.textMuted} />
+            <Text style={styles.actionCount}>{post.comments ?? 0}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionBtn} activeOpacity={0.7}>
+            <Ionicons name="share-social-outline" size={18} color={COLORS.textMuted} />
+          </TouchableOpacity>
         </View>
       </View>
-    </Card>
+    </TouchableOpacity>
   );
-});
-
-PostCard.displayName = 'PostCard';
-export default PostCard;
+}
 
 const styles = StyleSheet.create({
-  card: { marginBottom: spacing.md },
-  creatorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md, gap: spacing.sm },
-  creatorInfo: { flex: 1, gap: 2 },
-  creatorName: { fontFamily: fontFamilies.bodyMedium, fontSize: fontSizes.sm, color: colors.textPrimary },
-  time: { fontFamily: fontFamilies.body, fontSize: fontSizes.xs, color: colors.textMuted },
-  title: { fontFamily: fontFamilies.heading, fontSize: fontSizes.lg, color: colors.textPrimary, marginBottom: spacing.sm },
-  body: { fontFamily: fontFamilies.body, fontSize: fontSizes.md, color: colors.textSecondary, lineHeight: fontSizes.md * 1.5, marginBottom: spacing.sm },
-  media: { width: '100%', aspectRatio: 16 / 9, borderRadius: borderRadius.md, marginBottom: spacing.sm },
-  footer: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xs },
-  stat: { fontFamily: fontFamilies.body, fontSize: fontSizes.xs, color: colors.textMuted },
-  tags: { flex: 1, flexDirection: 'row', gap: spacing.xs, justifyContent: 'flex-end' },
-  tagChip: { marginLeft: 0 },
+  card: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    marginHorizontal: SPACING.md,
+    marginBottom: SPACING.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  thumbnail: {
+    width: '100%',
+    height: SCREEN_W * 0.5,
+    backgroundColor: COLORS.surfaceOffset,
+  },
+  body: {
+    padding: SPACING.md,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.xs,
+  },
+  authorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  authorName: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.textMuted,
+  },
+  title: {
+    ...TYPOGRAPHY.bodyMd,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: SPACING.xs,
+  },
+  description: {
+    ...TYPOGRAPHY.bodySm,
+    color: COLORS.textMuted,
+    marginBottom: SPACING.sm,
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    marginTop: SPACING.xs,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minWidth: 44,
+    minHeight: 44,
+  },
+  actionCount: {
+    ...TYPOGRAPHY.labelSm,
+    color: COLORS.textMuted,
+  },
 });
