@@ -1,65 +1,59 @@
+import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
-import { AuthProvider } from '../components/AuthContext';
-import { useAuth } from '../components/AuthContext';
-import { useEffect } from 'react';
-import { useRouter, useSegments } from 'expo-router';
-
-const PROTECTED = ['feed', 'create', 'profile', 'settings', 'opportunities'];
-
-function RouteGuard({ children }) {
-  const { user, loading } = useAuth();
-  const segments = useSegments();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (loading) return;
-    const current = segments[0];
-    const inBusiness = current === 'business';
-    const inAuth = !current || current === 'login' || current === 'signup' ||
-      current === 'business-login' || current === 'business-signup' ||
-      current === 'terms' || current === 'privacy';
-
-    if (!user && PROTECTED.includes(current)) {
-      router.replace('/login');
-      return;
-    }
-
-    if (user && user.role === 'BUSINESS' && !inBusiness && !inAuth) {
-      router.replace('/business/dashboard');
-    }
-  }, [user, loading, segments]);
-
-  return children;
-}
+import { StatusBar } from 'expo-status-bar';
+import * as Font from 'expo-font';
+import {
+  DMSans_400Regular,
+  DMSans_500Medium,
+  DMSans_600SemiBold,
+} from '@expo-google-fonts/dm-sans';
+import {
+  Syne_400Regular,
+  Syne_600SemiBold,
+  Syne_700Bold,
+} from '@expo-google-fonts/syne';
+import { useAuthStore } from '../store/authStore';
+import { Colors } from '../constants/colors';
+import { View, ActivityIndicator } from 'react-native';
 
 export default function RootLayout() {
+  const { init, isLoading } = useAuthStore();
+  const [fontsLoaded, setFontsLoaded] = React.useState(false);
+
+  useEffect(() => {
+    async function load() {
+      await Font.loadAsync({
+        DMSans_400Regular,
+        DMSans_500Medium,
+        DMSans_600SemiBold,
+        Syne_400Regular,
+        Syne_600SemiBold,
+        Syne_700Bold,
+      });
+      setFontsLoaded(true);
+      await init();
+    }
+    load();
+  }, []);
+
+  if (!fontsLoaded || isLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: Colors.background, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={Colors.primary} />
+      </View>
+    );
+  }
+
   return (
-    <AuthProvider>
-      <RouteGuard>
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#080C14' } }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="login" />
-          <Stack.Screen name="signup" />
-          <Stack.Screen name="business-login" />
-          <Stack.Screen name="business-signup" />
-          <Stack.Screen name="feed" />
-          <Stack.Screen name="opportunities" />
-          <Stack.Screen name="create" />
-          <Stack.Screen name="profile" />
-          <Stack.Screen name="settings" />
-          <Stack.Screen name="terms" />
-          <Stack.Screen name="privacy" />
-          <Stack.Screen name="post/[id]" />
-          <Stack.Screen name="business/dashboard" />
-          <Stack.Screen name="business/profile" />
-          <Stack.Screen name="business/edit-profile" />
-          <Stack.Screen name="business/create-post" />
-          <Stack.Screen name="business/my-content" />
-          <Stack.Screen name="business/search-creators" />
-          <Stack.Screen name="business/opportunities" />
-          <Stack.Screen name="business/settings" />
-        </Stack>
-      </RouteGuard>
-    </AuthProvider>
+    <>
+      <StatusBar style="light" />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.background }, animation: 'fade' }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="post/[id]" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+        <Stack.Screen name="creator/[slug]" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+      </Stack>
+    </>
   );
 }
