@@ -1,16 +1,12 @@
-function requireFields(fields) {
-  return (req, res, next) => {
-    const missing = [];
-    for (const field of fields) {
-      if (req.body[field] === undefined || req.body[field] === null || req.body[field] === '') {
-        missing.push(field);
-      }
-    }
-    if (missing.length > 0) {
-      return res.status(400).json({ error: 'Missing required fields', fields: missing });
-    }
-    next();
-  };
+'use strict';
+const { validationResult } = require('express-validator');
+
+function validate(req, res, next) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(422).json({ success: false, error: 'Validation failed', details: errors.array() });
+  }
+  next();
 }
 
-module.exports = { requireFields };
+module.exports = validate;

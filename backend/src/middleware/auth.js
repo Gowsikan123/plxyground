@@ -1,47 +1,38 @@
-const jwt = require('jsonwebtoken');
-const db = require('../db/setup');
+'use strict';
+const { verifyToken } = require('../utils/jwt');
 
-function verifyToken(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'No token provided' });
+function requireAuth(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) {
+    return res.status(401).json({ success: false, error: 'Unauthorised — no token provided' });
   }
-
-  const token = authHeader.split(' ')[1];
-  if (!process.env.JWT_SECRET) {
-    console.error('JWT_SECRET is not configured');
-    return res.status(500).json({ error: 'Server configuration error' });
-  }
-
+  const token = header.slice(7);
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
+    const payload = verifyToken(token);
+    req.user = payload;
+    req.userType = payload.type;
     next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+  } catch {
+    return res.status(401).json({ success: false, error: 'Unauthorised — invalid or expired token' });
   }
 }
 
-async function requireAdmin(req, res, next) {
-  if (!req.user || req.user.role !== 'ADMIN') {
-    return res.status(403).json({ error: 'Admin access required' });
+function requireAdmin(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) {
+    return res.status(401).json({ success: false, error: 'Unauthorised' });
   }
-
-  const admin = await db.prepare('SELECT * FROM admins WHERE id = ? AND is_active = 1').get(req.user.id);
-  if (!admin) {
-    return res.status(403).json({ error: 'Admin access required' });
-  }
-
-  next();
-}
-
-function requireRole(...roles) {
-  return (req, res, next) => {
-    if (!req.user || !roles.includes(req.user.role)) {
-      return res.status(403).json({ error: `Requires role: ${roles.join(', ')}` });
+  const token = header.slice(7);
+  try {
+    const payload = verifyToken(token);
+    if (payload.type !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Forbidden — admin only' });
     }
+    req.admin = payload;
     next();
-  };
+  } catch {
+    return res.status(401).json({ success: false, error: 'Unauthorised — invalid or expired token' });
+  }
 }
 
-module.exports = { verifyToken, requireAdmin, requireRole };
+module.exports = { requireAuth, requireAdmin };

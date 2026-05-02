@@ -1,11 +1,114 @@
-const db = require('./setup');
+'use strict';
+const bcrypt = require('bcryptjs');
+const db = require('./client');
 
-db.ready
-  .then(() => {
-    console.log('Database schema and demo data are ready.');
-    return db.pool.end();
-  })
-  .catch((error) => {
-    console.error('Failed to initialize database', error);
-    process.exit(1);
-  });
+function slugify(str) {
+  return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+function seed() {
+  const hash = (pw) => bcrypt.hashSync(pw, 12);
+
+  // Admin
+  db.prepare(`INSERT OR IGNORE INTO admins (email, password_hash) VALUES (?, ?)`)
+    .run('admin@plxyground.local', hash('Internet2026@'));
+
+  // Creators
+  const creators = [
+    { username: 'marcus_hoops', display_name: 'Marcus Hoops', sport: 'Basketball', location: 'London, UK', bio: 'Ballin since day one. NBA aspirations.', email: 'marcus@test.com' },
+    { username: 'swift_feet', display_name: 'Swift Feet', sport: 'Football', location: 'Manchester, UK', bio: 'Football content, skills & drills.', email: 'swift@test.com' },
+    { username: 'ace_tennislife', display_name: 'Ace TennisLife', sport: 'Tennis', location: 'Birmingham, UK', bio: 'Breaking down serves and volleys.', email: 'ace@test.com' },
+    { username: 'sprint_king', display_name: 'Sprint King', sport: 'Athletics', location: 'Glasgow, UK', bio: '100m personal best: 10.4s.', email: 'sprint@test.com' },
+    { username: 'knockout_clips', display_name: 'Knockout Clips', sport: 'Boxing', location: 'Liverpool, UK', bio: 'Ring life. Training content daily.', email: 'knockout@test.com' },
+  ];
+
+  for (const c of creators) {
+    const slug = slugify(c.username);
+    const follower_count = Math.floor(Math.random() * 5000) + 100;
+    let creatorId;
+    const existing = db.prepare('SELECT id FROM creators WHERE username = ?').get(c.username);
+    if (!existing) {
+      const result = db.prepare(`INSERT INTO creators (username, slug, display_name, bio, sport, location, follower_count) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+        .run(c.username, slug, c.display_name, c.bio, c.sport, c.location, follower_count);
+      creatorId = result.lastInsertRowid;
+    } else {
+      creatorId = existing.id;
+    }
+    db.prepare(`INSERT OR IGNORE INTO creator_accounts (creator_id, email, password_hash, is_email_verified) VALUES (?, ?, ?, 1)`)
+      .run(creatorId, c.email, hash('Test1234!'));
+  }
+
+  // Businesses
+  const businesses = [
+    { email: 'nike@test.com', company_name: 'NikeUK Partnerships', industry: 'Sportswear', website: 'https://nike.com', location: 'London, UK', bio: 'Partnering with the next generation of athletes.' },
+    { email: 'redbull@test.com', company_name: 'Red Bull Media', industry: 'Energy Drinks', website: 'https://redbull.com', location: 'London, UK', bio: 'We give wings to athletes and creators.' },
+    { email: 'gymshark@test.com', company_name: 'Gymshark', industry: 'Fitness Apparel', website: 'https://gymshark.com', location: 'Birmingham, UK', bio: 'Empowering athletes worldwide.' },
+  ];
+
+  for (const b of businesses) {
+    const slug = slugify(b.company_name);
+    db.prepare(`INSERT OR IGNORE INTO businesses (email, password_hash, company_name, slug, bio, industry, website, location, is_email_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`)
+      .run(b.email, hash('Test1234!'), b.company_name, slug, b.bio, b.industry, b.website, b.location);
+  }
+
+  // Content
+  const creatorRows = db.prepare('SELECT id FROM creators').all();
+  const contentItems = [
+    { title: 'My top 5 dribble moves', body: 'Breaking down each move with slow-mo clips.', tags: '["basketball","skills"]', status: 'published' },
+    { title: 'Pre-season fitness routine', body: 'Full week breakdown of what I do to stay sharp.', tags: '["fitness","training"]', status: 'published' },
+    { title: 'How I got scouted', body: 'The story behind my first pro trial.', tags: '["motivation"]', status: 'published' },
+    { title: 'Best training drills for beginners', body: 'Simple drills you can do anywhere.', tags: '["drills","beginner"]', status: 'published' },
+    { title: 'Game day nutrition', body: 'What I eat on matchday and why.', tags: '["nutrition"]', status: 'published' },
+    { title: 'Interview: my coach speaks', body: 'Exclusive chat with my head coach.', tags: '["interview"]', status: 'published' },
+    { title: 'Recovery tips after a hard session', body: 'Ice baths, stretching, and sleep.', tags: '["recovery"]', status: 'published' },
+    { title: 'Mental game is everything', body: 'How I stay focused under pressure.', tags: '["mindset"]', status: 'published' },
+    { title: 'New kit reveal 2026', body: 'Unboxing my new season kit — LINK IN BIO', tags: '["gear"]', status: 'pending' },
+    { title: 'Behind the scenes at Wembley', body: 'Never seen footage from training day.', tags: '["behindthescenes"]', status: 'pending' },
+  ];
+
+  for (let i = 0; i < contentItems.length; i++) {
+    const c = contentItems[i];
+    const creator = creatorRows[i % creatorRows.length];
+    const result = db.prepare(`INSERT INTO content (creator_id, title, body, tags, status) VALUES (?, ?, ?, ?, ?)`)
+      .run(creator.id, c.title, c.body, c.tags, c.status);
+    db.prepare(`INSERT INTO moderation_queue (content_type, content_id, status) VALUES ('creator_content', ?, ?)`)
+      .run(result.lastInsertRowid, c.status === 'published' ? 'approved' : 'pending');
+  }
+
+  // Business content
+  const bizRows = db.prepare('SELECT id FROM businesses').all();
+  const bizContent = [
+    { title: 'Partner with NikeUK this season', body: 'We are looking for grassroots athletes.', budget_range: '£500-£2000', target_sport: 'All' },
+    { title: 'Red Bull Creator Challenge 2026', body: 'Show us your best clip and win.', budget_range: '£1000-£5000', target_sport: 'Athletics' },
+    { title: 'Gymshark ambassador programme', body: 'Apply to be part of our 2026 team.', budget_range: '£200-£800', target_sport: 'Fitness' },
+  ];
+
+  for (let i = 0; i < bizContent.length; i++) {
+    const bc = bizContent[i];
+    const biz = bizRows[i % bizRows.length];
+    const result = db.prepare(`INSERT INTO business_content (business_id, title, body, budget_range, target_sport, status) VALUES (?, ?, ?, ?, ?, 'pending')`)
+      .run(biz.id, bc.title, bc.body, bc.budget_range, bc.target_sport);
+    db.prepare(`INSERT INTO moderation_queue (content_type, content_id, status) VALUES ('business_content', ?, 'pending')`)
+      .run(result.lastInsertRowid);
+  }
+
+  // Opportunities
+  const opps = [
+    { type: 'creator', title: 'Looking for football collab', description: 'Want to film skills content with another creator in London.', sport: 'Football', location: 'London', budget: 'Unpaid/exposure' },
+    { type: 'business', title: 'Brand ambassador — NikeUK', description: 'Seeking 3 creators to rep our new collection.', sport: 'All', location: 'Remote', budget: '£1500' },
+    { type: 'creator', title: 'Tennis doubles partner for YouTube', description: 'Filming doubles match for a YouTube series.', sport: 'Tennis', location: 'Birmingham', budget: 'Revenue share' },
+    { type: 'business', title: 'Red Bull filming crew', description: 'We need a videographer for our October event.', sport: 'Athletics', location: 'Manchester', budget: '£3000' },
+    { type: 'business', title: 'Gymshark content week', description: 'Join us for a content creation week at our HQ.', sport: 'Fitness', location: 'Birmingham', budget: '£500 + kit' },
+  ];
+
+  const firstCreatorId = creatorRows[0]?.id;
+  const firstBizId = bizRows[0]?.id;
+
+  for (const opp of opps) {
+    const posted_by_id = opp.type === 'creator' ? firstCreatorId : firstBizId;
+    db.prepare(`INSERT INTO opportunities (posted_by_type, posted_by_id, title, description, sport, location, budget) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run(opp.type === 'creator' ? 'creator' : 'business', posted_by_id, opp.title, opp.description, opp.sport, opp.location, opp.budget);
+  }
+}
+
+module.exports = seed;
