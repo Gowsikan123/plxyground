@@ -1,57 +1,83 @@
 import { create } from 'zustand';
-import { contentService } from '../services/contentService';
+import { getFeed } from '../services/contentService';
+
+const LIMIT = 20;
 
 export const useFeedStore = create((set, get) => ({
   posts: [],
   total: 0,
   offset: 0,
-  limit: 20,
   isLoading: false,
   isRefreshing: false,
-  isFetchingMore: false,
-  error: null,
+  hasMore: true,
   search: '',
   sport: '',
+  _searchTimer: null,
 
-  setFilters: (filters) => {
-    set({ ...filters, posts: [], offset: 0 });
-  },
-
-  fetchFeed: async (reset = false) => {
-    const { limit, search, sport, posts } = get();
-    const offset = reset ? 0 : posts.length;
-
-    if (reset) {
-      set({ isLoading: true, error: null, posts: [], offset: 0 });
+  fetchPosts: async () => {
+    const { search, sport } = get();
+    set({ isLoading: true });
+    const { data, error } = await getFeed({ search, sport, limit: LIMIT, offset: 0 });
+    if (!error && data) {
+      set({
+        posts: data.data || [],
+        total: data.total || 0,
+        offset: LIMIT,
+        hasMore: (data.data || []).length === LIMIT,
+        isLoading: false,
+      });
     } else {
-      set({ isFetchingMore: true });
+      set({ isLoading: false });
     }
-
-    const { data, error } = await contentService.getFeed({ search, sport, limit, offset });
-
-    if (error) {
-      set({ error, isLoading: false, isFetchingMore: false });
-      return;
-    }
-
-    set((state) => ({
-      posts: reset ? data.data : [...state.posts, ...data.data],
-      total: data.total,
-      offset: offset + data.data.length,
-      isLoading: false,
-      isFetchingMore: false,
-      error: null,
-    }));
   },
 
-  refresh: async () => {
+  refreshPosts: async () => {
+    const { search, sport } = get();
     set({ isRefreshing: true });
-    const { limit, search, sport } = get();
-    const { data, error } = await contentService.getFeed({ search, sport, limit, offset: 0 });
-
-    if (!error) {
-      set({ posts: data.data, total: data.total, offset: data.data.length, error: null });
+    const { data, error } = await getFeed({ search, sport, limit: LIMIT, offset: 0 });
+    if (!error && data) {
+      set({
+        posts: data.data || [],
+        total: data.total || 0,
+        offset: LIMIT,
+        hasMore: (data.data || []).length === LIMIT,
+        isRefreshing: false,
+      });
+    } else {
+      set({ isRefreshing: false });
     }
-    set({ isRefreshing: false });
+  },
+
+  loadMorePosts: async () => {
+    const { isLoading, hasMore, posts, offset, search, sport } = get();
+    if (isLoading || !hasMore) return;
+    set({ isLoading: true });
+    const { data, error } = await getFeed({ search, sport, limit: LIMIT, offset });
+    if (!error && data) {
+      const newPosts = data.data || [];
+      set({
+        posts: [...posts, ...newPosts],
+        offset: offset + LIMIT,
+        hasMore: newPosts.length === LIMIT,
+        isLoading: false,
+      });
+    } else {
+      set({ isLoading: false });
+    }
+  },
+
+  setSearch: (query) => {
+    const { _searchTimer } = get();
+    if (_searchTimer) clearTimeout(_searchTimer);
+    const timer = setTimeout(() => {
+      set({ search: query, offset: 0, posts: [], hasMore: true });
+      get().fetchPosts();
+    }, 400);
+    set({ _searchTimer: timer });
+  },
+
+  setSport: (sport) => {
+    set({ sport, offset: 0, posts: [], hasMore: true });
+    get().fetchPosts();
   },
 }));

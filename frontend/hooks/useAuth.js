@@ -1,53 +1,39 @@
 import { useCallback } from 'react';
+import { useRouter } from 'expo-router';
 import { useAuthStore } from '../store/authStore';
-import { authService } from '../services/authService';
 
 export function useAuth() {
-  const { user, token, userType, isLoading, isAuthenticated, setAuth, updateUser, logout } = useAuthStore();
+  const { user, userType, token, isLoading, isHydrated, login, logout, setUser } = useAuthStore();
+  const router = useRouter();
 
-  const creatorLogin = useCallback(async (email, password) => {
-    const { data, error } = await authService.creatorLogin(email, password);
-    if (data) {
-      setAuth(data.token, data.user, 'creator');
-    }
-    return { data, error };
-  }, [setAuth]);
+  const handleLogin = useCallback(
+    async (token, user, userType) => {
+      await login(token, user, userType);
+      if (userType === 'creator') {
+        router.replace('/(creator)/feed');
+      } else {
+        router.replace('/(business)/dashboard');
+      }
+    },
+    [login, router],
+  );
 
-  const businessLogin = useCallback(async (email, password) => {
-    const { data, error } = await authService.businessLogin(email, password);
-    if (data) {
-      setAuth(data.token, data.user, 'business');
-    }
-    return { data, error };
-  }, [setAuth]);
-
-  const creatorSignup = useCallback(async (formData) => {
-    const { data, error } = await authService.creatorSignup(formData);
-    if (data) {
-      setAuth(data.token, data.user, 'creator');
-    }
-    return { data, error };
-  }, [setAuth]);
-
-  const businessSignup = useCallback(async (formData) => {
-    const { data, error } = await authService.businessSignup(formData);
-    if (data) {
-      setAuth(data.token, data.user, 'business');
-    }
-    return { data, error };
-  }, [setAuth]);
+  const handleLogout = useCallback(async () => {
+    await logout();
+    router.replace('/(auth)/login');
+  }, [logout, router]);
 
   return {
     user,
-    token,
     userType,
+    token,
     isLoading,
-    isAuthenticated,
-    creatorLogin,
-    businessLogin,
-    creatorSignup,
-    businessSignup,
-    updateUser,
-    logout,
+    isHydrated,
+    isCreator: userType === 'creator',
+    isBusiness: userType === 'business',
+    isLoggedIn: !!token && !!user,
+    login: handleLogin,
+    logout: handleLogout,
+    setUser,
   };
 }

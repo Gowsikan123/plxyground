@@ -1,48 +1,31 @@
 import api from './api';
 
-export const opportunityService = {
-  async getOpportunities({ search = '', sport = '', limit = 20, offset = 0 } = {}) {
-    try {
-      const res = await api.get('/api/opportunities', { params: { search, sport, limit, offset } });
-      return { data: res.data, error: null };
-    } catch (err) {
-      return { data: null, error: err.response?.data?.message || 'Failed to load opportunities' };
-    }
-  },
-
-  async getOpportunity(id) {
-    try {
-      const res = await api.get(`/api/opportunities/${id}`);
-      return { data: res.data, error: null };
-    } catch (err) {
-      return { data: null, error: err.response?.data?.message || 'Opportunity not found' };
-    }
-  },
-
-  async createOpportunity(data) {
-    try {
-      const res = await api.post('/api/opportunities', data);
-      return { data: res.data, error: null };
-    } catch (err) {
-      return { data: null, error: err.response?.data?.errors || err.response?.data?.message || 'Failed to create opportunity' };
-    }
-  },
-
-  async updateOpportunity(id, data) {
-    try {
-      const res = await api.put(`/api/opportunities/${id}`, data);
-      return { data: res.data, error: null };
-    } catch (err) {
-      return { data: null, error: err.response?.data?.message || 'Failed to update opportunity' };
-    }
-  },
-
-  async deleteOpportunity(id) {
-    try {
-      const res = await api.delete(`/api/opportunities/${id}`);
-      return { data: res.data, error: null };
-    } catch (err) {
-      return { data: null, error: err.response?.data?.message || 'Failed to delete opportunity' };
-    }
-  },
+const wrap = async (fn) => {
+  try {
+    const res = await fn();
+    return { data: res.data, error: null };
+  } catch (err) {
+    return { data: null, error: err.response?.data?.error || err.message || 'Unknown error' };
+  }
 };
+
+export const getOpportunities = ({ search = '', sport = '', limit = 20, offset = 0 } = {}) => {
+  const params = new URLSearchParams();
+  if (search) params.set('search', search);
+  if (sport) params.set('sport', sport);
+  params.set('limit', String(limit));
+  params.set('offset', String(offset));
+  return wrap(() => api.get(`/api/opportunities?${params.toString()}`));
+};
+
+export const getOpportunityById = (id) =>
+  wrap(() => api.get(`/api/opportunities/${id}`));
+
+export const createOpportunity = (data) =>
+  wrap(() => api.post('/api/opportunities', data));
+
+export const updateOpportunity = (id, data) =>
+  wrap(() => api.put(`/api/opportunities/${id}`, data));
+
+export const deleteOpportunity = (id) =>
+  wrap(() => api.delete(`/api/opportunities/${id}`));

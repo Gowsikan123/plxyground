@@ -1,36 +1,28 @@
-import { Platform } from 'react-native';
-
-export const fontFamily = {
-  regular: Platform.select({ ios: 'DMSans-Regular', android: 'DMSans-Regular', default: 'DMSans-Regular' }),
-  medium: Platform.select({ ios: 'DMSans-Medium', android: 'DMSans-Medium', default: 'DMSans-Medium' }),
-  bold: Platform.select({ ios: 'DMSans-Bold', android: 'DMSans-Bold', default: 'DMSans-Bold' }),
-  displayRegular: Platform.select({ ios: 'Syne-Regular', android: 'Syne-Regular', default: 'Syne-Regular' }),
-  displayBold: Platform.select({ ios: 'Syne-Bold', android: 'Syne-Bold', default: 'Syne-Bold' }),
-  displayExtraBold: Platform.select({ ios: 'Syne-ExtraBold', android: 'Syne-ExtraBold', default: 'Syne-ExtraBold' }),
+export const fontFamilies = {
+  heading: 'Syne_700Bold',
+  body: 'DMSans_400Regular',
+  bodyMedium: 'DMSans_500Medium',
 };
 
-export const fontSize = {
+export const fontSizes = {
   xs: 11,
   sm: 13,
-  base: 15,
-  md: 17,
-  lg: 20,
-  xl: 24,
-  '2xl': 30,
-  '3xl': 36,
-  '4xl': 48,
+  md: 15,
+  lg: 17,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
+  display: 42,
 };
 
-export const lineHeight = {
+export const fontWeights = {
+  regular: '400',
+  medium: '500',
+  bold: '700',
+};
+
+export const lineHeights = {
   tight: 1.2,
   normal: 1.5,
   relaxed: 1.75,
-};
-
-export const fontWeight = {
-  regular: '400',
-  medium: '500',
-  semibold: '600',
-  bold: '700',
-  extrabold: '800',
 };

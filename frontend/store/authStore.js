@@ -1,39 +1,53 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
-import { authService } from '../services/authService';
+
+const TOKEN_KEY = 'plxyground_token';
+const USER_TYPE_KEY = 'plxyground_user_type';
 
 export const useAuthStore = create((set, get) => ({
   user: null,
-  token: null,
   userType: null,
-  isLoading: true,
-  isAuthenticated: false,
+  token: null,
+  isLoading: false,
+  isHydrated: false,
 
   hydrate: async () => {
+    set({ isLoading: true });
     try {
-      const token = await SecureStore.getItemAsync('authToken');
-      const userRaw = await SecureStore.getItemAsync('authUser');
-      if (token && userRaw) {
-        const user = JSON.parse(userRaw);
-        set({ token, user, userType: user.type, isAuthenticated: true, isLoading: false });
-      } else {
-        set({ isLoading: false });
+      const token = await SecureStore.getItemAsync(TOKEN_KEY);
+      const userType = await SecureStore.getItemAsync(USER_TYPE_KEY);
+      if (!token || !userType) {
+        set({ isHydrated: true, isLoading: false });
+        return;
       }
+      // Dynamically import to avoid circular deps
+      const { getCreatorMe, getBusinessMe } = await import('../services/authService');
+      const fn = userType === 'creator' ? getCreatorMe : getBusinessMe;
+      const { data, error } = await fn();
+      if (error || !data) {
+        await SecureStore.deleteItemAsync(TOKEN_KEY);
+        await SecureStore.deleteItemAsync(USER_TYPE_KEY);
+        set({ user: null, userType: null, token: null, isHydrated: true, isLoading: false });
+        return;
+      }
+      const user = data.user || data.business || data;
+      set({ user, userType, token, isHydrated: true, isLoading: false });
     } catch {
-      set({ isLoading: false });
+      set({ isHydrated: true, isLoading: false });
     }
   },
 
-  setAuth: (token, user, userType) => {
-    set({ token, user, userType, isAuthenticated: true });
-  },
-
-  updateUser: (updates) => {
-    set((state) => ({ user: { ...state.user, ...updates } }));
+  login: async (token, user, userType) => {
+    await SecureStore.setItemAsync(TOKEN_KEY, token);
+    await SecureStore.setItemAsync(USER_TYPE_KEY, userType);
+    set({ token, user, userType });
   },
 
   logout: async () => {
-    await authService.logout();
-    set({ user: null, token: null, userType: null, isAuthenticated: false });
+    await SecureStore.deleteItemAsync(TOKEN_KEY);
+    await SecureStore.deleteItemAsync(USER_TYPE_KEY);
+    set({ user: null, userType: null, token: null });
   },
+
+  setUser: (user) => set({ user }),
 }));
