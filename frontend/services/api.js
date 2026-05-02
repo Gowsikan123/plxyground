@@ -1,39 +1,30 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-const TOKEN_KEY = 'plxyground_token';
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 const api = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_BASE_URL,
+  baseURL: API_URL,
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
 });
 
-api.interceptors.request.use(
-  async (config) => {
-    try {
-      const token = await SecureStore.getItemAsync(TOKEN_KEY);
-      if (token) config.headers.Authorization = `Bearer ${token}`;
-    } catch { /* SecureStore unavailable */ }
-    return config;
-  },
-  (error) => Promise.reject(error),
-);
+api.interceptors.request.use(async (config) => {
+  const token = await SecureStore.getItemAsync('plxy_auth_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    if (error.response?.status === 401) {
-      try {
-        await SecureStore.deleteItemAsync(TOKEN_KEY);
-        await SecureStore.deleteItemAsync('plxyground_user_type');
-      } catch { /* ignore */ }
-      // Signal logout to any subscribers
-      const { useAuthStore } = await import('../store/authStore');
-      useAuthStore.getState().logout();
-    }
-    return Promise.reject(error);
-  },
-);
+export async function apiCall(fn) {
+  try {
+    const res = await fn(api);
+    return { data: res.data, error: null };
+  } catch (err) {
+    const msg = err?.response?.data?.error || err?.message || 'An unexpected error occurred.';
+    return { data: null, error: msg };
+  }
+}
 
 export default api;

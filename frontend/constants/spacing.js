@@ -1,17 +1,20 @@
-export const spacing = {
-  xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 24,
-  xxl: 32,
-  xxxl: 48,
+export const Spacing = {
+  1: 4,
+  2: 8,
+  3: 12,
+  4: 16,
+  5: 20,
+  6: 24,
+  8: 32,
+  10: 40,
+  12: 48,
+  16: 64,
 };
 
-export const borderRadius = {
+export const Radius = {
   sm: 6,
-  md: 12,
-  lg: 20,
-  xl: 28,
-  full: 999,
+  md: 10,
+  lg: 16,
+  xl: 24,
+  full: 9999,
 };

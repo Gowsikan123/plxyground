@@ -1,82 +1,39 @@
-import React, { createContext, useContext, useCallback, useRef, useState } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
-import { colors } from '../../constants/colors';
-import { fontFamilies, fontSizes } from '../../constants/typography';
-import { spacing, borderRadius } from '../../constants/spacing';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Text, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Colors } from '../../constants/colors';
+import { Typography } from '../../constants/typography';
+import { Spacing, Radius } from '../../constants/spacing';
 
-const ToastContext = createContext(null);
+export function Toast({ message, type = 'error', visible, onHide }) {
+  const insets = useSafeAreaInsets();
+  const anim = useRef(new Animated.Value(0)).current;
 
-export function ToastProvider({ children }) {
-  const [toasts, setToasts] = useState([]);
-  const idRef = useRef(0);
+  useEffect(() => {
+    if (visible) {
+      Animated.spring(anim, { toValue: 1, useNativeDriver: true, tension: 80, friction: 10 }).start();
+      const t = setTimeout(() => {
+        Animated.timing(anim, { toValue: 0, duration: 250, useNativeDriver: true }).start(onHide);
+      }, 3500);
+      return () => clearTimeout(t);
+    }
+  }, [visible, anim, onHide]);
 
-  const showToast = useCallback((message, type = 'info') => {
-    const id = ++idRef.current;
-    const anim = new Animated.Value(0);
-    setToasts((prev) => [...prev, { id, message, type, anim }]);
+  if (!visible && !message) return null;
 
-    Animated.timing(anim, { toValue: 1, duration: 250, useNativeDriver: true }).start();
-
-    setTimeout(() => {
-      Animated.timing(anim, { toValue: 0, duration: 250, useNativeDriver: true }).start(() => {
-        setToasts((prev) => prev.filter((t) => t.id !== id));
-      });
-    }, 3000);
-  }, []);
+  const bg = type === 'error' ? Colors.error : type === 'success' ? Colors.success : Colors.warning;
 
   return (
-    <ToastContext.Provider value={showToast}>
-      {children}
-      <View style={styles.container} pointerEvents="none">
-        {toasts.map((t) => (
-          <Animated.View
-            key={t.id}
-            style={[
-              styles.toast,
-              t.type === 'success' && styles.success,
-              t.type === 'error' && styles.error,
-              t.type === 'info' && styles.info,
-              { opacity: t.anim, transform: [{ translateY: t.anim.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] }) }] },
-            ]}
-          >
-            <Text style={styles.text}>{t.message}</Text>
-          </Animated.View>
-        ))}
-      </View>
-    </ToastContext.Provider>
+    <Animated.View style={[
+      styles.toast,
+      { bottom: insets.bottom + Spacing[4], backgroundColor: bg, opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) }] },
+    ]}>
+      <Text style={styles.text}>{message}</Text>
+    </Animated.View>
   );
 }
 
-export function useToast() {
-  const ctx = useContext(ToastContext);
-  if (!ctx) throw new Error('useToast must be used inside ToastProvider');
-  return ctx;
-}
-
 const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    top: 60,
-    left: spacing.lg,
-    right: spacing.lg,
-    zIndex: 9999,
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  toast: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.md,
-    maxWidth: 340,
-    alignSelf: 'center',
-  },
-  text: {
-    fontFamily: fontFamilies.bodyMedium,
-    fontSize: fontSizes.sm,
-    color: colors.white,
-    textAlign: 'center',
-  },
-  success: { backgroundColor: '#0e4d25' },
-  error: { backgroundColor: '#5a0d0d' },
-  info: { backgroundColor: '#1a1a2e' },
+  toast: { position: 'absolute', left: Spacing[4], right: Spacing[4], borderRadius: Radius.md, padding: Spacing[4], zIndex: 999 },
+  text: { fontFamily: Typography.fontBodyMedium, fontSize: Typography.sizes.sm, color: Colors.text },
 });

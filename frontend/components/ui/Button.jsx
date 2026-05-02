@@ -1,61 +1,45 @@
 import React from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
-import { colors } from '../../constants/colors';
-import { fontFamilies, fontSizes } from '../../constants/typography';
-import { spacing, borderRadius } from '../../constants/spacing';
+import { TouchableOpacity, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { Colors } from '../../constants/colors';
+import { Typography } from '../../constants/typography';
+import { Spacing, Radius } from '../../constants/spacing';
 
-const Button = React.memo(({ label, onPress, variant = 'primary', loading = false, disabled = false, fullWidth = false, size = 'md', style }) => {
+export function Button({ title, onPress, variant = 'primary', loading = false, disabled = false, style }) {
   const isDisabled = disabled || loading;
   return (
-    <Pressable
+    <TouchableOpacity
       onPress={onPress}
       disabled={isDisabled}
-      style={({ pressed }) => [
+      activeOpacity={0.75}
+      style={[
         styles.base,
-        styles[variant],
-        styles[`size_${size}`],
-        fullWidth && styles.fullWidth,
+        variant === 'primary' && styles.primary,
+        variant === 'secondary' && styles.secondary,
+        variant === 'ghost' && styles.ghost,
         isDisabled && styles.disabled,
-        pressed && !isDisabled && styles.pressed,
         style,
       ]}
     >
       {loading ? (
-        <ActivityIndicator size="small" color={variant === 'primary' ? colors.white : colors.primary} />
+        <ActivityIndicator color={variant === 'primary' ? Colors.bg : Colors.accent} size="small" />
       ) : (
-        <Text style={[styles.label, styles[`label_${variant}`], styles[`labelSize_${size}`]]}>
-          {label}
-        </Text>
+        <Text style={[
+          styles.label,
+          variant === 'secondary' && styles.labelSecondary,
+          variant === 'ghost' && styles.labelGhost,
+        ]}>{title}</Text>
       )}
-    </Pressable>
+    </TouchableOpacity>
   );
-});
-
-Button.displayName = 'Button';
-export default Button;
+}
 
 const styles = StyleSheet.create({
-  base: { borderRadius: borderRadius.sm, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
-  fullWidth: { width: '100%' },
-  disabled: { opacity: 0.45 },
-  pressed: { opacity: 0.8 },
-
-  primary: { backgroundColor: colors.primary },
-  secondary: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border },
-  danger: { backgroundColor: '#3d0d0d' },
+  base: { alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing[3], paddingHorizontal: Spacing[6], borderRadius: Radius.md, minHeight: 48 },
+  primary: { backgroundColor: Colors.accent },
+  secondary: { backgroundColor: 'transparent', borderWidth: 1, borderColor: Colors.accent },
   ghost: { backgroundColor: 'transparent' },
-
-  size_sm: { paddingVertical: spacing.xs, paddingHorizontal: spacing.md, minHeight: 34 },
-  size_md: { paddingVertical: spacing.sm + 2, paddingHorizontal: spacing.lg, minHeight: 44 },
-  size_lg: { paddingVertical: spacing.md, paddingHorizontal: spacing.xl, minHeight: 52 },
-
-  label: { fontFamily: fontFamilies.bodyMedium },
-  label_primary: { color: colors.white },
-  label_secondary: { color: colors.textPrimary },
-  label_danger: { color: colors.error },
-  label_ghost: { color: colors.primary },
-
-  labelSize_sm: { fontSize: fontSizes.xs },
-  labelSize_md: { fontSize: fontSizes.md },
-  labelSize_lg: { fontSize: fontSizes.lg },
+  disabled: { opacity: 0.45 },
+  label: { fontFamily: Typography.fontBodyBold, fontSize: Typography.sizes.base, color: Colors.bg },
+  labelSecondary: { color: Colors.accent },
+  labelGhost: { color: Colors.textMuted },
 });

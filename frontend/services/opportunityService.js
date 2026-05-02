@@ -1,31 +1,13 @@
-import api from './api';
+import { apiCall } from './api';
 
-const wrap = async (fn) => {
-  try {
-    const res = await fn();
-    return { data: res.data, error: null };
-  } catch (err) {
-    return { data: null, error: err.response?.data?.error || err.message || 'Unknown error' };
-  }
-};
+export const getOpportunities = (page = 1, sport) =>
+  apiCall((api) => api.get('/api/opportunities', { params: { page, limit: 20, ...(sport ? { sport } : {}) } }));
 
-export const getOpportunities = ({ search = '', sport = '', limit = 20, offset = 0 } = {}) => {
-  const params = new URLSearchParams();
-  if (search) params.set('search', search);
-  if (sport) params.set('sport', sport);
-  params.set('limit', String(limit));
-  params.set('offset', String(offset));
-  return wrap(() => api.get(`/api/opportunities?${params.toString()}`));
-};
+export const getOpportunity = (id) =>
+  apiCall((api) => api.get(`/api/opportunities/${id}`));
 
-export const getOpportunityById = (id) =>
-  wrap(() => api.get(`/api/opportunities/${id}`));
-
-export const createOpportunity = (data) =>
-  wrap(() => api.post('/api/opportunities', data));
-
-export const updateOpportunity = (id, data) =>
-  wrap(() => api.put(`/api/opportunities/${id}`, data));
+export const createOpportunity = (payload) =>
+  apiCall((api) => api.post('/api/opportunities', payload));
 
 export const deleteOpportunity = (id) =>
-  wrap(() => api.delete(`/api/opportunities/${id}`));
+  apiCall((api) => api.delete(`/api/opportunities/${id}`));

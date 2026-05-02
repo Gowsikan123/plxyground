@@ -1,53 +1,51 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 
-const TOKEN_KEY = 'plxyground_token';
-const USER_TYPE_KEY = 'plxyground_user_type';
+const TOKEN_KEY = 'plxy_auth_token';
+const USER_KEY = 'plxy_auth_user';
+const ROLE_KEY = 'plxy_auth_role';
 
 export const useAuthStore = create((set, get) => ({
-  user: null,
-  userType: null,
   token: null,
-  isLoading: false,
-  isHydrated: false,
+  user: null,
+  role: null,
+  isLoading: true,
 
   hydrate: async () => {
-    set({ isLoading: true });
     try {
-      const token = await SecureStore.getItemAsync(TOKEN_KEY);
-      const userType = await SecureStore.getItemAsync(USER_TYPE_KEY);
-      if (!token || !userType) {
-        set({ isHydrated: true, isLoading: false });
-        return;
-      }
-      // Dynamically import to avoid circular deps
-      const { getCreatorMe, getBusinessMe } = await import('../services/authService');
-      const fn = userType === 'creator' ? getCreatorMe : getBusinessMe;
-      const { data, error } = await fn();
-      if (error || !data) {
-        await SecureStore.deleteItemAsync(TOKEN_KEY);
-        await SecureStore.deleteItemAsync(USER_TYPE_KEY);
-        set({ user: null, userType: null, token: null, isHydrated: true, isLoading: false });
-        return;
-      }
-      const user = data.user || data.business || data;
-      set({ user, userType, token, isHydrated: true, isLoading: false });
+      const [token, userStr, role] = await Promise.all([
+        SecureStore.getItemAsync(TOKEN_KEY),
+        SecureStore.getItemAsync(USER_KEY),
+        SecureStore.getItemAsync(ROLE_KEY),
+      ]);
+      const user = userStr ? JSON.parse(userStr) : null;
+      set({ token, user, role, isLoading: false });
     } catch {
-      set({ isHydrated: true, isLoading: false });
+      set({ token: null, user: null, role: null, isLoading: false });
     }
   },
 
-  login: async (token, user, userType) => {
-    await SecureStore.setItemAsync(TOKEN_KEY, token);
-    await SecureStore.setItemAsync(USER_TYPE_KEY, userType);
-    set({ token, user, userType });
+  signIn: async (token, user, role) => {
+    await Promise.all([
+      SecureStore.setItemAsync(TOKEN_KEY, token),
+      SecureStore.setItemAsync(USER_KEY, JSON.stringify(user)),
+      SecureStore.setItemAsync(ROLE_KEY, role),
+    ]);
+    set({ token, user, role });
   },
 
-  logout: async () => {
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
-    await SecureStore.deleteItemAsync(USER_TYPE_KEY);
-    set({ user: null, userType: null, token: null });
+  signOut: async () => {
+    await Promise.all([
+      SecureStore.deleteItemAsync(TOKEN_KEY),
+      SecureStore.deleteItemAsync(USER_KEY),
+      SecureStore.deleteItemAsync(ROLE_KEY),
+    ]);
+    set({ token: null, user: null, role: null });
   },
 
-  setUser: (user) => set({ user }),
+  updateUser: (updates) => {
+    const updated = { ...get().user, ...updates };
+    set({ user: updated });
+    SecureStore.setItemAsync(USER_KEY, JSON.stringify(updated));
+  },
 }));

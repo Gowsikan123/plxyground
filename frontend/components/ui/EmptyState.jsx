@@ -1,28 +1,27 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { colors } from '../../constants/colors';
-import { fontFamilies, fontSizes } from '../../constants/typography';
-import { spacing } from '../../constants/spacing';
-import Button from './Button';
+import { View, Text, StyleSheet } from 'react-native';
+import { Button } from './Button';
+import { Colors } from '../../constants/colors';
+import { Typography } from '../../constants/typography';
+import { Spacing } from '../../constants/spacing';
 
-const EmptyState = React.memo(({ icon, title, subtitle, actionLabel, onAction }) => (
-  <View style={styles.container}>
-    {icon ? <Text style={styles.icon}>{icon}</Text> : null}
-    <Text style={styles.title}>{title}</Text>
-    {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-    {actionLabel && onAction ? (
-      <Button label={actionLabel} onPress={onAction} variant="primary" size="md" style={styles.action} />
-    ) : null}
-  </View>
-));
-
-EmptyState.displayName = 'EmptyState';
-export default EmptyState;
+export function EmptyState({ title, message, actionLabel, onAction }) {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.emoji}>📭</Text>
+      <Text style={styles.title}>{title}</Text>
+      {message ? <Text style={styles.message}>{message}</Text> : null}
+      {actionLabel && onAction ? (
+        <Button title={actionLabel} onPress={onAction} style={styles.btn} />
+      ) : null}
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xxxl },
-  icon: { fontSize: 48, marginBottom: spacing.lg },
-  title: { fontFamily: fontFamilies.heading, fontSize: fontSizes.lg, color: colors.textPrimary, textAlign: 'center', marginBottom: spacing.sm },
-  subtitle: { fontFamily: fontFamilies.body, fontSize: fontSizes.md, color: colors.textSecondary, textAlign: 'center', lineHeight: fontSizes.md * 1.5 },
-  action: { marginTop: spacing.xl },
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing[8], gap: Spacing[3] },
+  emoji: { fontSize: 48 },
+  title: { fontFamily: Typography.fontDisplay, fontSize: Typography.sizes.xl, color: Colors.text, textAlign: 'center' },
+  message: { fontFamily: Typography.fontBody, fontSize: Typography.sizes.base, color: Colors.textMuted, textAlign: 'center', maxWidth: 280 },
+  btn: { marginTop: Spacing[2], paddingHorizontal: Spacing[8] },
 });

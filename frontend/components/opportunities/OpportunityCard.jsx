@@ -1,41 +1,38 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import Card from '../ui/Card';
-import Badge from '../ui/Badge';
-import { colors } from '../../constants/colors';
-import { fontFamilies, fontSizes } from '../../constants/typography';
-import { spacing } from '../../constants/spacing';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Badge } from '../ui/Badge';
+import { Colors } from '../../constants/colors';
+import { Typography } from '../../constants/typography';
+import { Spacing, Radius } from '../../constants/spacing';
 
-const OpportunityCard = React.memo(({ opportunity, onPress }) => {
-  const o = opportunity;
+export function OpportunityCard({ item }) {
+  const router = useRouter();
   return (
-    <Card onPress={onPress} style={styles.card}>
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.85}
+      onPress={() => router.push(`/opportunity/${item.id}`)}
+    >
       <View style={styles.header}>
-        <Text style={styles.title} numberOfLines={2}>{o.title}</Text>
-        {o.sport ? <Badge label={o.sport} variant="info" /> : null}
+        <Text style={styles.title}>{item.title}</Text>
+        {item.sport ? <Badge label={item.sport} /> : null}
       </View>
-      <Text style={styles.desc} numberOfLines={2}>{o.description}</Text>
-      <View style={styles.meta}>
-        {o.budget ? <Text style={styles.metaItem}>💰 {o.budget}</Text> : null}
-        {o.location ? <Text style={styles.metaItem}>📍 {o.location}</Text> : null}
-        {o.deadline ? <Text style={styles.metaItem}>📅 {o.deadline}</Text> : null}
+      <Text style={styles.desc} numberOfLines={2}>{item.description}</Text>
+      <View style={styles.footer}>
+        {item.budget ? <Text style={styles.meta}>💰 {item.budget}</Text> : null}
+        {item.location ? <Text style={styles.meta}>📍 {item.location}</Text> : null}
+        {item.deadline ? <Text style={styles.meta}>⏰ {item.deadline}</Text> : null}
       </View>
-      {o.poster_name ? (
-        <Text style={styles.poster}>Posted by {o.poster_name}</Text>
-      ) : null}
-    </Card>
+    </TouchableOpacity>
   );
-});
-
-OpportunityCard.displayName = 'OpportunityCard';
-export default OpportunityCard;
+}
 
 const styles = StyleSheet.create({
-  card: { marginBottom: spacing.md },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.sm },
-  title: { flex: 1, fontFamily: fontFamilies.heading, fontSize: fontSizes.lg, color: colors.textPrimary },
-  desc: { fontFamily: fontFamilies.body, fontSize: fontSizes.md, color: colors.textSecondary, lineHeight: fontSizes.md * 1.5, marginBottom: spacing.sm },
-  meta: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.xs },
-  metaItem: { fontFamily: fontFamilies.body, fontSize: fontSizes.xs, color: colors.textMuted },
-  poster: { fontFamily: fontFamilies.body, fontSize: fontSizes.xs, color: colors.textMuted, marginTop: spacing.xs },
+  card: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing[4], marginBottom: Spacing[3], borderWidth: 1, borderColor: Colors.border, gap: Spacing[2] },
+  header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: Spacing[2] },
+  title: { flex: 1, fontFamily: Typography.fontDisplay, fontSize: Typography.sizes.lg, color: Colors.text },
+  desc: { fontFamily: Typography.fontBody, fontSize: Typography.sizes.base, color: Colors.textMuted },
+  footer: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing[2] },
+  meta: { fontFamily: Typography.fontBody, fontSize: Typography.sizes.sm, color: Colors.textMuted },
 });

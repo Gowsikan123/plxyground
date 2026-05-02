@@ -1,83 +1,26 @@
 import { create } from 'zustand';
-import { getFeed } from '../services/contentService';
-
-const LIMIT = 20;
 
 export const useFeedStore = create((set, get) => ({
   posts: [],
+  page: 1,
   total: 0,
-  offset: 0,
   isLoading: false,
   isRefreshing: false,
+  error: null,
   hasMore: true,
-  search: '',
-  sport: '',
-  _searchTimer: null,
 
-  fetchPosts: async () => {
-    const { search, sport } = get();
-    set({ isLoading: true });
-    const { data, error } = await getFeed({ search, sport, limit: LIMIT, offset: 0 });
-    if (!error && data) {
-      set({
-        posts: data.data || [],
-        total: data.total || 0,
-        offset: LIMIT,
-        hasMore: (data.data || []).length === LIMIT,
-        isLoading: false,
-      });
-    } else {
-      set({ isLoading: false });
-    }
-  },
+  setPosts: (posts, total) => set({ posts, total, hasMore: posts.length < total }),
 
-  refreshPosts: async () => {
-    const { search, sport } = get();
-    set({ isRefreshing: true });
-    const { data, error } = await getFeed({ search, sport, limit: LIMIT, offset: 0 });
-    if (!error && data) {
-      set({
-        posts: data.data || [],
-        total: data.total || 0,
-        offset: LIMIT,
-        hasMore: (data.data || []).length === LIMIT,
-        isRefreshing: false,
-      });
-    } else {
-      set({ isRefreshing: false });
-    }
-  },
+  appendPosts: (newPosts, total) =>
+    set((s) => ({
+      posts: [...s.posts, ...newPosts],
+      total,
+      hasMore: s.posts.length + newPosts.length < total,
+    })),
 
-  loadMorePosts: async () => {
-    const { isLoading, hasMore, posts, offset, search, sport } = get();
-    if (isLoading || !hasMore) return;
-    set({ isLoading: true });
-    const { data, error } = await getFeed({ search, sport, limit: LIMIT, offset });
-    if (!error && data) {
-      const newPosts = data.data || [];
-      set({
-        posts: [...posts, ...newPosts],
-        offset: offset + LIMIT,
-        hasMore: newPosts.length === LIMIT,
-        isLoading: false,
-      });
-    } else {
-      set({ isLoading: false });
-    }
-  },
-
-  setSearch: (query) => {
-    const { _searchTimer } = get();
-    if (_searchTimer) clearTimeout(_searchTimer);
-    const timer = setTimeout(() => {
-      set({ search: query, offset: 0, posts: [], hasMore: true });
-      get().fetchPosts();
-    }, 400);
-    set({ _searchTimer: timer });
-  },
-
-  setSport: (sport) => {
-    set({ sport, offset: 0, posts: [], hasMore: true });
-    get().fetchPosts();
-  },
+  setPage: (page) => set({ page }),
+  setLoading: (isLoading) => set({ isLoading }),
+  setRefreshing: (isRefreshing) => set({ isRefreshing }),
+  setError: (error) => set({ error }),
+  reset: () => set({ posts: [], page: 1, total: 0, hasMore: true, error: null }),
 }));

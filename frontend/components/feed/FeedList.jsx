@@ -1,35 +1,38 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import PostCard from './PostCard';
-import Skeleton from '../ui/Skeleton';
-import EmptyState from '../ui/EmptyState';
-import { spacing } from '../../constants/spacing';
+import { PostCard } from './PostCard';
+import { SkeletonCard } from '../ui/Skeleton';
+import { EmptyState } from '../ui/EmptyState';
+import { Colors } from '../../constants/colors';
+import { Spacing } from '../../constants/spacing';
 
-function SkeletonCard() {
-  return (
-    <View style={styles.skeletonCard}>
-      <View style={styles.skeletonRow}>
-        <Skeleton width={40} height={40} borderRadius={20} />
-        <View style={{ flex: 1, gap: 6 }}>
-          <Skeleton width="50%" height={12} />
-          <Skeleton width="30%" height={10} />
-        </View>
-      </View>
-      <Skeleton width="80%" height={18} style={{ marginBottom: 8 }} />
-      <Skeleton width="100%" height={13} style={{ marginBottom: 4 }} />
-      <Skeleton width="70%" height={13} />
-    </View>
-  );
-}
-
-const FeedList = React.memo(({ posts, isLoading, isRefreshing, hasMore, onRefresh, onLoadMore, ListHeaderComponent }) => {
-  if (isLoading && !posts.length) {
+export function FeedList({ posts, isLoading, isRefreshing, error, hasMore, onRefresh, onEndReached }) {
+  if (isLoading && posts.length === 0) {
     return (
-      <View style={styles.container}>
-        {ListHeaderComponent ? <ListHeaderComponent /> : null}
-        {[0, 1, 2, 3].map((i) => <SkeletonCard key={i} />)}
+      <View style={styles.list}>
+        {[1, 2, 3, 4].map((k) => <SkeletonCard key={k} />)}
       </View>
+    );
+  }
+
+  if (error && posts.length === 0) {
+    return (
+      <EmptyState
+        title="Could not load feed"
+        message={error}
+        actionLabel="Retry"
+        onAction={onRefresh}
+      />
+    );
+  }
+
+  if (!isLoading && posts.length === 0) {
+    return (
+      <EmptyState
+        title="Nothing here yet"
+        message="Be the first to post something."
+      />
     );
   }
 
@@ -38,32 +41,17 @@ const FeedList = React.memo(({ posts, isLoading, isRefreshing, hasMore, onRefres
       data={posts}
       keyExtractor={(item) => String(item.id)}
       renderItem={({ item }) => <PostCard post={item} />}
-      estimatedItemSize={220}
-      onEndReached={onLoadMore}
-      onEndReachedThreshold={0.5}
+      estimatedItemSize={160}
+      contentContainerStyle={styles.content}
       onRefresh={onRefresh}
       refreshing={isRefreshing}
-      ListHeaderComponent={ListHeaderComponent}
-      ListEmptyComponent={
-        !isLoading ? (
-          <EmptyState
-            icon="🏀"
-            title="No posts yet"
-            subtitle="Be the first to create content on PLXYGROUND!"
-          />
-        ) : null
-      }
-      contentContainerStyle={styles.list}
+      onEndReached={hasMore ? onEndReached : undefined}
+      onEndReachedThreshold={0.5}
     />
   );
-});
-
-FeedList.displayName = 'FeedList';
-export default FeedList;
+}
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: spacing.lg },
-  list: { padding: spacing.lg },
-  skeletonCard: { backgroundColor: '#141414', borderRadius: 20, padding: spacing.lg, marginBottom: spacing.md, gap: spacing.sm },
-  skeletonRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+  list: { padding: Spacing[4] },
+  content: { padding: Spacing[4] },
 });
