@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, StatusBar, ScrollV
 import { useState, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '../utils/haptics';
 import { useAuthStore } from '../store/authStore';
 import { apiRequest } from '../components/ApiClient';
 import { C, R, GRAD_ACCENT } from '../components/theme';

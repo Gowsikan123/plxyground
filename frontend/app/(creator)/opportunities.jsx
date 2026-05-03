@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '../../utils/haptics';
 import { C, R } from '../../components/theme';
 import { Header } from '../../components/layout/Header';
 import { EmptyState } from '../../components/ui/EmptyState';

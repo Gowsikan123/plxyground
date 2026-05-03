@@ -5,7 +5,7 @@ import {
   ActivityIndicator, StatusBar,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '../../utils/haptics';
 import { C, R } from '../../components/theme';
 import { Avatar } from '../../components/ui/Avatar';
 import { SkeletonCard } from '../../components/ui/Skeleton';

@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Animated, Modal, ActivityIndicator,
 } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '../../utils/haptics';
 import { useRouter } from 'expo-router';
 import { C, R } from '../../components/theme';
 import { Header } from '../../components/layout/Header';
