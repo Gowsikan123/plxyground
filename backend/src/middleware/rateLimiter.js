@@ -15,7 +15,7 @@ const authLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, error: 'Too many login attempts, please try again later.' },
+  message: { success: false, error: 'Too many auth attempts, please try again later.' },
 });
 
 module.exports = { globalLimiter, authLimiter };

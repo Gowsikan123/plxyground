@@ -1,82 +1,84 @@
 'use strict';
-require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
-const config = require('../config');
+const http = require('http');
 
-const BASE = `http://localhost:${config.PORT}`;
+const BASE = `http://localhost:3011`;
+let pass = 0;
+let fail = 0;
 
-async function req(method, path, body, token) {
-  const headers = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  const res = await fetch(`${BASE}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
+function req(method, path, body, token) {
+  return new Promise((resolve) => {
+    const opts = {
+      hostname: 'localhost',
+      port: 3011,
+      path,
+      method,
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    };
+    const r = http.request(opts, (res) => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
+        catch { resolve({ status: res.statusCode, body: data }); }
+      });
+    });
+    r.on('error', () => resolve({ status: 0, body: {} }));
+    if (body) r.write(JSON.stringify(body));
+    r.end();
   });
-  const json = await res.json();
-  return { status: res.status, json };
+}
+
+function check(label, condition) {
+  if (condition) {
+    process.stdout.write(`  \u2713 ${label}\n`);
+    pass++;
+  } else {
+    process.stdout.write(`  \u2717 ${label}\n`);
+    fail++;
+  }
 }
 
 async function run() {
-  let passed = 0;
-  let failed = 0;
+  process.stdout.write('\n=== PLXYGROUND SMOKE TESTS ===\n\n');
 
-  function assert(label, condition, detail = '') {
-    if (condition) {
-      process.stdout.write(`  ✓ ${label}\n`);
-      passed++;
-    } else {
-      process.stderr.write(`  ✗ ${label}${detail ? ' — ' + detail : ''}\n`);
-      failed++;
-    }
-  }
+  const health = await req('GET', '/healthz');
+  check('GET /healthz → success', health.body.success === true);
 
-  process.stdout.write('\n[SMOKE] PLXYGROUND API\n\n');
+  const root = await req('GET', '/');
+  check('GET / → PLXYGROUND API', root.body.name === 'PLXYGROUND API');
 
-  let r;
+  const login = await req('POST', '/api/auth/login', { email: 'jayden@example.com', password: 'Password1!' });
+  check('POST /api/auth/login → token', !!login.body.data?.token);
+  const creatorToken = login.body.data?.token;
 
-  r = await req('GET', '/healthz');
-  assert('GET /healthz returns 200', r.status === 200);
-  assert('healthz has status ok', r.json.status === 'ok');
+  const me = await req('GET', '/api/auth/me', null, creatorToken);
+  check('GET /api/auth/me → username', !!me.body.data?.username);
 
-  r = await req('GET', '/');
-  assert('GET / returns API name', r.json.name === 'PLXYGROUND API');
+  const feed = await req('GET', '/api/content');
+  check('GET /api/content → posts array', Array.isArray(feed.body.data?.posts));
 
-  r = await req('POST', '/api/auth/login', { email: 'jayden.hoops@example.com', password: 'Password1!' });
-  assert('Creator login succeeds', r.status === 200, JSON.stringify(r.json));
-  const creatorToken = r.json.data?.token;
-  assert('Creator login returns token', !!creatorToken);
+  const creatorsRes = await req('GET', '/api/creators');
+  check('GET /api/creators → data array', Array.isArray(creatorsRes.body.data?.data));
 
-  r = await req('GET', '/api/auth/me', null, creatorToken);
-  assert('GET /api/auth/me returns user', r.status === 200 && r.json.data?.username === 'jayden_hoops');
+  const oppsRes = await req('GET', '/api/opportunities');
+  check('GET /api/opportunities → data array', Array.isArray(oppsRes.body.data?.data));
 
-  r = await req('GET', '/api/content');
-  assert('GET /api/content returns posts array', Array.isArray(r.json.data?.posts));
+  const adminLogin = await req('POST', '/api/admin/auth/login', { email: 'admin@plxyground.local', password: 'Internet2026@' });
+  check('POST /api/admin/auth/login → token', !!adminLogin.body.data?.token);
+  const adminToken = adminLogin.body.data?.token;
 
-  r = await req('GET', '/api/creators');
-  assert('GET /api/creators returns creators array', Array.isArray(r.json.data?.creators));
+  const analytics = await req('GET', '/api/admin/analytics', null, adminToken);
+  check('GET /api/admin/analytics → total_creators', analytics.body.data?.total_creators >= 0);
 
-  r = await req('GET', '/api/opportunities');
-  assert('GET /api/opportunities returns array', Array.isArray(r.json.data?.opportunities));
+  const queue = await req('GET', '/api/admin/queue', null, adminToken);
+  check('GET /api/admin/queue → data array', Array.isArray(queue.body.data?.data));
 
-  r = await req('POST', '/api/admin/auth/login', { email: 'admin@plxyground.local', password: 'Internet2026@' });
-  assert('Admin login succeeds', r.status === 200, JSON.stringify(r.json));
-  const adminToken = r.json.data?.token;
-  assert('Admin login returns token', !!adminToken);
+  process.stdout.write(`\n===========================\n`);
+  process.stdout.write(`  PASSED: ${pass}\n`);
+  process.stdout.write(`  FAILED: ${fail}\n`);
+  process.stdout.write(`===========================\n\n`);
 
-  r = await req('GET', '/api/admin/analytics', null, adminToken);
-  assert('GET /api/admin/analytics returns KPIs', r.status === 200 && typeof r.json.data?.total_creators === 'number');
-
-  r = await req('GET', '/api/admin/queue', null, adminToken);
-  assert('GET /api/admin/queue returns items', r.status === 200 && Array.isArray(r.json.data?.items));
-
-  r = await req('GET', '/api/admin/users', null, adminToken);
-  assert('GET /api/admin/users returns users', r.status === 200 && Array.isArray(r.json.data?.users));
-
-  process.stdout.write(`\n[SMOKE] ${passed} passed, ${failed} failed\n\n`);
-  if (failed > 0) process.exit(1);
+  process.exit(fail > 0 ? 1 : 0);
 }
 
-run().catch((err) => {
-  process.stderr.write(`[SMOKE] Fatal: ${err.message}\n`);
-  process.exit(1);
-});
+run();

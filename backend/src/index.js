@@ -12,56 +12,49 @@ const morgan = require('morgan');
 const cors = require('cors');
 const { globalLimiter } = require('./middleware/rateLimiter');
 
-const authRoutes = require('./routes/auth');
-const businessAuthRoutes = require('./routes/businessAuth');
-const contentRoutes = require('./routes/content');
-const creatorsRoutes = require('./routes/creators');
-const opportunitiesRoutes = require('./routes/opportunities');
-const adminAuthRoutes = require('./routes/admin/auth');
-const adminQueueRoutes = require('./routes/admin/queue');
-const adminContentRoutes = require('./routes/admin/content');
-const adminUsersRoutes = require('./routes/admin/users');
-const adminAnalyticsRoutes = require('./routes/admin/analytics');
-const adminAuditRoutes = require('./routes/admin/audit');
-
 const app = express();
 
 app.use(helmet());
-app.use(morgan('combined'));
-app.use(cors({ origin: config.CORS_ORIGIN.split(',').map((o) => o.trim()) }));
+app.use(morgan('combined', {
+  stream: { write: (msg) => logger.info(msg.trim()) },
+}));
+app.use(cors({ origin: config.CORS_ORIGIN.split(',').map(o => o.trim()) }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(globalLimiter);
 
-app.get('/healthz', (_req, res) => {
+// Health + root
+app.get('/healthz', (req, res) => {
   res.json({ success: true, status: 'ok', uptime: process.uptime(), timestamp: new Date() });
 });
-
-app.get('/', (_req, res) => {
+app.get('/', (req, res) => {
   res.json({ success: true, name: 'PLXYGROUND API', version: '1.0.0' });
 });
 
-app.use('/api/auth', authRoutes);
-app.use('/api/business', businessAuthRoutes);
-app.use('/api/content', contentRoutes);
-app.use('/api/creators', creatorsRoutes);
-app.use('/api/opportunities', opportunitiesRoutes);
-app.use('/api/admin/auth', adminAuthRoutes);
-app.use('/api/admin/queue', adminQueueRoutes);
-app.use('/api/admin/content', adminContentRoutes);
-app.use('/api/admin/users', adminUsersRoutes);
-app.use('/api/admin/analytics', adminAnalyticsRoutes);
-app.use('/api/admin/audit', adminAuditRoutes);
+// Routes
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/business', require('./routes/businessAuth'));
+app.use('/api/content', require('./routes/content'));
+app.use('/api/creators', require('./routes/creators'));
+app.use('/api/opportunities', require('./routes/opportunities'));
+app.use('/api/admin/auth', require('./routes/admin/auth'));
+app.use('/api/admin/queue', require('./routes/admin/queue'));
+app.use('/api/admin/content', require('./routes/admin/content'));
+app.use('/api/admin/users', require('./routes/admin/users'));
+app.use('/api/admin/analytics', require('./routes/admin/analytics'));
+app.use('/api/admin/audit', require('./routes/admin/audit'));
 
-app.use((_req, res) => {
+// 404
+app.use((req, res) => {
   res.status(404).json({ success: false, error: 'Route not found' });
 });
 
-app.use((err, _req, res, _next) => {
-  logger.error(err.stack || err.message);
+// Global error handler
+app.use((err, req, res, next) => {
+  logger.error(`Unhandled error: ${err.message}`);
   res.status(500).json({ success: false, error: 'Internal server error' });
 });
 
 app.listen(config.PORT, () => {
-  logger.info(`PLXYGROUND API running on port ${config.PORT} [${config.NODE_ENV}]`);
+  logger.info(`PLXYGROUND API listening on port ${config.PORT} [${config.NODE_ENV}]`);
 });
