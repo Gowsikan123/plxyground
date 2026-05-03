@@ -1,87 +1,120 @@
 'use strict';
-const { Router } = require('express');
-const { body, query } = require('express-validator');
+const express = require('express');
+const { body } = require('express-validator');
 const db = require('../db/client');
+const audit = require('../utils/auditLogger');
 const { requireAuth } = require('../middleware/auth');
-const { validate } = require('../middleware/validate');
-const { logAudit } = require('../utils/auditLogger');
-const logger = require('../logger');
+const { validationErrorHandler } = require('../middleware/validate');
 
-const router = Router();
+const router = express.Router();
 
-router.get('/', [
-  query('page').optional().isInt({ min: 1 }),
-  query('limit').optional().isInt({ min: 1, max: 50 }),
-  query('sport').optional().trim(),
-], validate, (req, res) => {
+function attachPoster(opp) {
+  if (opp.posted_by_type === 'creator') {
+    const c = db.prepare('SELECT display_name, username, avatar_url FROM creators WHERE id = ?').get(opp.posted_by_id);
+    return { ...opp, poster: c || null };
+  }
+  const b = db.prepare('SELECT company_name, logo_url FROM businesses WHERE id = ?').get(opp.posted_by_id);
+  return { ...opp, poster: b ? { display_name: b.company_name, avatar_url: b.logo_url } : null };
+}
+
+router.get('/', (req, res) => {
   try {
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 20;
-    const offset = (page - 1) * limit;
-    const sport = req.query.sport;
+    const search = req.query.search || '';
+    const sport = req.query.sport || '';
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const offset = parseInt(req.query.offset) || 0;
 
-    let sql = `SELECT * FROM opportunities WHERE status = 'published'`;
+    let where = "WHERE o.status = 'published'";
     const params = [];
-    if (sport) { sql += ' AND sport = ?'; params.push(sport); }
-    sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-    params.push(limit, offset);
+    if (search) {
+      where += ' AND (o.title LIKE ? OR o.description LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
+    }
+    if (sport) {
+      where += ' AND o.sport = ?';
+      params.push(sport);
+    }
 
-    const rows = db.prepare(sql).all(...params);
-    const total = db.prepare(`SELECT COUNT(*) as n FROM opportunities WHERE status = 'published'${sport ? ' AND sport = ?' : ''}`).get(...(sport ? [sport] : []));
+    const rows = db.prepare(`SELECT * FROM opportunities o ${where} ORDER BY o.created_at DESC LIMIT ? OFFSET ?`).all(...params, limit, offset);
+    const total = db.prepare(`SELECT COUNT(*) as n FROM opportunities o ${where}`).get(...params).n;
+    const opps = rows.map(attachPoster);
 
-    res.json({ data: rows, meta: { page, limit, total: total.n } });
+    return res.json({ success: true, data: { opportunities: opps, total, limit, offset } });
   } catch (err) {
-    logger.error('Opportunities list error', { message: err.message });
-    res.status(500).json({ error: 'Could not load opportunities.' });
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
 router.get('/:id', (req, res) => {
   try {
-    const opp = db.prepare(`SELECT * FROM opportunities WHERE id = ? AND status = 'published'`).get(req.params.id);
-    if (!opp) return res.status(404).json({ error: 'Opportunity not found.' });
-    res.json({ data: opp });
+    const opp = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(req.params.id);
+    if (!opp || opp.status === 'deleted') return res.status(404).json({ success: false, error: 'Opportunity not found' });
+    return res.json({ success: true, data: attachPoster(opp) });
   } catch (err) {
-    logger.error('Opportunity fetch error', { message: err.message });
-    res.status(500).json({ error: 'Could not load opportunity.' });
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-router.post('/', requireAuth(), [
-  body('title').trim().isLength({ min: 1, max: 200 }),
-  body('description').trim().isLength({ min: 1 }),
-  body('sport').optional().trim(),
-  body('location').optional().trim(),
-  body('budget').optional().trim(),
-  body('deadline').optional().trim(),
-], validate, (req, res) => {
+router.post(
+  '/',
+  requireAuth,
+  [
+    body('title').notEmpty().withMessage('Title required'),
+    body('description').notEmpty().withMessage('Description required'),
+  ],
+  validationErrorHandler,
+  (req, res) => {
+    try {
+      const { title, description, sport = '', location = '', budget = '', deadline = '' } = req.body;
+      const posted_by_id = req.userType === 'creator' ? req.user.creator_id : req.user.id;
+
+      const row = db
+        .prepare('INSERT INTO opportunities (posted_by_type, posted_by_id, title, description, sport, location, budget, deadline) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(req.userType, posted_by_id, title, description, sport, location, budget, deadline);
+
+      audit.log({ actor_type: req.userType, actor_id: req.user.id, action: 'OPPORTUNITY_CREATED', target_type: 'opportunities', target_id: row.lastInsertRowid, ip_address: req.ip });
+      const created = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(row.lastInsertRowid);
+      return res.status(201).json({ success: true, data: created });
+    } catch (err) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+);
+
+router.put('/:id', requireAuth, (req, res) => {
   try {
-    const { title, description, sport = '', location = '', budget = '', deadline = '' } = req.body;
-    const postedByType = req.user.role;
-    const result = db.prepare(
-      'INSERT INTO opportunities (posted_by_type, posted_by_id, title, description, sport, location, budget, deadline) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(postedByType, req.user.id, title, description, sport, location, budget, deadline);
+    const posted_by_id = req.userType === 'creator' ? req.user.creator_id : req.user.id;
+    const opp = db.prepare('SELECT * FROM opportunities WHERE id = ? AND posted_by_type = ? AND posted_by_id = ?').get(req.params.id, req.userType, posted_by_id);
+    if (!opp) return res.status(404).json({ success: false, error: 'Opportunity not found or not yours' });
 
-    logAudit({ actorType: postedByType, actorId: req.user.id, action: 'opportunity_created', targetType: 'opportunity', targetId: result.lastInsertRowid, ipAddress: req.ip });
-
-    const opp = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(result.lastInsertRowid);
-    res.status(201).json({ data: opp });
+    const { title, description, sport, location, budget, deadline, status } = req.body;
+    db.prepare('UPDATE opportunities SET title=?, description=?, sport=?, location=?, budget=?, deadline=?, status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?')
+      .run(
+        title !== undefined ? title : opp.title,
+        description !== undefined ? description : opp.description,
+        sport !== undefined ? sport : opp.sport,
+        location !== undefined ? location : opp.location,
+        budget !== undefined ? budget : opp.budget,
+        deadline !== undefined ? deadline : opp.deadline,
+        status !== undefined ? status : opp.status,
+        opp.id
+      );
+    const updated = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(opp.id);
+    return res.json({ success: true, data: updated });
   } catch (err) {
-    logger.error('Opportunity create error', { message: err.message });
-    res.status(500).json({ error: 'Could not create opportunity.' });
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-router.delete('/:id', requireAuth(), (req, res) => {
+router.delete('/:id', requireAuth, (req, res) => {
   try {
-    const opp = db.prepare('SELECT * FROM opportunities WHERE id = ? AND posted_by_id = ? AND posted_by_type = ?').get(req.params.id, req.user.id, req.user.role);
-    if (!opp) return res.status(404).json({ error: 'Opportunity not found or not yours.' });
-    db.prepare(`UPDATE opportunities SET status = 'deleted' WHERE id = ?`).run(opp.id);
-    logAudit({ actorType: req.user.role, actorId: req.user.id, action: 'opportunity_deleted', targetType: 'opportunity', targetId: opp.id, ipAddress: req.ip });
-    res.json({ message: 'Opportunity deleted.' });
+    const posted_by_id = req.userType === 'creator' ? req.user.creator_id : req.user.id;
+    const opp = db.prepare('SELECT * FROM opportunities WHERE id = ? AND posted_by_type = ? AND posted_by_id = ?').get(req.params.id, req.userType, posted_by_id);
+    if (!opp) return res.status(404).json({ success: false, error: 'Opportunity not found or not yours' });
+    db.prepare("UPDATE opportunities SET status='deleted', updated_at=CURRENT_TIMESTAMP WHERE id=?").run(opp.id);
+    return res.json({ success: true });
   } catch (err) {
-    logger.error('Opportunity delete error', { message: err.message });
-    res.status(500).json({ error: 'Could not delete opportunity.' });
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 

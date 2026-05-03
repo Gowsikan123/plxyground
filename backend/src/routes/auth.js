@@ -1,57 +1,84 @@
 'use strict';
-const { Router } = require('express');
+const express = require('express');
 const { body } = require('express-validator');
 const bcrypt = require('bcryptjs');
-const { v4: uuidv4 } = require('uuid');
 const db = require('../db/client');
 const { signToken } = require('../utils/jwt');
-const { slugify } = require('../utils/slugify');
-const { validate } = require('../middleware/validate');
+const { slugify, ensureUniqueSlug } = require('../utils/slugify');
+const audit = require('../utils/auditLogger');
+const { requireAuth } = require('../middleware/auth');
+const { validationErrorHandler } = require('../middleware/validate');
 const { authLimiter } = require('../middleware/rateLimiter');
-const { logAudit } = require('../utils/auditLogger');
-const logger = require('../logger');
 
-const router = Router();
+const router = express.Router();
 
 router.post(
   '/signup',
   authLimiter,
   [
-    body('email').isEmail().normalizeEmail(),
-    body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters.'),
-    body('username').trim().isLength({ min: 3, max: 30 }).matches(/^[a-z0-9_]+$/i),
-    body('display_name').trim().isLength({ min: 1, max: 80 }),
+    body('email').isEmail().withMessage('Valid email required'),
+    body('password')
+      .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+      .matches(/[A-Z]/).withMessage('Password must contain an uppercase letter')
+      .matches(/[0-9]/).withMessage('Password must contain a digit'),
+    body('username')
+      .matches(/^[a-zA-Z0-9_]{3,20}$/).withMessage('Username must be 3-20 characters, alphanumeric or underscore'),
+    body('display_name')
+      .isLength({ min: 1, max: 50 }).withMessage('Display name must be 1-50 characters'),
   ],
-  validate,
-  async (req, res) => {
+  validationErrorHandler,
+  (req, res) => {
     try {
-      const { email, password, username, display_name, bio = '', sport = '', location = '' } = req.body;
-      const existing = db.prepare('SELECT id FROM creator_accounts WHERE email = ?').get(email);
-      if (existing) return res.status(409).json({ error: 'Email already registered.' });
+      const { email, password, username, display_name, sport = '', location = '' } = req.body;
 
-      const existingUser = db.prepare('SELECT id FROM creators WHERE username = ?').get(username);
-      if (existingUser) return res.status(409).json({ error: 'Username taken.' });
+      const existingUsername = db.prepare('SELECT id FROM creators WHERE username = ?').get(username);
+      if (existingUsername) {
+        return res.status(409).json({ success: false, error: 'Username already taken' });
+      }
 
-      const hash = await bcrypt.hash(password, 12);
-      const slug = slugify(display_name) + '-' + uuidv4().slice(0, 6);
+      const existingEmail = db.prepare('SELECT id FROM creator_accounts WHERE email = ?').get(email);
+      if (existingEmail) {
+        return res.status(409).json({ success: false, error: 'Email already registered' });
+      }
 
-      const creator = db.prepare(
-        'INSERT INTO creators (username, slug, display_name, bio, sport, location) VALUES (?, ?, ?, ?, ?, ?)'
-      ).run(username, slug, display_name, bio, sport, location);
+      const passwordHash = bcrypt.hashSync(password, 12);
+      const baseSlug = slugify(username);
+      const slug = ensureUniqueSlug('creators', baseSlug);
 
-      db.prepare(
-        'INSERT INTO creator_accounts (creator_id, email, password_hash) VALUES (?, ?, ?)'
-      ).run(creator.lastInsertRowid, email, hash);
+      const creator = db
+        .prepare('INSERT INTO creators (username, slug, display_name, sport, location) VALUES (?, ?, ?, ?, ?)')
+        .run(username, slug, display_name, sport, location);
 
-      const c = db.prepare('SELECT * FROM creators WHERE id = ?').get(creator.lastInsertRowid);
-      const token = signToken({ id: c.id, role: 'creator', slug: c.slug });
+      const account = db
+        .prepare('INSERT INTO creator_accounts (creator_id, email, password_hash) VALUES (?, ?, ?)')
+        .run(creator.lastInsertRowid, email, passwordHash);
 
-      logAudit({ actorType: 'creator', actorId: c.id, action: 'signup', targetType: 'creator', targetId: c.id, ipAddress: req.ip });
+      const token = signToken({ sub: account.lastInsertRowid, type: 'creator' });
 
-      res.status(201).json({ token, creator: sanitizeCreator(c) });
+      audit.log({
+        actor_type: 'creator',
+        actor_id: account.lastInsertRowid,
+        action: 'CREATOR_SIGNUP',
+        ip_address: req.ip,
+      });
+
+      return res.status(201).json({
+        success: true,
+        data: {
+          token,
+          user: {
+            id: account.lastInsertRowid,
+            username,
+            slug,
+            display_name,
+            sport,
+            avatar_url: '',
+            email,
+          },
+        },
+      });
     } catch (err) {
-      logger.error('Creator signup error', { message: err.message });
-      res.status(500).json({ error: 'Signup failed.' });
+      return res.status(500).json({ success: false, error: err.message });
     }
   }
 );
@@ -60,59 +87,74 @@ router.post(
   '/login',
   authLimiter,
   [
-    body('email').isEmail().normalizeEmail(),
-    body('password').notEmpty(),
+    body('email').isEmail().withMessage('Valid email required'),
+    body('password').notEmpty().withMessage('Password required'),
   ],
-  validate,
-  async (req, res) => {
+  validationErrorHandler,
+  (req, res) => {
     try {
       const { email, password } = req.body;
-      const account = db.prepare('SELECT * FROM creator_accounts WHERE email = ?').get(email);
-      if (!account) return res.status(401).json({ error: 'Invalid credentials.' });
-      if (account.is_suspended) return res.status(403).json({ error: 'Account suspended.' });
 
-      const valid = await bcrypt.compare(password, account.password_hash);
-      if (!valid) return res.status(401).json({ error: 'Invalid credentials.' });
+      const account = db
+        .prepare(
+          `SELECT ca.*, c.id as creator_id, c.username, c.slug, c.display_name,
+           c.bio, c.avatar_url, c.sport, c.location, c.follower_count, c.is_verified
+           FROM creator_accounts ca JOIN creators c ON ca.creator_id = c.id
+           WHERE ca.email = ?`
+        )
+        .get(email);
+
+      if (!account) {
+        return res.status(401).json({ success: false, error: 'Invalid credentials' });
+      }
+      if (account.is_suspended) {
+        return res.status(403).json({ success: false, error: 'Account suspended' });
+      }
+
+      const valid = bcrypt.compareSync(password, account.password_hash);
+      if (!valid) {
+        return res.status(401).json({ success: false, error: 'Invalid credentials' });
+      }
 
       db.prepare('UPDATE creator_accounts SET last_login = CURRENT_TIMESTAMP WHERE id = ?').run(account.id);
-      const creator = db.prepare('SELECT * FROM creators WHERE id = ?').get(account.creator_id);
-      const token = signToken({ id: creator.id, role: account.role, slug: creator.slug });
 
-      logAudit({ actorType: 'creator', actorId: creator.id, action: 'login', ipAddress: req.ip });
+      const token = signToken({ sub: account.id, type: 'creator' });
 
-      res.json({ token, creator: sanitizeCreator(creator) });
+      audit.log({ actor_type: 'creator', actor_id: account.id, action: 'CREATOR_LOGIN', ip_address: req.ip });
+
+      return res.json({
+        success: true,
+        data: {
+          token,
+          user: {
+            id: account.id,
+            creator_id: account.creator_id,
+            username: account.username,
+            slug: account.slug,
+            display_name: account.display_name,
+            bio: account.bio,
+            avatar_url: account.avatar_url,
+            sport: account.sport,
+            location: account.location,
+            follower_count: account.follower_count,
+            is_verified: account.is_verified,
+            email,
+          },
+        },
+      });
     } catch (err) {
-      logger.error('Creator login error', { message: err.message });
-      res.status(500).json({ error: 'Login failed.' });
+      return res.status(500).json({ success: false, error: err.message });
     }
   }
 );
 
-router.get('/me', require('../middleware/auth').requireAuth('creator'), (req, res) => {
+router.get('/me', requireAuth, (req, res) => {
   try {
-    const creator = db.prepare('SELECT * FROM creators WHERE id = ?').get(req.user.id);
-    if (!creator) return res.status(404).json({ error: 'Creator not found.' });
-    res.json({ creator: sanitizeCreator(creator) });
+    const { password_hash, ...user } = req.user;
+    return res.json({ success: true, data: user });
   } catch (err) {
-    logger.error('Creator /me error', { message: err.message });
-    res.status(500).json({ error: 'Could not fetch profile.' });
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
-
-function sanitizeCreator(c) {
-  return {
-    id: c.id,
-    username: c.username,
-    slug: c.slug,
-    display_name: c.display_name,
-    bio: c.bio,
-    avatar_url: c.avatar_url,
-    sport: c.sport,
-    location: c.location,
-    follower_count: c.follower_count,
-    is_verified: c.is_verified,
-    created_at: c.created_at,
-  };
-}
 
 module.exports = router;

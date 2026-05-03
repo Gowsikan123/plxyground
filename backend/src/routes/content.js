@@ -1,107 +1,147 @@
 'use strict';
-const { Router } = require('express');
-const { body, query } = require('express-validator');
+const express = require('express');
+const { body } = require('express-validator');
 const db = require('../db/client');
+const audit = require('../utils/auditLogger');
 const { requireAuth } = require('../middleware/auth');
-const { validate } = require('../middleware/validate');
-const { logAudit } = require('../utils/auditLogger');
-const logger = require('../logger');
+const { validationErrorHandler } = require('../middleware/validate');
 
-const router = Router();
+const router = express.Router();
 
-router.get('/', [
-  query('page').optional().isInt({ min: 1 }),
-  query('limit').optional().isInt({ min: 1, max: 50 }),
-  query('sport').optional().trim(),
-], validate, (req, res) => {
+router.get('/', (req, res) => {
   try {
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 20;
-    const offset = (page - 1) * limit;
-    const sport = req.query.sport;
+    const search = req.query.search || '';
+    const sport = req.query.sport || '';
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const offset = parseInt(req.query.offset) || 0;
 
-    let baseQuery = `
-      SELECT c.*, cr.display_name, cr.username, cr.slug as creator_slug, cr.avatar_url, cr.sport as creator_sport, cr.is_verified
-      FROM content c
-      JOIN creators cr ON c.creator_id = cr.id
-      WHERE c.status = 'published'
-    `;
+    let where = "WHERE c.status = 'published'";
     const params = [];
-    if (sport) { baseQuery += ' AND cr.sport = ?'; params.push(sport); }
-    baseQuery += ' ORDER BY c.created_at DESC LIMIT ? OFFSET ?';
-    params.push(limit, offset);
 
-    const rows = db.prepare(baseQuery).all(...params);
-    const total = db.prepare(`SELECT COUNT(*) as n FROM content c JOIN creators cr ON c.creator_id = cr.id WHERE c.status = 'published'${sport ? ' AND cr.sport = ?' : ''}`).get(...(sport ? [sport] : []));
+    if (search) {
+      where += ' AND (c.title LIKE ? OR c.body LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
+    }
+    if (sport) {
+      where += ' AND cr.sport = ?';
+      params.push(sport);
+    }
 
-    res.json({ data: rows.map(formatPost), meta: { page, limit, total: total.n } });
+    const posts = db
+      .prepare(
+        `SELECT c.*, cr.display_name, cr.username, cr.slug as creator_slug, cr.avatar_url, cr.sport
+         FROM content c JOIN creators cr ON c.creator_id = cr.id
+         ${where}
+         ORDER BY c.created_at DESC LIMIT ? OFFSET ?`
+      )
+      .all(...params, limit, offset);
+
+    const total = db
+      .prepare(
+        `SELECT COUNT(*) as n FROM content c JOIN creators cr ON c.creator_id = cr.id ${where}`
+      )
+      .get(...params).n;
+
+    return res.json({ success: true, data: { posts, total, limit, offset } });
   } catch (err) {
-    logger.error('Feed fetch error', { message: err.message });
-    res.status(500).json({ error: 'Could not load feed.' });
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
 router.get('/:id', (req, res) => {
   try {
-    const post = db.prepare(`
-      SELECT c.*, cr.display_name, cr.username, cr.slug as creator_slug, cr.avatar_url, cr.is_verified
-      FROM content c JOIN creators cr ON c.creator_id = cr.id
-      WHERE c.id = ? AND c.status = 'published'
-    `).get(req.params.id);
-    if (!post) return res.status(404).json({ error: 'Post not found.' });
-    db.prepare('UPDATE content SET view_count = view_count + 1 WHERE id = ?').run(post.id);
-    res.json({ data: formatPost(post) });
+    const post = db
+      .prepare(
+        `SELECT c.*, cr.display_name, cr.username, cr.slug as creator_slug, cr.avatar_url, cr.sport
+         FROM content c JOIN creators cr ON c.creator_id = cr.id
+         WHERE c.id = ? AND c.status = 'published'`
+      )
+      .get(req.params.id);
+
+    if (!post) return res.status(404).json({ success: false, error: 'Post not found' });
+
+    db.prepare('UPDATE content SET view_count = view_count + 1 WHERE id = ?').run(req.params.id);
+    return res.json({ success: true, data: post });
   } catch (err) {
-    logger.error('Post fetch error', { message: err.message });
-    res.status(500).json({ error: 'Could not load post.' });
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-router.post('/', requireAuth('creator'), [
-  body('title').trim().isLength({ min: 1, max: 200 }),
-  body('body').optional().trim(),
-  body('media_url').optional().trim(),
-  body('media_type').optional().isIn(['image', 'video', 'none']),
-  body('tags').optional().isArray(),
-], validate, (req, res) => {
+router.post(
+  '/',
+  requireAuth,
+  [
+    body('title').notEmpty().withMessage('Title required'),
+    body('media_type').optional().isIn(['image', 'video', 'none']).withMessage('Invalid media_type'),
+  ],
+  validationErrorHandler,
+  (req, res) => {
+    try {
+      if (req.userType !== 'creator') return res.status(403).json({ success: false, error: 'Creator access required' });
+      const { title, body: bodyText = '', media_url = '', media_type = 'none', tags = [] } = req.body;
+      const tagsJson = JSON.stringify(Array.isArray(tags) ? tags : []);
+
+      const row = db
+        .prepare(
+          "INSERT INTO content (creator_id, title, body, media_url, media_type, tags, status) VALUES (?, ?, ?, ?, ?, ?, 'pending')"
+        )
+        .run(req.user.creator_id, title, bodyText, media_url, media_type, tagsJson);
+
+      db.prepare("INSERT INTO moderation_queue (content_type, content_id) VALUES ('creator_content', ?)").run(row.lastInsertRowid);
+      audit.log({ actor_type: 'creator', actor_id: req.user.id, action: 'CONTENT_CREATED', target_type: 'content', target_id: row.lastInsertRowid, ip_address: req.ip });
+
+      const created = db.prepare('SELECT * FROM content WHERE id = ?').get(row.lastInsertRowid);
+      return res.status(201).json({ success: true, data: created });
+    } catch (err) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+);
+
+router.put('/:id', requireAuth, (req, res) => {
   try {
-    const { title, body: bodyText = '', media_url = '', media_type = 'none', tags = [] } = req.body;
-    const result = db.prepare(
-      'INSERT INTO content (creator_id, title, body, media_url, media_type, tags, status) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).run(req.user.id, title, bodyText, media_url, media_type, JSON.stringify(tags), 'pending');
+    if (req.userType !== 'creator') return res.status(403).json({ success: false, error: 'Creator access required' });
+    const post = db.prepare('SELECT * FROM content WHERE id = ? AND creator_id = ?').get(req.params.id, req.user.creator_id);
+    if (!post) return res.status(404).json({ success: false, error: 'Post not found' });
+    if (['deleted', 'rejected'].includes(post.status)) {
+      return res.status(400).json({ success: false, error: `Cannot edit a ${post.status} post` });
+    }
 
-    db.prepare(
-      'INSERT INTO moderation_queue (content_type, content_id) VALUES (?, ?)'
-    ).run('creator_content', result.lastInsertRowid);
+    const { title, body: bodyText, media_url, media_type, tags } = req.body;
+    const newTitle = title !== undefined ? title : post.title;
+    const newBody = bodyText !== undefined ? bodyText : post.body;
+    const newMedia = media_url !== undefined ? media_url : post.media_url;
+    const newType = media_type !== undefined ? media_type : post.media_type;
+    const newTags = tags !== undefined ? JSON.stringify(Array.isArray(tags) ? tags : []) : post.tags;
 
-    logAudit({ actorType: 'creator', actorId: req.user.id, action: 'content_submitted', targetType: 'content', targetId: result.lastInsertRowid, ipAddress: req.ip });
+    let newStatus = post.status;
+    if ((title !== undefined || bodyText !== undefined) && post.status === 'published') {
+      newStatus = 'pending';
+      db.prepare("INSERT INTO moderation_queue (content_type, content_id) VALUES ('creator_content', ?)").run(post.id);
+    }
 
-    const post = db.prepare('SELECT * FROM content WHERE id = ?').get(result.lastInsertRowid);
-    res.status(201).json({ data: formatPost(post) });
+    db.prepare('UPDATE content SET title=?, body=?, media_url=?, media_type=?, tags=?, status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?')
+      .run(newTitle, newBody, newMedia, newType, newTags, newStatus, post.id);
+
+    const updated = db.prepare('SELECT * FROM content WHERE id = ?').get(post.id);
+    return res.json({ success: true, data: updated });
   } catch (err) {
-    logger.error('Content create error', { message: err.message });
-    res.status(500).json({ error: 'Could not create post.' });
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-router.delete('/:id', requireAuth('creator'), (req, res) => {
+router.delete('/:id', requireAuth, (req, res) => {
   try {
-    const post = db.prepare('SELECT * FROM content WHERE id = ? AND creator_id = ?').get(req.params.id, req.user.id);
-    if (!post) return res.status(404).json({ error: 'Post not found or not yours.' });
-    db.prepare('UPDATE content SET status = ? WHERE id = ?').run('deleted', post.id);
-    logAudit({ actorType: 'creator', actorId: req.user.id, action: 'content_deleted', targetType: 'content', targetId: post.id, ipAddress: req.ip });
-    res.json({ message: 'Post deleted.' });
+    if (req.userType !== 'creator') return res.status(403).json({ success: false, error: 'Creator access required' });
+    const post = db.prepare('SELECT * FROM content WHERE id = ? AND creator_id = ?').get(req.params.id, req.user.creator_id);
+    if (!post) return res.status(404).json({ success: false, error: 'Post not found' });
+
+    db.prepare("UPDATE content SET status='deleted', updated_at=CURRENT_TIMESTAMP WHERE id=?").run(post.id);
+    audit.log({ actor_type: 'creator', actor_id: req.user.id, action: 'CONTENT_DELETED', target_type: 'content', target_id: post.id, ip_address: req.ip });
+    return res.json({ success: true });
   } catch (err) {
-    logger.error('Content delete error', { message: err.message });
-    res.status(500).json({ error: 'Could not delete post.' });
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
-
-function formatPost(c) {
-  return {
-    ...c,
-    tags: (() => { try { return JSON.parse(c.tags); } catch { return []; } })()
-  };
-}
 
 module.exports = router;

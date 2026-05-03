@@ -1,38 +1,39 @@
 'use strict';
-const { Router } = require('express');
-const { query } = require('express-validator');
+const express = require('express');
 const db = require('../../db/client');
-const { requireAuth } = require('../../middleware/auth');
-const { validate } = require('../../middleware/validate');
-const logger = require('../../logger');
+const { requireAdmin } = require('../../middleware/auth');
 
-const router = Router();
-const adminOnly = requireAuth('admin');
+const router = express.Router();
 
-router.get('/', adminOnly, [
-  query('page').optional().isInt({ min: 1 }),
-  query('actor_type').optional().isIn(['admin', 'creator', 'business', 'system']),
-], validate, (req, res) => {
+router.get('/', requireAdmin, (req, res) => {
   try {
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = 50;
-    const offset = (page - 1) * limit;
-    const actorType = req.query.actor_type;
+    const actor_type = req.query.actor_type || '';
+    const action = req.query.action || '';
+    const limit = Math.min(parseInt(req.query.limit) || 50, 500);
+    const offset = parseInt(req.query.offset) || 0;
 
-    let sql = 'SELECT * FROM audit_log';
+    let where = 'WHERE 1=1';
     const params = [];
-    if (actorType) { sql += ' WHERE actor_type = ?'; params.push(actorType); }
-    sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-    params.push(limit, offset);
+    if (actor_type) { where += ' AND actor_type = ?'; params.push(actor_type); }
+    if (action) { where += ' AND action LIKE ?'; params.push(`%${action}%`); }
 
-    const rows = db.prepare(sql).all(...params);
-    const totalSql = 'SELECT COUNT(*) as n FROM audit_log' + (actorType ? ' WHERE actor_type = ?' : '');
-    const total = db.prepare(totalSql).get(...(actorType ? [actorType] : []));
+    const rows = db.prepare(`SELECT * FROM audit_log ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(...params, limit, offset);
+    const total = db.prepare(`SELECT COUNT(*) as n FROM audit_log ${where}`).get(...params).n;
 
-    res.json({ data: rows, meta: { page, limit, total: total.n } });
+    return res.json({ success: true, data: { logs: rows, total, limit, offset } });
   } catch (err) {
-    logger.error('Audit log error', { message: err.message });
-    res.status(500).json({ error: 'Could not load audit log.' });
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/export', requireAdmin, (req, res) => {
+  try {
+    const rows = db.prepare('SELECT * FROM audit_log ORDER BY created_at DESC').all();
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename="audit-export.json"');
+    return res.send(JSON.stringify(rows, null, 2));
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 

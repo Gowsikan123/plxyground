@@ -1,7 +1,6 @@
 'use strict';
 const db = require('./client');
 const logger = require('../logger');
-const { seedDatabase } = require('./seed');
 
 function setupDatabase() {
   db.exec(`
@@ -122,14 +121,11 @@ function setupDatabase() {
     );
   `);
 
-  logger.info('Database schema applied.');
-  autoSeed();
-}
+  logger.info('Database schema ready.');
 
-function autoSeed() {
-  const row = db.prepare('SELECT COUNT(*) as count FROM admins').get();
-  if (row.count === 0) {
-    logger.info('Empty database detected — running seed...');
+  const adminCount = db.prepare('SELECT COUNT(*) as c FROM admins').get().c;
+  if (adminCount === 0) {
+    const { seedDatabase } = require('./seed');
     seedDatabase();
   }
 }

@@ -1,37 +1,52 @@
 'use strict';
-const { Router } = require('express');
+const express = require('express');
 const db = require('../../db/client');
-const { requireAuth } = require('../../middleware/auth');
-const logger = require('../../logger');
+const { requireAdmin } = require('../../middleware/auth');
 
-const router = Router();
-const adminOnly = requireAuth('admin');
+const router = express.Router();
 
-router.get('/', adminOnly, (_req, res) => {
+router.get('/', requireAdmin, (req, res) => {
   try {
-    const totalCreators = db.prepare('SELECT COUNT(*) as n FROM creators').get().n;
-    const totalBusinesses = db.prepare('SELECT COUNT(*) as n FROM businesses').get().n;
-    const totalContent = db.prepare(`SELECT COUNT(*) as n FROM content WHERE status = 'published'`).get().n;
-    const pendingQueue = db.prepare(`SELECT COUNT(*) as n FROM moderation_queue WHERE status = 'pending'`).get().n;
-    const totalOpportunities = db.prepare(`SELECT COUNT(*) as n FROM opportunities WHERE status = 'published'`).get().n;
-    const recentContent = db.prepare(`
-      SELECT DATE(created_at) as day, COUNT(*) as count
-      FROM content WHERE created_at >= DATE('now', '-7 days')
-      GROUP BY day ORDER BY day ASC
-    `).all();
-    res.json({
+    const total_creators = db.prepare('SELECT COUNT(*) as n FROM creators').get().n;
+    const total_businesses = db.prepare('SELECT COUNT(*) as n FROM businesses').get().n;
+    const total_content = db.prepare("SELECT COUNT(*) as n FROM content WHERE status != 'deleted'").get().n;
+    const published_content = db.prepare("SELECT COUNT(*) as n FROM content WHERE status = 'published'").get().n;
+    const pending_moderation = db.prepare("SELECT COUNT(*) as n FROM moderation_queue WHERE status = 'pending'").get().n;
+    const total_opportunities = db.prepare("SELECT COUNT(*) as n FROM opportunities WHERE status != 'deleted'").get().n;
+
+    const weekly_signups = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const day = date.toISOString().slice(0, 10);
+      const creators_count = db.prepare("SELECT COUNT(*) as n FROM creators WHERE DATE(created_at) = ?").get(day).n;
+      const businesses_count = db.prepare("SELECT COUNT(*) as n FROM businesses WHERE DATE(created_at) = ?").get(day).n;
+      weekly_signups.push({ date: day, creators: creators_count, businesses: businesses_count });
+    }
+
+    return res.json({
+      success: true,
       data: {
-        totalCreators,
-        totalBusinesses,
-        totalContent,
-        pendingQueue,
-        totalOpportunities,
-        recentContent,
-      }
+        total_creators,
+        total_businesses,
+        total_content,
+        published_content,
+        pending_moderation,
+        total_opportunities,
+        weekly_signups,
+      },
     });
   } catch (err) {
-    logger.error('Analytics error', { message: err.message });
-    res.status(500).json({ error: 'Could not load analytics.' });
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/alerts', requireAdmin, (req, res) => {
+  try {
+    const alerts = db.prepare('SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 10').all();
+    return res.json({ success: true, data: alerts });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
