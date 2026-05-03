@@ -1,39 +1,78 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Text, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors } from '../../constants/colors';
-import { Typography } from '../../constants/typography';
-import { Spacing, Radius } from '../../constants/spacing';
+import { Animated, Text, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { create } from 'zustand';
+import { C, R } from '../theme';
 
-export function Toast({ message, type = 'error', visible, onHide }) {
-  const insets = useSafeAreaInsets();
-  const anim = useRef(new Animated.Value(0)).current;
+export const useToastStore = create((set) => ({
+  toasts: [],
+  show: (message, type = 'info') => {
+    const id = Date.now();
+    set(s => ({ toasts: [...s.toasts, { id, message, type }] }));
+    setTimeout(() => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), 3200);
+  },
+  dismiss: (id) => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })),
+}));
+
+function ToastItem({ toast, onDismiss }) {
+  const opacity    = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(-16)).current;
 
   useEffect(() => {
-    if (visible) {
-      Animated.spring(anim, { toValue: 1, useNativeDriver: true, tension: 80, friction: 10 }).start();
-      const t = setTimeout(() => {
-        Animated.timing(anim, { toValue: 0, duration: 250, useNativeDriver: true }).start(onHide);
-      }, 3500);
-      return () => clearTimeout(t);
-    }
-  }, [visible, anim, onHide]);
+    Animated.parallel([
+      Animated.spring(opacity,    { toValue: 1, useNativeDriver: true, speed: 22 }),
+      Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 18, stiffness: 220 }),
+    ]).start();
+  }, []);
 
-  if (!visible && !message) return null;
-
-  const bg = type === 'error' ? Colors.error : type === 'success' ? Colors.success : Colors.warning;
+  const bgColor     = toast.type === 'success' ? C.successDark  : toast.type === 'error' ? C.errorDark  : C.surface2;
+  const borderColor = toast.type === 'success' ? 'rgba(34,197,94,0.3)' : toast.type === 'error' ? 'rgba(239,68,68,0.3)' : C.border;
+  const textColor   = toast.type === 'success' ? C.success       : toast.type === 'error' ? C.error      : C.text;
 
   return (
-    <Animated.View style={[
-      styles.toast,
-      { bottom: insets.bottom + Spacing[4], backgroundColor: bg, opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) }] },
-    ]}>
-      <Text style={styles.text}>{message}</Text>
+    <Animated.View style={[s.toast, { backgroundColor: bgColor, borderColor, opacity, transform: [{ translateY }] }]}>
+      <Text style={[s.toastText, { color: textColor }]} numberOfLines={2}>{toast.message}</Text>
+      <TouchableOpacity onPress={onDismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <Text style={{ color: textColor, fontSize: 16, fontWeight: '700', marginLeft: 8 }}>×</Text>
+      </TouchableOpacity>
     </Animated.View>
   );
 }
 
-const styles = StyleSheet.create({
-  toast: { position: 'absolute', left: Spacing[4], right: Spacing[4], borderRadius: Radius.md, padding: Spacing[4], zIndex: 999 },
-  text: { fontFamily: Typography.fontBodyMedium, fontSize: Typography.sizes.sm, color: Colors.text },
+export function ToastContainer() {
+  const { toasts, dismiss } = useToastStore();
+  if (!toasts.length) return null;
+  return (
+    <View style={s.container} pointerEvents="box-none">
+      {toasts.map(t => (
+        <ToastItem key={t.id} toast={t} onDismiss={() => dismiss(t.id)} />
+      ))}
+    </View>
+  );
+}
+
+const s = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    top: 64,
+    left: 16,
+    right: 16,
+    zIndex: 9999,
+    gap: 8,
+    pointerEvents: 'box-none',
+  },
+  toast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: R.lg,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 6,
+  },
+  toastText: { fontSize: 13, fontWeight: '600', flex: 1 },
 });

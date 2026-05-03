@@ -1,212 +1,195 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  View, Text, StyleSheet, TextInput, TouchableOpacity,
+  ScrollView, KeyboardAvoidingView, Platform, StatusBar,
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { apiRequest } from '../../components/ApiClient';
-import BottomNav from '../../components/BottomNav';
-import Toast from '../../components/Toast';
+import { LinearGradient } from 'expo-linear-gradient';
 import { C, R, GRAD_ACCENT } from '../../components/theme';
+import { Header } from '../../components/layout/Header';
+import { apiRequest } from '../../components/ApiClient';
+import { useToastStore } from '../../components/ui/Toast';
 
-const TYPES = [
-  { key: 'article',     label: 'Article', icon: '✦' },
-  { key: 'video_embed', label: 'Video',   icon: '▶' },
-  { key: 'image_story', label: 'Story',   icon: '◈' },
-];
-
-const SUGGESTED_TAGS = ['football', 'basketball', 'fitness', 'nutrition', 'mindset', 'athletics', 'cricket', 'swimming'];
+const CONTENT_TYPES   = ['Article', 'Video', 'Highlight', 'Opinion'];
+const TAG_SUGGESTIONS = ['football', 'nutrition', 'fitness', 'mindset', 'basketball', 'recovery'];
+const TITLE_MAX       = 120;
 
 function wordCount(text) {
-  const words = text.trim().split(/\s+/).filter(Boolean).length;
-  const mins  = Math.max(1, Math.round(words / 200));
-  return { words, mins };
+  if (!text?.trim()) return 0;
+  return text.trim().split(/\s+/).length;
 }
 
-export default function Create() {
-  const router = useRouter();
-  const draftRef = useRef({});
+export default function CreatePost() {
+  const router      = useRouter();
+  const showToast   = useToastStore(s => s.show);
+  const draftRef    = useRef(null);
 
-  const [type, setType]       = useState('article');
   const [title, setTitle]     = useState('');
   const [body, setBody]       = useState('');
   const [tags, setTags]       = useState('');
+  const [type, setType]       = useState('Article');
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
-  const [toast, setToast]     = useState({ visible: false, message: '', type: 'success' });
 
   // Restore draft on mount
   useEffect(() => {
-    const d = draftRef.current;
-    if (d.title) setTitle(d.title);
-    if (d.body)  setBody(d.body);
-    if (d.type)  setType(d.type);
+    if (draftRef.current) {
+      setTitle(draftRef.current.title || '');
+      setBody(draftRef.current.body   || '');
+      setType(draftRef.current.type   || 'Article');
+    }
   }, []);
 
-  // Auto-save draft on every change
-  useEffect(() => { draftRef.current = { title, body, type, tags }; }, [title, body, type, tags]);
+  // Auto-save draft on every keystroke (in-memory)
+  useEffect(() => {
+    draftRef.current = { title, body, type };
+  }, [title, body, type]);
 
-  const addTag = (tag) => {
-    Haptics.selectionAsync();
-    const existing = tags.split(',').map(t => t.trim()).filter(Boolean);
-    if (!existing.includes(tag)) {
-      setTags(existing.length ? existing.join(', ') + ', ' + tag : tag);
+  const appendTag = (tag) => {
+    const current = tags.split(',').map(t => t.trim()).filter(Boolean);
+    if (!current.includes(tag)) {
+      setTags([...current, tag].join(', '));
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   };
 
+  const wc       = wordCount(body);
+  const readMins = Math.max(1, Math.ceil(wc / 200));
+
   const handleSubmit = async () => {
-    if (!title.trim()) { setError('Title is required.'); return; }
-    setError('');
-    setLoading(true);
+    if (!title.trim() || !body.trim()) { setError('Title and body are required.'); return; }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setLoading(true); setError('');
     try {
+      const tagArr = tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
       await apiRequest('/api/content', {
         method: 'POST',
         body: {
-          title: title.trim(),
-          body: body.trim(),
-          content_type: type,
-          tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+          title:        title.trim(),
+          body:         body.trim(),
+          content_type: 'content',
+          tags:         tagArr,
+          media_type:   type.toLowerCase(),
         },
       });
-      draftRef.current = {};
-      setTitle(''); setBody(''); setTags('');
-      setToast({ visible: true, message: '✓ Submitted — under review', type: 'success' });
+      draftRef.current = null;
+      showToast('Post submitted for review!', 'success');
+      router.back();
     } catch (e) {
-      setError(e.error || e.message || 'Submission failed.');
+      setError(e.message || 'Failed to post. Try again.');
+      showToast('Failed to post. Try again.', 'error');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setLoading(false);
     }
   };
 
-  const wc = wordCount(body);
-
   return (
-    <SafeAreaView style={s.safe}>
-      <Toast message={toast.message} type={toast.type} visible={toast.visible} onHide={() => setToast(t => ({ ...t, visible: false }))} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={s.topBar}>
-          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
-            <Text style={s.back}>← Back</Text>
-          </TouchableOpacity>
-          <Text style={s.heading}>New Post</Text>
-          <View style={{ width: 60 }} />
+    <KeyboardAvoidingView style={s.page} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <StatusBar barStyle="light-content" />
+      <Header title="New Post" showBack />
+      <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+
+        {error ? <View style={s.errorBox}><Text style={s.errorText}>{error}</Text></View> : null}
+
+        {/* Content type chips */}
+        <Text style={s.label}>Type</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.typeRow}>
+          {CONTENT_TYPES.map(t => (
+            <TouchableOpacity
+              key={t}
+              style={[s.typeChip, type === t && s.typeChipActive]}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setType(t); }}
+            >
+              <Text style={[s.typeText, type === t && s.typeTextActive]}>{t}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Title + character counter */}
+        <View style={s.labelRow}>
+          <Text style={s.label}>Title</Text>
+          <Text style={[s.counter, title.length >= TITLE_MAX && s.counterRed]}>
+            {title.length} / {TITLE_MAX}
+          </Text>
+        </View>
+        <TextInput
+          style={s.titleInput}
+          placeholder="Post title…"
+          placeholderTextColor={C.textFaint}
+          value={title}
+          onChangeText={t => setTitle(t.slice(0, TITLE_MAX))}
+          maxLength={TITLE_MAX}
+          multiline
+        />
+
+        {/* Body + word count */}
+        <Text style={s.label}>Body</Text>
+        <TextInput
+          style={s.bodyInput}
+          placeholder="Write your post…"
+          placeholderTextColor={C.textFaint}
+          value={body}
+          onChangeText={setBody}
+          multiline
+          textAlignVertical="top"
+        />
+        {wc > 0 && (
+          <Text style={s.wordCount}>{wc} words · ~{readMins} min read</Text>
+        )}
+
+        {/* Tags + autocomplete chips */}
+        <Text style={s.label}>Tags</Text>
+        <TextInput
+          style={s.tagInput}
+          placeholder="football, fitness, nutrition…"
+          placeholderTextColor={C.textFaint}
+          value={tags}
+          onChangeText={setTags}
+          autoCapitalize="none"
+        />
+        <View style={s.tagSuggestions}>
+          {TAG_SUGGESTIONS.map(tag => (
+            <TouchableOpacity key={tag} style={s.tagSugChip} onPress={() => appendTag(tag)}>
+              <Text style={s.tagSugText}>+ {tag}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
-        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-
-          <Text style={s.label}>Content Type</Text>
-          <View style={s.typeRow}>
-            {TYPES.map(t => (
-              <TouchableOpacity
-                key={t.key}
-                style={[s.typeBtn, type === t.key && s.typeBtnActive]}
-                onPress={() => { Haptics.selectionAsync(); setType(t.key); }}
-                activeOpacity={0.8}
-              >
-                <Text style={[s.typeIcon, type === t.key && s.typeIconActive]}>{t.icon}</Text>
-                <Text style={[s.typeLabel, type === t.key && s.typeLabelActive]}>{t.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <View style={s.labelRow}>
-            <Text style={s.label}>Title <Text style={s.req}>*</Text></Text>
-            <Text style={s.counter}>{title.length} / 120</Text>
-          </View>
-          <TextInput
-            style={s.input}
-            value={title}
-            onChangeText={setTitle}
-            placeholder="Give your post a title…"
-            placeholderTextColor={C.textFaint}
-            maxLength={120}
-          />
-
-          <Text style={s.label}>Content</Text>
-          <TextInput
-            style={[s.input, s.textarea]}
-            value={body}
-            onChangeText={setBody}
-            placeholder="What do you want to share?"
-            placeholderTextColor={C.textFaint}
-            multiline
-            numberOfLines={8}
-            textAlignVertical="top"
-          />
-          {body.trim().length > 0 && (
-            <Text style={s.wordCount}>{wc.words} words · ~{wc.mins} min read</Text>
-          )}
-
-          <Text style={s.label}>Tags <Text style={s.hint}>(comma separated)</Text></Text>
-          <TextInput
-            style={s.input}
-            value={tags}
-            onChangeText={setTags}
-            placeholder="football, fitness, nutrition"
-            placeholderTextColor={C.textFaint}
-            autoCapitalize="none"
-          />
-          <View style={s.tagChips}>
-            {SUGGESTED_TAGS.map(tag => {
-              const active = tags.split(',').map(t => t.trim()).includes(tag);
-              return (
-                <TouchableOpacity
-                  key={tag}
-                  style={[s.tagChip, active && s.tagChipActive]}
-                  onPress={() => addTag(tag)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[s.tagChipText, active && s.tagChipTextActive]}>{tag}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {error ? <Text style={s.error}>{error}</Text> : null}
-
-          <TouchableOpacity onPress={handleSubmit} activeOpacity={0.85} disabled={loading} style={{ marginTop: 28 }}>
-            <LinearGradient colors={GRAD_ACCENT} style={[s.submitBtn, loading && s.submitDisabled]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-              <Text style={s.submitText}>{loading ? 'Submitting…' : 'Submit for Review'}</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <Text style={s.reviewNote}>Posts are reviewed before publishing.</Text>
-        </ScrollView>
-      </KeyboardAvoidingView>
-      <BottomNav />
-    </SafeAreaView>
+        {/* Submit */}
+        <TouchableOpacity style={s.submitWrap} onPress={handleSubmit} disabled={loading} activeOpacity={0.85}>
+          <LinearGradient colors={GRAD_ACCENT} style={s.submitBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+            <Text style={s.submitText}>{loading ? 'Posting…' : 'Publish Post →'}</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const s = StyleSheet.create({
-  safe:           { flex: 1, backgroundColor: C.bg },
-  topBar:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: C.border },
-  back:           { color: C.accent, fontSize: 15, fontWeight: '600', width: 60 },
-  heading:        { color: C.text, fontSize: 16, fontWeight: '800', letterSpacing: 0.2 },
-  scroll:         { padding: 20, paddingBottom: 120 },
-  labelRow:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 10 },
-  label:          { color: C.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10, marginTop: 20 },
-  counter:        { color: C.textFaint, fontSize: 12 },
-  req:            { color: C.accent },
-  hint:           { color: C.textFaint, fontWeight: '400', textTransform: 'none', letterSpacing: 0 },
-  typeRow:        { flexDirection: 'row', gap: 10 },
-  typeBtn:        { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: R.lg, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface, gap: 6 },
-  typeBtnActive:  { borderColor: C.accent, backgroundColor: C.accentDark },
-  typeIcon:       { fontSize: 18, color: C.textFaint },
-  typeIconActive: { color: C.accent },
-  typeLabel:      { color: C.textMuted, fontSize: 12, fontWeight: '600' },
-  typeLabelActive:{ color: C.accent },
-  input:          { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: R.md, paddingHorizontal: 16, paddingVertical: 14, color: C.text, fontSize: 15 },
-  textarea:       { minHeight: 150, paddingTop: 14 },
-  wordCount:      { color: C.textFaint, fontSize: 12, marginTop: 6, textAlign: 'right' },
-  tagChips:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
-  tagChip:        { paddingHorizontal: 12, paddingVertical: 6, borderRadius: R.full, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface },
-  tagChipActive:  { borderColor: C.accent, backgroundColor: C.accentDim },
-  tagChipText:    { color: C.textMuted, fontSize: 12, fontWeight: '600' },
-  tagChipTextActive: { color: C.accent },
-  error:          { color: C.error, fontSize: 13, marginTop: 10 },
-  submitBtn:      { borderRadius: R.full, paddingVertical: 17, alignItems: 'center' },
-  submitDisabled: { opacity: 0.45 },
-  submitText:     { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 0.3 },
-  reviewNote:     { color: C.textFaint, fontSize: 12, textAlign: 'center', marginTop: 14 },
+  page:           { flex: 1, backgroundColor: C.bg },
+  content:        { padding: 20, gap: 10, paddingBottom: 48 },
+  errorBox:       { backgroundColor: C.errorDark, borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)', padding: 14, borderRadius: R.md },
+  errorText:      { color: C.error, fontSize: 13, fontWeight: '600' },
+  labelRow:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  label:          { color: C.textMuted, fontSize: 12, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', marginTop: 4 },
+  counter:        { color: C.textFaint, fontSize: 12, fontWeight: '600' },
+  counterRed:     { color: C.error },
+  typeRow:        { gap: 8, marginBottom: 4 },
+  typeChip:       { paddingHorizontal: 14, paddingVertical: 7, borderRadius: R.full, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
+  typeChipActive: { backgroundColor: C.accent, borderColor: C.accent },
+  typeText:       { color: C.textMuted, fontSize: 13, fontWeight: '600' },
+  typeTextActive: { color: '#fff' },
+  titleInput:     { backgroundColor: C.surface, borderRadius: R.lg, padding: 14, color: C.text, fontSize: 16, fontWeight: '700', borderWidth: 1, borderColor: C.border, minHeight: 56 },
+  bodyInput:      { backgroundColor: C.surface, borderRadius: R.lg, padding: 14, color: C.text, fontSize: 15, borderWidth: 1, borderColor: C.border, minHeight: 200, lineHeight: 22 },
+  wordCount:      { color: C.textFaint, fontSize: 12, marginTop: -4 },
+  tagInput:       { backgroundColor: C.surface, borderRadius: R.lg, padding: 14, color: C.text, fontSize: 14, borderWidth: 1, borderColor: C.border },
+  tagSuggestions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 2 },
+  tagSugChip:     { backgroundColor: C.surface3, borderRadius: R.full, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: C.border },
+  tagSugText:     { color: C.accent, fontSize: 12, fontWeight: '700' },
+  submitWrap:     { borderRadius: R.xl, overflow: 'hidden', marginTop: 16 },
+  submitBtn:      { paddingVertical: 20, alignItems: 'center' },
+  submitText:     { color: '#fff', fontSize: 17, fontWeight: '900' },
 });

@@ -1,163 +1,149 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, SafeAreaView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { C, R } from '../../components/theme';
+import { Header } from '../../components/layout/Header';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { SkeletonCard } from '../../components/ui/Skeleton';
 import { apiRequest } from '../../components/ApiClient';
-import BottomNav from '../../components/BottomNav';
-import EmptyState from '../../components/EmptyState';
-import Toast from '../../components/Toast';
-import { useApplyStore } from '../../store/applyStore';
-import { C, R, GRAD_ACCENT } from '../../components/theme';
+import { useToastStore } from '../../components/ui/Toast';
 
-const DEMO_OPPS = [
-  { id: 'o1', title: 'Social Media Ambassador', business_name: 'Nike Sport UK',    budget: '£500–£1,000',  category: 'Apparel',   deadline: '2026-06-01', description: 'Looking for UK-based athletes with 5k+ followers for a summer kit campaign.' },
-  { id: 'o2', title: 'YouTube Collaboration',   business_name: 'Myprotein',         budget: '£200 + product', category: 'Nutrition', deadline: '2026-05-20', description: 'Review our new recovery range in a training video. Full product supply included.' },
-  { id: 'o3', title: 'Event Appearance',        business_name: 'Adidas Grassroots', budget: '£300/day',     category: 'Footwear',  deadline: '2026-07-15', description: 'Seeking youth athletes to appear at our regional community events this summer.' },
-  { id: 'o4', title: 'Podcast Guest Spot',      business_name: 'The Sports Desk',   budget: 'Revenue share', category: 'Media',    deadline: '2026-05-30', description: 'Share your story on our weekly show. Ideal for athletes with an inspiring journey.' },
-  { id: 'o5', title: 'Fitness App Promotion',   business_name: 'Hyrox UK',          budget: '£150 + access', category: 'Fitness',  deadline: '2026-06-10', description: 'Promote our app to your community. Free premium access included for you and followers.' },
-];
+const SPORT_FILTERS = ['All', 'Football', 'Basketball', 'Fitness', 'Nutrition', 'Running'];
 
-const CATEGORIES = ['All', 'Apparel', 'Nutrition', 'Footwear', 'Media', 'Fitness'];
+function formatBudget(opp) {
+  if (opp.budget_min && opp.budget_max) return `£${opp.budget_min}–£${opp.budget_max}`;
+  if (opp.budget)  return `£${opp.budget}`;
+  if (opp.value)   return `£${opp.value}`;
+  return null;
+}
 
 export default function Opportunities() {
-  const [items, setItems]       = useState([]);
-  const [filter, setFilter]     = useState('All');
-  const [loading, setLoading]   = useState(true);
-  const [refreshing, setRefresh]= useState(false);
-  const [toast, setToast]       = useState({ visible: false, message: '', type: 'success' });
+  const showToast              = useToastStore(s => s.show);
+  const [opps, setOpps]        = useState([]);
+  const [loading, setLoading]  = useState(true);
+  const [filter, setFilter]    = useState('All');
+  const [applied, setApplied]  = useState({});
 
-  const apply      = useApplyStore((s) => s.apply);
-  const hasApplied = useApplyStore((s) => s.hasApplied);
-  const appliedAt  = useApplyStore((s) => s.appliedAt);
-
-  const load = async () => {
-    try {
-      const data = await apiRequest('/api/opportunities?limit=30');
-      const live = data?.data || data?.items || [];
-      setItems(live.length > 0 ? live : DEMO_OPPS);
-    } catch {
-      setItems(DEMO_OPPS);
-    } finally {
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await apiRequest('/api/opportunities');
+        setOpps(data.data || data || []);
+      } catch (_) {}
       setLoading(false);
-      setRefresh(false);
-    }
+    })();
+  }, []);
+
+  const handleApply = async (opp) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await apiRequest(`/api/opportunities/${opp.id}/apply`, { method: 'POST' });
+    } catch (_) {}
+    setApplied(prev => ({ ...prev, [opp.id]: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }));
+    showToast('Application sent!', 'success');
   };
 
-  useEffect(() => { load(); }, []);
-
-  const displayed = filter === 'All' ? items : items.filter(i => i.category === filter);
-
-  const handleApply = (item) => {
-    if (hasApplied(item.id)) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    apply(item.id);
-    setToast({ visible: true, message: `Applied to "${item.title}" ✓`, type: 'success' });
-  };
-
-  const renderItem = ({ item }) => {
-    const applied   = hasApplied(item.id);
-    const appliedTs = appliedAt(item.id);
-    const appliedDate = appliedTs ? new Date(appliedTs).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : null;
-
-    return (
-      <View style={s.card}>
-        <View style={s.cardTop}>
-          <View style={s.tagRow}>
-            {item.category && (
-              <View style={s.catPill}>
-                <Text style={s.catText}>{item.category}</Text>
-              </View>
-            )}
-            {item.deadline && (
-              <Text style={s.deadline}>Closes {new Date(item.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</Text>
-            )}
-          </View>
-          <Text style={s.cardTitle} numberOfLines={2}>{item.title}</Text>
-          <Text style={s.bizName}>{item.business_name}</Text>
-        </View>
-        {item.description ? <Text style={s.desc} numberOfLines={3}>{item.description}</Text> : null}
-        <View style={s.cardFooter}>
-          {item.budget ? <Text style={s.budget}>{item.budget}</Text> : null}
-          {applied ? (
-            <View style={s.appliedPill}>
-              <Text style={s.appliedText}>Applied ✓{appliedDate ? `  ${appliedDate}` : ''}</Text>
-            </View>
-          ) : (
-            <TouchableOpacity style={s.applyBtn} onPress={() => handleApply(item)} activeOpacity={0.85}>
-              <Text style={s.applyText}>Apply →</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    );
-  };
+  const filtered = filter === 'All'
+    ? opps
+    : opps.filter(o =>
+        o.sport?.toLowerCase()    === filter.toLowerCase() ||
+        o.category?.toLowerCase() === filter.toLowerCase()
+      );
 
   return (
-    <SafeAreaView style={s.safe}>
-      <Toast message={toast.message} type={toast.type} visible={toast.visible} onHide={() => setToast(t => ({ ...t, visible: false }))} />
+    <View style={s.page}>
+      <Header title="Opportunities" />
 
-      <View style={s.header}>
-        <Text style={s.heading}>Opportunities</Text>
-        <Text style={s.sub}>Brand deals & collabs for creators</Text>
-      </View>
+      {/* Sport filter chips */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filtersScroll} style={s.filtersBar}>
+        {SPORT_FILTERS.map(f => (
+          <TouchableOpacity
+            key={f}
+            style={[s.chip, filter === f && s.chipActive]}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setFilter(f); }}
+          >
+            <Text style={[s.chipText, filter === f && s.chipTextActive]}>{f}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
-      {/* Category filter */}
-      <View style={s.filtersWrap}>
-        {CATEGORIES.map(cat => {
-          const active = filter === cat;
-          return (
-            <TouchableOpacity
-              key={cat}
-              style={[s.chip, active && s.chipActive]}
-              onPress={() => { Haptics.selectionAsync(); setFilter(cat); }}
-              activeOpacity={0.8}
-            >
-              <Text style={[s.chipText, active && s.chipActiveText]}>{cat}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      {loading ? (
+        <FlatList data={[1,2,3]} keyExtractor={i => String(i)} renderItem={() => <SkeletonCard />} contentContainerStyle={{ padding: 16, gap: 12 }} />
+      ) : (
+        <FlatList
+          data={filtered}
+          keyExtractor={o => String(o.id)}
+          contentContainerStyle={{ padding: 16, gap: 12 }}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <EmptyState title="No opportunities" message="Check back soon for new deals." />
+          }
+          renderItem={({ item: opp }) => {
+            const isApplied = !!applied[opp.id];
+            const budget    = formatBudget(opp);
+            return (
+              <View style={s.card}>
+                <View style={s.cardHeader}>
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <Text style={s.cardTitle}>{opp.title}</Text>
+                    <Text style={s.cardBusiness}>{opp.business_name || opp.company || 'Brand Partner'}</Text>
+                  </View>
+                  {budget && (
+                    <View style={s.budgetPill}>
+                      <Text style={s.budgetText}>{budget}</Text>
+                    </View>
+                  )}
+                </View>
 
-      <FlatList
-        data={displayed}
-        keyExtractor={i => String(i.id)}
-        renderItem={renderItem}
-        contentContainerStyle={s.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefresh(true); load(); }} tintColor={C.accent} />}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          !loading ? <EmptyState icon="🎯" title="No opportunities here" subtitle="Try a different category or check back soon." /> : null
-        }
-      />
+                {opp.description ? (
+                  <Text style={s.cardDesc} numberOfLines={3}>{opp.description}</Text>
+                ) : null}
 
-      <BottomNav />
-    </SafeAreaView>
+                <View style={s.cardFooter}>
+                  {opp.sport && (
+                    <View style={s.sportChip}>
+                      <Text style={s.sportText}>{opp.sport}</Text>
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={[s.applyBtn, isApplied && s.applyBtnDone]}
+                    onPress={() => !isApplied && handleApply(opp)}
+                    activeOpacity={isApplied ? 1 : 0.8}
+                  >
+                    <Text style={[s.applyText, isApplied && s.applyTextDone]}>
+                      {isApplied ? `Applied ✓  ${applied[opp.id]}` : 'Apply Now →'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          }}
+        />
+      )}
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  safe:         { flex: 1, backgroundColor: C.bg },
-  header:       { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
-  heading:      { color: C.text, fontSize: 22, fontWeight: '900', letterSpacing: -0.4 },
-  sub:          { color: C.textMuted, fontSize: 13, marginTop: 2 },
-  filtersWrap:  { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 12, marginTop: 8 },
-  chip:         { paddingHorizontal: 14, paddingVertical: 7, borderRadius: R.full, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface },
-  chipActive:   { borderColor: C.accent, backgroundColor: C.accentDim },
-  chipText:     { color: C.textMuted, fontSize: 12, fontWeight: '600' },
-  chipActiveText: { color: C.accent, fontWeight: '700' },
-  list:         { paddingHorizontal: 16, paddingBottom: 120, paddingTop: 4 },
-  card:         { backgroundColor: C.surface, borderRadius: R.xl, marginBottom: 14, borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
-  cardTop:      { padding: 16 },
-  tagRow:       { flexDirection: 'row', gap: 8, marginBottom: 10, alignItems: 'center' },
-  catPill:      { paddingHorizontal: 10, paddingVertical: 4, borderRadius: R.full, backgroundColor: C.accentDim, borderWidth: 1, borderColor: C.accent },
-  catText:      { color: C.accent, fontSize: 11, fontWeight: '800' },
-  deadline:     { color: C.textFaint, fontSize: 12 },
-  cardTitle:    { color: C.text, fontSize: 16, fontWeight: '800', marginBottom: 4, letterSpacing: -0.3 },
-  bizName:      { color: C.textMuted, fontSize: 13 },
-  desc:         { color: C.textMuted, fontSize: 13, lineHeight: 20, paddingHorizontal: 16, paddingBottom: 12 },
-  cardFooter:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderTopColor: C.border },
-  budget:       { color: C.accent, fontSize: 14, fontWeight: '800' },
-  applyBtn:     { backgroundColor: C.accentDim, paddingHorizontal: 16, paddingVertical: 8, borderRadius: R.full, borderWidth: 1, borderColor: C.accent },
-  applyText:    { color: C.accent, fontSize: 13, fontWeight: '700' },
-  appliedPill:  { backgroundColor: 'rgba(34,197,94,0.12)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: R.full, borderWidth: 1, borderColor: 'rgba(34,197,94,0.3)' },
-  appliedText:  { color: C.success, fontSize: 12, fontWeight: '700' },
+  page:           { flex: 1, backgroundColor: C.bg },
+  filtersBar:     { maxHeight: 52 },
+  filtersScroll:  { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
+  chip:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: R.full, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
+  chipActive:     { backgroundColor: C.accent, borderColor: C.accent },
+  chipText:       { color: C.textMuted, fontSize: 13, fontWeight: '600' },
+  chipTextActive: { color: '#fff' },
+  card:           { backgroundColor: C.surface, borderRadius: R.xl, padding: 16, borderWidth: 1, borderColor: C.border, gap: 10 },
+  cardHeader:     { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  cardTitle:      { color: C.text, fontSize: 15, fontWeight: '800', letterSpacing: -0.2 },
+  cardBusiness:   { color: C.textMuted, fontSize: 12 },
+  cardDesc:       { color: C.textMuted, fontSize: 13, lineHeight: 19 },
+  budgetPill:     { backgroundColor: C.successDark, borderRadius: R.full, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(34,197,94,0.2)' },
+  budgetText:     { color: C.success, fontSize: 12, fontWeight: '800' },
+  cardFooter:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' },
+  sportChip:      { backgroundColor: C.surface3, borderRadius: R.full, paddingHorizontal: 10, paddingVertical: 4 },
+  sportText:      { color: C.textFaint, fontSize: 11, fontWeight: '700' },
+  applyBtn:       { backgroundColor: C.accent, borderRadius: R.lg, paddingHorizontal: 18, paddingVertical: 10 },
+  applyBtnDone:   { backgroundColor: C.successDark, borderWidth: 1, borderColor: 'rgba(34,197,94,0.3)' },
+  applyText:      { color: '#fff', fontSize: 13, fontWeight: '800' },
+  applyTextDone:  { color: C.success },
 });
