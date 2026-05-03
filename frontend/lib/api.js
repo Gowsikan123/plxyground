@@ -1,6 +1,18 @@
 import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../constants/api';
+
+// expo-secure-store cannot be imported at the top level on web —
+// it is native-only and blows up before any Platform check runs.
+// Use a lazy getter instead so the import only happens on native.
+async function getToken() {
+  if (Platform.OS === 'web') {
+    try { return localStorage.getItem('auth_token'); } catch { return null; }
+  }
+  const SecureStore = await import('expo-secure-store');
+  return SecureStore.getItemAsync('auth_token');
+}
 
 const client = axios.create({
   baseURL: API_BASE_URL,
@@ -9,7 +21,7 @@ const client = axios.create({
 });
 
 client.interceptors.request.use(async (config) => {
-  const token = await SecureStore.getItemAsync('auth_token');
+  const token = await getToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
