@@ -1,72 +1,85 @@
 'use strict';
 const express = require('express');
 const { body } = require('express-validator');
-const db = require('../db/client');
+const pool = require('../db/client');   // PostgreSQL — all tables live here
 const audit = require('../utils/auditLogger');
 const { requireAuth } = require('../middleware/auth');
 const { validationErrorHandler } = require('../middleware/validate');
 
 const router = express.Router();
 
-router.get('/', (req, res) => {
+// GET /api/content
+router.get('/', async (req, res) => {
   try {
     const search = req.query.search || '';
-    const sport = req.query.sport || '';
-    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const sport  = req.query.sport  || '';
+    const limit  = Math.min(parseInt(req.query.limit)  || 20, 100);
     const offset = parseInt(req.query.offset) || 0;
 
-    let where = "WHERE c.status = 'published'";
+    let where  = "WHERE c.status = 'published'";
     const params = [];
+    let idx = 1;
 
     if (search) {
-      where += ' AND (c.title LIKE ? OR c.body LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`);
+      where += ` AND (c.title ILIKE $${idx} OR c.body ILIKE $${idx})`;
+      params.push(`%${search}%`);
+      idx++;
     }
     if (sport) {
-      where += ' AND cr.sport = ?';
+      where += ` AND cr.sport = $${idx}`;
       params.push(sport);
+      idx++;
     }
 
-    const posts = db
-      .prepare(
-        `SELECT c.*, cr.display_name, cr.username, cr.slug as creator_slug, cr.avatar_url, cr.sport
+    const dataParams  = [...params, limit, offset];
+    const countParams = [...params];
+
+    const [postsResult, countResult] = await Promise.all([
+      pool.query(
+        `SELECT c.*, cr.display_name, cr.username, cr.slug AS creator_slug, cr.avatar_url, cr.sport
          FROM content c JOIN creators cr ON c.creator_id = cr.id
          ${where}
-         ORDER BY c.created_at DESC LIMIT ? OFFSET ?`
-      )
-      .all(...params, limit, offset);
+         ORDER BY c.created_at DESC LIMIT $${idx} OFFSET $${idx + 1}`,
+        dataParams
+      ),
+      pool.query(
+        `SELECT COUNT(*) AS n FROM content c JOIN creators cr ON c.creator_id = cr.id ${where}`,
+        countParams
+      ),
+    ]);
 
-    const total = db
-      .prepare(
-        `SELECT COUNT(*) as n FROM content c JOIN creators cr ON c.creator_id = cr.id ${where}`
-      )
-      .get(...params).n;
-
-    return res.json({ success: true, data: { posts, total, limit, offset } });
+    return res.json({
+      success: true,
+      data: {
+        posts:  postsResult.rows,
+        total:  parseInt(countResult.rows[0].n, 10),
+        limit,
+        offset,
+      },
+    });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-router.get('/:id', (req, res) => {
+// GET /api/content/:id
+router.get('/:id', async (req, res) => {
   try {
-    const post = db
-      .prepare(
-        `SELECT c.*, cr.display_name, cr.username, cr.slug as creator_slug, cr.avatar_url, cr.sport
-         FROM content c JOIN creators cr ON c.creator_id = cr.id
-         WHERE c.id = ? AND c.status = 'published'`
-      )
-      .get(req.params.id);
-
-    if (!post) return res.status(404).json({ success: false, error: 'Post not found' });
-
-    db.prepare('UPDATE content SET view_count = view_count + 1 WHERE id = ?').run(req.params.id);
-    return res.json({ success: true, data: post });
+    const { rows } = await pool.query(
+      `SELECT c.*, cr.display_name, cr.username, cr.slug AS creator_slug, cr.avatar_url, cr.sport
+       FROM content c JOIN creators cr ON c.creator_id = cr.id
+       WHERE c.id = $1 AND c.status = 'published'`,
+      [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ success: false, error: 'Post not found' });
+    await pool.query('UPDATE content SET view_count = view_count + 1 WHERE id = $1', [req.params.id]);
+    return res.json({ success: true, data: rows[0] });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
 });
 
+// POST /api/content
 router.post(
   '/',
   requireAuth,
@@ -75,23 +88,34 @@ router.post(
     body('media_type').optional().isIn(['image', 'video', 'none']).withMessage('Invalid media_type'),
   ],
   validationErrorHandler,
-  (req, res) => {
+  async (req, res) => {
     try {
-      if (req.userType !== 'creator') return res.status(403).json({ success: false, error: 'Creator access required' });
+      if (req.userType !== 'creator') {
+        return res.status(403).json({ success: false, error: 'Creator access required' });
+      }
       const { title, body: bodyText = '', media_url = '', media_type = 'none', tags = [] } = req.body;
       const tagsJson = JSON.stringify(Array.isArray(tags) ? tags : []);
 
-      const row = db
-        .prepare(
-          "INSERT INTO content (creator_id, title, body, media_url, media_type, tags, status) VALUES (?, ?, ?, ?, ?, ?, 'pending')"
-        )
-        .run(req.user.creator_id, title, bodyText, media_url, media_type, tagsJson);
+      const { rows: contentRows } = await pool.query(
+        `INSERT INTO content (creator_id, title, body, media_url, media_type, tags, status)
+         VALUES ($1, $2, $3, $4, $5, $6, 'pending')
+         RETURNING *`,
+        [req.user.creator_id, title, bodyText, media_url, media_type, tagsJson]
+      );
+      const created = contentRows[0];
 
-      // content_type must be 'content' to match the admin /queue JOIN on mq.content_type = 'content'
-      db.prepare("INSERT INTO moderation_queue (content_type, content_id) VALUES ('content', ?)").run(row.lastInsertRowid);
-      audit.log({ actor_type: 'creator', actor_id: req.user.id, action: 'CONTENT_CREATED', target_type: 'content', target_id: row.lastInsertRowid, ip_address: req.ip });
+      // content_type = 'content' matches the admin /queue JOIN
+      await pool.query(
+        "INSERT INTO moderation_queue (content_type, content_id) VALUES ('content', $1)",
+        [created.id]
+      );
 
-      const created = db.prepare('SELECT * FROM content WHERE id = ?').get(row.lastInsertRowid);
+      await audit.log({
+        actor_type: 'creator', actor_id: req.user.id,
+        action: 'CONTENT_CREATED', target_type: 'content', target_id: created.id,
+        ip_address: req.ip,
+      });
+
       return res.status(201).json({ success: true, data: created });
     } catch (err) {
       return res.status(500).json({ success: false, error: err.message });
@@ -99,47 +123,68 @@ router.post(
   }
 );
 
-router.put('/:id', requireAuth, (req, res) => {
+// PUT /api/content/:id
+router.put('/:id', requireAuth, async (req, res) => {
   try {
-    if (req.userType !== 'creator') return res.status(403).json({ success: false, error: 'Creator access required' });
-    const post = db.prepare('SELECT * FROM content WHERE id = ? AND creator_id = ?').get(req.params.id, req.user.creator_id);
+    if (req.userType !== 'creator') {
+      return res.status(403).json({ success: false, error: 'Creator access required' });
+    }
+    const { rows: existing } = await pool.query(
+      'SELECT * FROM content WHERE id = $1 AND creator_id = $2',
+      [req.params.id, req.user.creator_id]
+    );
+    const post = existing[0];
     if (!post) return res.status(404).json({ success: false, error: 'Post not found' });
     if (['deleted', 'rejected'].includes(post.status)) {
       return res.status(400).json({ success: false, error: `Cannot edit a ${post.status} post` });
     }
 
     const { title, body: bodyText, media_url, media_type, tags } = req.body;
-    const newTitle = title !== undefined ? title : post.title;
-    const newBody = bodyText !== undefined ? bodyText : post.body;
-    const newMedia = media_url !== undefined ? media_url : post.media_url;
-    const newType = media_type !== undefined ? media_type : post.media_type;
-    const newTags = tags !== undefined ? JSON.stringify(Array.isArray(tags) ? tags : []) : post.tags;
+    const newTitle = title      !== undefined ? title      : post.title;
+    const newBody  = bodyText   !== undefined ? bodyText   : post.body;
+    const newMedia = media_url  !== undefined ? media_url  : post.media_url;
+    const newType  = media_type !== undefined ? media_type : post.media_type;
+    const newTags  = tags       !== undefined ? JSON.stringify(Array.isArray(tags) ? tags : []) : post.tags;
 
     let newStatus = post.status;
     if ((title !== undefined || bodyText !== undefined) && post.status === 'published') {
       newStatus = 'pending';
-      // content_type must be 'content' to match the admin /queue JOIN
-      db.prepare("INSERT INTO moderation_queue (content_type, content_id) VALUES ('content', ?)").run(post.id);
+      await pool.query(
+        "INSERT INTO moderation_queue (content_type, content_id) VALUES ('content', $1)",
+        [post.id]
+      );
     }
 
-    db.prepare('UPDATE content SET title=?, body=?, media_url=?, media_type=?, tags=?, status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?')
-      .run(newTitle, newBody, newMedia, newType, newTags, newStatus, post.id);
-
-    const updated = db.prepare('SELECT * FROM content WHERE id = ?').get(post.id);
-    return res.json({ success: true, data: updated });
+    const { rows: updated } = await pool.query(
+      'UPDATE content SET title=$1, body=$2, media_url=$3, media_type=$4, tags=$5, status=$6, updated_at=NOW() WHERE id=$7 RETURNING *',
+      [newTitle, newBody, newMedia, newType, newTags, newStatus, post.id]
+    );
+    return res.json({ success: true, data: updated[0] });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-router.delete('/:id', requireAuth, (req, res) => {
+// DELETE /api/content/:id
+router.delete('/:id', requireAuth, async (req, res) => {
   try {
-    if (req.userType !== 'creator') return res.status(403).json({ success: false, error: 'Creator access required' });
-    const post = db.prepare('SELECT * FROM content WHERE id = ? AND creator_id = ?').get(req.params.id, req.user.creator_id);
-    if (!post) return res.status(404).json({ success: false, error: 'Post not found' });
-
-    db.prepare("UPDATE content SET status='deleted', updated_at=CURRENT_TIMESTAMP WHERE id=?").run(post.id);
-    audit.log({ actor_type: 'creator', actor_id: req.user.id, action: 'CONTENT_DELETED', target_type: 'content', target_id: post.id, ip_address: req.ip });
+    if (req.userType !== 'creator') {
+      return res.status(403).json({ success: false, error: 'Creator access required' });
+    }
+    const { rows } = await pool.query(
+      'SELECT * FROM content WHERE id = $1 AND creator_id = $2',
+      [req.params.id, req.user.creator_id]
+    );
+    if (!rows.length) return res.status(404).json({ success: false, error: 'Post not found' });
+    await pool.query(
+      "UPDATE content SET status='deleted', updated_at=NOW() WHERE id=$1",
+      [req.params.id]
+    );
+    await audit.log({
+      actor_type: 'creator', actor_id: req.user.id,
+      action: 'CONTENT_DELETED', target_type: 'content', target_id: req.params.id,
+      ip_address: req.ip,
+    });
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });

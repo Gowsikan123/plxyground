@@ -1,8 +1,7 @@
 'use strict';
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const pool = require('../db/client');      // PostgreSQL – used for admin_users only
-const db   = require('../db/sqlite');     // SQLite  – used for all creator/content/queue data
+const pool = require('../db/client');   // PostgreSQL — all tables live here
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { signToken } = require('../utils/jwt');
 const { authLimiter } = require('../middleware/rateLimiter');
@@ -50,10 +49,7 @@ router.post('/auth/change-password', authLimiter, requireAuth, requireAdmin, asy
     return res.status(400).json({ error: 'New password must be at least 8 characters.' });
   }
   try {
-    const { rows } = await pool.query(
-      'SELECT * FROM admin_users WHERE email = $1 LIMIT 1',
-      [email]
-    );
+    const { rows } = await pool.query('SELECT * FROM admin_users WHERE email = $1 LIMIT 1', [email]);
     if (!rows.length) return res.status(404).json({ error: 'Admin not found.' });
     const admin = rows[0];
     const valid = await bcrypt.compare(current_password, admin.password_hash);
@@ -74,23 +70,25 @@ router.post('/auth/change-password', authLimiter, requireAuth, requireAdmin, asy
 router.use(requireAuth, requireAdmin);
 
 // ─────────────────────────────────────────────────────────────
-// STATS  — all tables are in SQLite
+// STATS
 // ─────────────────────────────────────────────────────────────
 
 // GET /api/admin/stats
-router.get('/stats', (req, res) => {
+router.get('/stats', async (_req, res) => {
   try {
-    const creators   = db.prepare('SELECT COUNT(*) AS cnt FROM creators').get();
-    const businesses = db.prepare('SELECT COUNT(*) AS cnt FROM businesses').get();
-    const content    = db.prepare("SELECT COUNT(*) AS cnt FROM content WHERE status = 'published'").get();
-    const opps       = db.prepare("SELECT COUNT(*) AS cnt FROM opportunities WHERE status = 'published'").get();
-    const queue      = db.prepare("SELECT COUNT(*) AS cnt FROM moderation_queue WHERE status = 'pending'").get();
+    const [creators, businesses, content, opps, queue] = await Promise.all([
+      pool.query('SELECT COUNT(*)::int AS cnt FROM creators'),
+      pool.query('SELECT COUNT(*)::int AS cnt FROM businesses'),
+      pool.query("SELECT COUNT(*)::int AS cnt FROM content WHERE status = 'published'"),
+      pool.query("SELECT COUNT(*)::int AS cnt FROM opportunities WHERE status = 'published'"),
+      pool.query("SELECT COUNT(*)::int AS cnt FROM moderation_queue WHERE status = 'pending'"),
+    ]);
     return res.json({
-      creators:             creators.cnt,
-      businesses:           businesses.cnt,
-      published_content:    content.cnt,
-      published_opportunities: opps.cnt,
-      pending_moderation:   queue.cnt,
+      creators:                creators.rows[0].cnt,
+      businesses:              businesses.rows[0].cnt,
+      published_content:       content.rows[0].cnt,
+      published_opportunities: opps.rows[0].cnt,
+      pending_moderation:      queue.rows[0].cnt,
     });
   } catch (err) {
     logger.error('GET /api/admin/stats', { message: err.message });
@@ -99,17 +97,18 @@ router.get('/stats', (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// MODERATION QUEUE  — SQLite
+// MODERATION QUEUE
 // ─────────────────────────────────────────────────────────────
 
 // GET /api/admin/moderation  (backward-compat)
-router.get('/moderation', (req, res) => {
+router.get('/moderation', async (req, res) => {
   try {
     const lim = Math.min(parseInt(req.query.limit, 10) || 20, 100);
     const off = parseInt(req.query.offset, 10) || 0;
-    const rows = db.prepare(
-      "SELECT * FROM moderation_queue WHERE status = 'pending' ORDER BY created_at ASC LIMIT ? OFFSET ?"
-    ).all(lim, off);
+    const { rows } = await pool.query(
+      "SELECT * FROM moderation_queue WHERE status = 'pending' ORDER BY created_at ASC LIMIT $1 OFFSET $2",
+      [lim, off]
+    );
     return res.json({ data: rows });
   } catch (err) {
     logger.error('GET /api/admin/moderation', { message: err.message });
@@ -119,19 +118,19 @@ router.get('/moderation', (req, res) => {
 
 // GET /api/admin/queue  (called by admin panel)
 // Fixed: separate JOINs per content_type, no OR poison, WHERE status = 'pending'
-router.get('/queue', (req, res) => {
+router.get('/queue', async (req, res) => {
   try {
-    const rows = db.prepare(`
+    const { rows } = await pool.query(`
       SELECT
         mq.id,
-        mq.content_type        AS type,
+        mq.content_type   AS type,
         mq.status,
         mq.created_at,
-        COALESCE(c.title, bc.title, o.title) AS title_or_name,
+        COALESCE(c.title, bc.title, o.title)                            AS title_or_name,
         CASE
           WHEN mq.content_type = 'content'          THEN COALESCE(cr.display_name, 'Unknown')
-          WHEN mq.content_type = 'business_content' THEN COALESCE(b_bc.organization_name, 'Unknown')
-          WHEN mq.content_type = 'opportunity'      THEN COALESCE(b_op.organization_name, 'Unknown')
+          WHEN mq.content_type = 'business_content' THEN COALESCE(b_bc.company_name, 'Unknown')
+          WHEN mq.content_type = 'opportunity'      THEN COALESCE(b_op.company_name, 'Unknown')
           ELSE 'Unknown'
         END AS submitted_by
       FROM moderation_queue mq
@@ -140,10 +139,10 @@ router.get('/queue', (req, res) => {
       LEFT JOIN opportunities    o    ON mq.content_type = 'opportunity'       AND mq.content_id = o.id
       LEFT JOIN creators         cr   ON c.creator_id    = cr.id
       LEFT JOIN businesses       b_bc ON bc.business_id  = b_bc.id
-      LEFT JOIN businesses       b_op ON o.business_id   = b_op.id
+      LEFT JOIN businesses       b_op ON o.posted_by_id  = b_op.id AND o.posted_by_type = 'business'
       WHERE mq.status = 'pending'
       ORDER BY mq.created_at DESC
-    `).all();
+    `);
     return res.json({ data: rows });
   } catch (err) {
     logger.error('GET /api/admin/queue', { message: err.message });
@@ -161,21 +160,21 @@ router.post('/queue/bulk-action', async (req, res) => {
     return res.status(400).json({ error: 'action must be approve, reject, or delete.' });
   }
   try {
-    const placeholders = ids.map(() => '?').join(',');
     if (action === 'delete') {
-      db.prepare(`DELETE FROM moderation_queue WHERE id IN (${placeholders})`).run(...ids);
+      await pool.query('DELETE FROM moderation_queue WHERE id = ANY($1::int[])', [ids]);
     } else {
-      const newStatus    = action === 'approve' ? 'approved' : 'rejected';
+      const newStatus     = action === 'approve' ? 'approved' : 'rejected';
       const contentStatus = action === 'approve' ? 'published' : 'rejected';
-      const items = db.prepare(`SELECT * FROM moderation_queue WHERE id IN (${placeholders})`).all(...ids);
-      for (const item of items) {
+      const { rows } = await pool.query('SELECT * FROM moderation_queue WHERE id = ANY($1::int[])', [ids]);
+      for (const item of rows) {
         const table = item.content_type === 'business_content' ? 'business_content'
                     : item.content_type === 'opportunity'      ? 'opportunities'
                     : 'content';
-        db.prepare(
-          `UPDATE moderation_queue SET status = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ?`
-        ).run(newStatus, req.user.id, item.id);
-        db.prepare(`UPDATE ${table} SET status = ? WHERE id = ?`).run(contentStatus, item.content_id);
+        await pool.query(
+          'UPDATE moderation_queue SET status = $1, reviewed_by = $2, reviewed_at = NOW() WHERE id = $3',
+          [newStatus, req.user.id, item.id]
+        );
+        await pool.query(`UPDATE ${table} SET status = $1 WHERE id = $2`, [contentStatus, item.content_id]);
         await auditLogger.log({
           actor_type: 'admin', actor_id: req.user.id,
           action: action === 'approve' ? 'MODERATION_APPROVED' : 'MODERATION_REJECTED',
@@ -194,11 +193,12 @@ router.post('/queue/bulk-action', async (req, res) => {
 // POST /api/admin/moderation/:id/approve  (backward-compat)
 router.post('/moderation/:id/approve', async (req, res) => {
   try {
-    const item = db.prepare('SELECT * FROM moderation_queue WHERE id = ?').get(req.params.id);
-    if (!item) return res.status(404).json({ error: 'Not found.' });
+    const { rows } = await pool.query('SELECT * FROM moderation_queue WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Not found.' });
+    const item  = rows[0];
     const table = item.content_type === 'business_content' ? 'business_content' : 'content';
-    db.prepare("UPDATE moderation_queue SET status = 'approved', reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.user.id, req.params.id);
-    db.prepare(`UPDATE ${table} SET status = 'published' WHERE id = ?`).run(item.content_id);
+    await pool.query("UPDATE moderation_queue SET status = 'approved', reviewed_by = $1, reviewed_at = NOW() WHERE id = $2", [req.user.id, req.params.id]);
+    await pool.query(`UPDATE ${table} SET status = 'published' WHERE id = $1`, [item.content_id]);
     await auditLogger.log({ actor_type: 'admin', actor_id: req.user.id, action: 'MODERATION_APPROVED', target_type: item.content_type, target_id: item.content_id, ip_address: req.ip });
     return res.json({ success: true });
   } catch (err) {
@@ -210,12 +210,13 @@ router.post('/moderation/:id/approve', async (req, res) => {
 // POST /api/admin/moderation/:id/reject  (backward-compat)
 router.post('/moderation/:id/reject', async (req, res) => {
   try {
-    const item = db.prepare('SELECT * FROM moderation_queue WHERE id = ?').get(req.params.id);
-    if (!item) return res.status(404).json({ error: 'Not found.' });
+    const { rows } = await pool.query('SELECT * FROM moderation_queue WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Not found.' });
+    const item  = rows[0];
     const table = item.content_type === 'business_content' ? 'business_content' : 'content';
     const reason = req.body.reason || null;
-    db.prepare("UPDATE moderation_queue SET status = 'rejected', reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP, rejection_reason = ? WHERE id = ?").run(req.user.id, reason, req.params.id);
-    db.prepare(`UPDATE ${table} SET status = 'rejected' WHERE id = ?`).run(item.content_id);
+    await pool.query("UPDATE moderation_queue SET status = 'rejected', reviewed_by = $1, reviewed_at = NOW(), rejection_reason = $2 WHERE id = $3", [req.user.id, reason, req.params.id]);
+    await pool.query(`UPDATE ${table} SET status = 'rejected' WHERE id = $1`, [item.content_id]);
     await auditLogger.log({ actor_type: 'admin', actor_id: req.user.id, action: 'MODERATION_REJECTED', target_type: item.content_type, target_id: item.content_id, ip_address: req.ip });
     return res.json({ success: true });
   } catch (err) {
@@ -225,22 +226,22 @@ router.post('/moderation/:id/reject', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// CONTENT  — SQLite
+// CONTENT
 // ─────────────────────────────────────────────────────────────
 
 // GET /api/admin/content?search=&limit=
-router.get('/content', (req, res) => {
+router.get('/content', async (req, res) => {
   try {
     const lim     = Math.min(parseInt(req.query.limit, 10) || 50, 2000);
     const pattern = `%${req.query.search || ''}%`;
-    const rows = db.prepare(`
+    const { rows } = await pool.query(`
       SELECT c.*, cr.display_name AS creator_name
       FROM content c
       LEFT JOIN creators cr ON c.creator_id = cr.id
-      WHERE c.title LIKE ? OR cr.display_name LIKE ?
+      WHERE c.title ILIKE $1 OR cr.display_name ILIKE $1
       ORDER BY c.created_at DESC
-      LIMIT ?
-    `).all(pattern, pattern, lim);
+      LIMIT $2
+    `, [pattern, lim]);
     return res.json({ data: rows });
   } catch (err) {
     logger.error('GET /api/admin/content', { message: err.message });
@@ -253,10 +254,10 @@ router.put('/content/:id', async (req, res) => {
   try {
     const { is_published } = req.body;
     const status = is_published ? 'published' : 'pending';
-    const info = db.prepare('UPDATE content SET status = ? WHERE id = ?').run(status, req.params.id);
-    if (!info.changes) return res.status(404).json({ error: 'Not found.' });
+    const { rows } = await pool.query('UPDATE content SET status = $1 WHERE id = $2 RETURNING *', [status, req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found.' });
     await auditLogger.log({ actor_type: 'admin', actor_id: req.user.id, action: is_published ? 'CONTENT_PUBLISHED' : 'CONTENT_UNPUBLISHED', target_type: 'content', target_id: req.params.id, ip_address: req.ip });
-    return res.json({ success: true });
+    return res.json({ success: true, data: rows[0] });
   } catch (err) {
     logger.error('PUT /api/admin/content/:id', { message: err.message });
     return res.status(500).json({ error: 'Failed to update content.' });
@@ -266,8 +267,8 @@ router.put('/content/:id', async (req, res) => {
 // DELETE /api/admin/content/:id
 router.delete('/content/:id', async (req, res) => {
   try {
-    const info = db.prepare('DELETE FROM content WHERE id = ?').run(req.params.id);
-    if (!info.changes) return res.status(404).json({ error: 'Not found.' });
+    const { rows } = await pool.query('DELETE FROM content WHERE id = $1 RETURNING id', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found.' });
     await auditLogger.log({ actor_type: 'admin', actor_id: req.user.id, action: 'CONTENT_DELETED', target_type: 'content', target_id: req.params.id, ip_address: req.ip });
     return res.json({ success: true });
   } catch (err) {
@@ -277,22 +278,22 @@ router.delete('/content/:id', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// OPPORTUNITIES  — SQLite
+// OPPORTUNITIES
 // ─────────────────────────────────────────────────────────────
 
 // GET /api/admin/opportunities?search=&limit=
-router.get('/opportunities', (req, res) => {
+router.get('/opportunities', async (req, res) => {
   try {
     const lim     = Math.min(parseInt(req.query.limit, 10) || 50, 2000);
     const pattern = `%${req.query.search || ''}%`;
-    const rows = db.prepare(`
-      SELECT o.*, b.organization_name AS creator_name
+    const { rows } = await pool.query(`
+      SELECT o.*, b.company_name AS creator_name
       FROM opportunities o
-      LEFT JOIN businesses b ON o.business_id = b.id
-      WHERE o.title LIKE ? OR b.organization_name LIKE ?
+      LEFT JOIN businesses b ON o.posted_by_id = b.id AND o.posted_by_type = 'business'
+      WHERE o.title ILIKE $1 OR b.company_name ILIKE $1
       ORDER BY o.created_at DESC
-      LIMIT ?
-    `).all(pattern, pattern, lim);
+      LIMIT $2
+    `, [pattern, lim]);
     const mapped = rows.map(r => ({ ...r, is_published: r.status === 'published' }));
     return res.json({ data: mapped });
   } catch (err) {
@@ -306,11 +307,11 @@ router.put('/opportunities/:id', async (req, res) => {
   try {
     const { is_published, moderation_status } = req.body;
     const status = moderation_status === 'rejected' ? 'rejected'
-                 : is_published ? 'published' : 'pending';
-    const info = db.prepare('UPDATE opportunities SET status = ? WHERE id = ?').run(status, req.params.id);
-    if (!info.changes) return res.status(404).json({ error: 'Not found.' });
+                 : is_published ? 'published' : 'closed';
+    const { rows } = await pool.query('UPDATE opportunities SET status = $1 WHERE id = $2 RETURNING *', [status, req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found.' });
     await auditLogger.log({ actor_type: 'admin', actor_id: req.user.id, action: 'OPPORTUNITY_STATUS_CHANGED', target_type: 'opportunity', target_id: req.params.id, ip_address: req.ip });
-    return res.json({ success: true });
+    return res.json({ success: true, data: rows[0] });
   } catch (err) {
     logger.error('PUT /api/admin/opportunities/:id', { message: err.message });
     return res.status(500).json({ error: 'Failed to update opportunity.' });
@@ -320,8 +321,8 @@ router.put('/opportunities/:id', async (req, res) => {
 // DELETE /api/admin/opportunities/:id
 router.delete('/opportunities/:id', async (req, res) => {
   try {
-    const info = db.prepare('DELETE FROM opportunities WHERE id = ?').run(req.params.id);
-    if (!info.changes) return res.status(404).json({ error: 'Not found.' });
+    const { rows } = await pool.query('DELETE FROM opportunities WHERE id = $1 RETURNING id', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Not found.' });
     await auditLogger.log({ actor_type: 'admin', actor_id: req.user.id, action: 'OPPORTUNITY_DELETED', target_type: 'opportunity', target_id: req.params.id, ip_address: req.ip });
     return res.json({ success: true });
   } catch (err) {
@@ -331,44 +332,48 @@ router.delete('/opportunities/:id', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// USERS  — SQLite
-// Fixed: was using pool (PostgreSQL) — now uses db (SQLite)
+// USERS
+// Fixed: split UNION into two queries then merge in JS to avoid
+// PostgreSQL UNION column-count mismatch; also uses correct
+// column names from schema (company_name not organization_name).
 // ─────────────────────────────────────────────────────────────
 
 // GET /api/admin/users?search=
-router.get('/users', (req, res) => {
+router.get('/users', async (req, res) => {
   try {
     const pattern = `%${req.query.search || ''}%`;
-
-    const creators = db.prepare(`
-      SELECT
-        ca.id,
-        cr.display_name  AS name,
-        ca.email,
-        'creator'        AS role,
-        ca.is_suspended,
-        ca.created_at
-      FROM creator_accounts ca
-      JOIN creators cr ON cr.id = ca.creator_id
-      WHERE cr.display_name LIKE ? OR ca.email LIKE ?
-    `).all(pattern, pattern);
-
-    const businesses = db.prepare(`
-      SELECT
-        b.id,
-        b.organization_name AS name,
-        b.email,
-        'business'          AS role,
-        b.is_suspended,
-        b.created_at
-      FROM businesses b
-      WHERE b.organization_name LIKE ? OR b.email LIKE ?
-    `).all(pattern, pattern);
-
-    const combined = [...creators, ...businesses]
+    const [creatorRows, businessRows] = await Promise.all([
+      pool.query(`
+        SELECT
+          ca.id,
+          cr.display_name AS name,
+          ca.email,
+          'creator'       AS role,
+          ca.is_suspended,
+          ca.created_at
+        FROM creator_accounts ca
+        JOIN creators cr ON cr.id = ca.creator_id
+        WHERE cr.display_name ILIKE $1 OR ca.email ILIKE $1
+        ORDER BY ca.created_at DESC
+        LIMIT 500
+      `, [pattern]),
+      pool.query(`
+        SELECT
+          b.id,
+          b.company_name AS name,
+          b.email,
+          'business'     AS role,
+          b.is_suspended,
+          b.created_at
+        FROM businesses b
+        WHERE b.company_name ILIKE $1 OR b.email ILIKE $1
+        ORDER BY b.created_at DESC
+        LIMIT 500
+      `, [pattern]),
+    ]);
+    const combined = [...creatorRows.rows, ...businessRows.rows]
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       .slice(0, 500);
-
     return res.json({ data: combined });
   } catch (err) {
     logger.error('GET /api/admin/users', { message: err.message });
@@ -381,9 +386,9 @@ router.post('/users/:id/suspend', async (req, res) => {
   const { type, reason } = req.body;
   try {
     if (type === 'creator') {
-      db.prepare('UPDATE creator_accounts SET is_suspended = 1 WHERE creator_id = ?').run(req.params.id);
+      await pool.query('UPDATE creator_accounts SET is_suspended = TRUE WHERE creator_id = $1', [req.params.id]);
     } else {
-      db.prepare('UPDATE businesses SET is_suspended = 1 WHERE id = ?').run(req.params.id);
+      await pool.query('UPDATE businesses SET is_suspended = TRUE WHERE id = $1', [req.params.id]);
     }
     await auditLogger.log({ actor_type: 'admin', actor_id: req.user.id, action: 'USER_SUSPENDED', target_type: type || 'user', target_id: req.params.id, reason: reason || null, ip_address: req.ip });
     return res.json({ success: true });
@@ -398,9 +403,9 @@ router.post('/users/:id/reactivate', async (req, res) => {
   const { type } = req.body;
   try {
     if (type === 'business') {
-      db.prepare('UPDATE businesses SET is_suspended = 0 WHERE id = ?').run(req.params.id);
+      await pool.query('UPDATE businesses SET is_suspended = FALSE WHERE id = $1', [req.params.id]);
     } else {
-      db.prepare('UPDATE creator_accounts SET is_suspended = 0 WHERE creator_id = ?').run(req.params.id);
+      await pool.query('UPDATE creator_accounts SET is_suspended = FALSE WHERE creator_id = $1', [req.params.id]);
     }
     await auditLogger.log({ actor_type: 'admin', actor_id: req.user.id, action: 'USER_REACTIVATED', target_type: type || 'user', target_id: req.params.id, ip_address: req.ip });
     return res.json({ success: true });
@@ -413,7 +418,7 @@ router.post('/users/:id/reactivate', async (req, res) => {
 // PUT /api/admin/users/:id/email-verify
 router.put('/users/:id/email-verify', async (req, res) => {
   try {
-    db.prepare('UPDATE creator_accounts SET is_email_verified = 1 WHERE creator_id = ?').run(req.params.id);
+    await pool.query('UPDATE creator_accounts SET is_email_verified = TRUE WHERE creator_id = $1', [req.params.id]);
     await auditLogger.log({ actor_type: 'admin', actor_id: req.user.id, action: 'EMAIL_VERIFIED', target_type: 'creator', target_id: req.params.id, ip_address: req.ip });
     return res.json({ success: true });
   } catch (err) {
@@ -427,12 +432,12 @@ router.post('/users/reset-password', async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'email required.' });
   try {
-    const row = db.prepare('SELECT id FROM creator_accounts WHERE email = ? LIMIT 1').get(email);
-    if (!row) return res.status(404).json({ error: 'User not found.' });
+    const { rows } = await pool.query('SELECT id FROM creator_accounts WHERE email = $1 LIMIT 1', [email]);
+    if (!rows.length) return res.status(404).json({ error: 'User not found.' });
     const tempPassword = Math.random().toString(36).slice(-10) + 'A1!';
     const hash = await bcrypt.hash(tempPassword, 12);
-    db.prepare('UPDATE creator_accounts SET password_hash = ? WHERE id = ?').run(hash, row.id);
-    await auditLogger.log({ actor_type: 'admin', actor_id: req.user.id, action: 'PASSWORD_RESET', target_type: 'creator_account', target_id: row.id, ip_address: req.ip });
+    await pool.query('UPDATE creator_accounts SET password_hash = $1 WHERE id = $2', [hash, rows[0].id]);
+    await auditLogger.log({ actor_type: 'admin', actor_id: req.user.id, action: 'PASSWORD_RESET', target_type: 'creator_account', target_id: rows[0].id, ip_address: req.ip });
     return res.json({ success: true, temp_password: tempPassword });
   } catch (err) {
     logger.error('POST /api/admin/users/reset-password', { message: err.message });
@@ -443,7 +448,7 @@ router.post('/users/reset-password', async (req, res) => {
 // POST /api/admin/users/:id/verify
 router.post('/users/:id/verify', async (req, res) => {
   try {
-    db.prepare('UPDATE creators SET is_verified = 1 WHERE id = ?').run(req.params.id);
+    await pool.query('UPDATE creators SET is_verified = TRUE WHERE id = $1', [req.params.id]);
     await auditLogger.log({ actor_type: 'admin', actor_id: req.user.id, action: 'CREATOR_VERIFIED', target_type: 'creator', target_id: req.params.id, ip_address: req.ip });
     return res.json({ success: true });
   } catch (err) {
@@ -453,7 +458,7 @@ router.post('/users/:id/verify', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// AUDIT LOGS  — still on PostgreSQL (audit_logs lives there)
+// AUDIT LOGS
 // ─────────────────────────────────────────────────────────────
 
 // GET /api/admin/audit
@@ -486,35 +491,38 @@ router.get('/audit/export', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// ANALYTICS  — SQLite
+// ANALYTICS
 // ─────────────────────────────────────────────────────────────
 
 // GET /api/admin/analytics
-router.get('/analytics', (req, res) => {
+router.get('/analytics', async (req, res) => {
   try {
-    const totalCreators   = db.prepare('SELECT COUNT(*) AS cnt FROM creators').get();
-    const totalBusinesses = db.prepare('SELECT COUNT(*) AS cnt FROM businesses').get();
-    const totalContent    = db.prepare('SELECT COUNT(*) AS cnt FROM content').get();
-    const totalOpps       = db.prepare('SELECT COUNT(*) AS cnt FROM opportunities').get();
-    const pendingQueue    = db.prepare("SELECT COUNT(*) AS cnt FROM moderation_queue WHERE status = 'pending'").get();
-    const trend           = db.prepare(`
-      SELECT
-        strftime('%Y-%m-%d', created_at) AS day,
-        COUNT(*) AS posts
-      FROM content
-      WHERE created_at >= datetime('now', '-14 days')
-      GROUP BY day
-      ORDER BY day ASC
-    `).all();
+    const [totalCreators, totalBusinesses, totalContent, totalOpps, pendingQueue, trend] =
+      await Promise.all([
+        pool.query('SELECT COUNT(*)::int AS cnt FROM creators'),
+        pool.query('SELECT COUNT(*)::int AS cnt FROM businesses'),
+        pool.query('SELECT COUNT(*)::int AS cnt FROM content'),
+        pool.query('SELECT COUNT(*)::int AS cnt FROM opportunities'),
+        pool.query("SELECT COUNT(*)::int AS cnt FROM moderation_queue WHERE status = 'pending'"),
+        pool.query(`
+          SELECT
+            TO_CHAR(DATE_TRUNC('day', created_at), 'YYYY-MM-DD') AS day,
+            COUNT(*)::int AS posts
+          FROM content
+          WHERE created_at >= NOW() - INTERVAL '14 days'
+          GROUP BY day
+          ORDER BY day ASC
+        `),
+      ]);
     return res.json({
       kpis: {
-        total_creators:      totalCreators.cnt,
-        total_businesses:    totalBusinesses.cnt,
-        total_content:       totalContent.cnt,
-        total_opportunities: totalOpps.cnt,
-        pending_moderation:  pendingQueue.cnt,
+        total_creators:      totalCreators.rows[0].cnt,
+        total_businesses:    totalBusinesses.rows[0].cnt,
+        total_content:       totalContent.rows[0].cnt,
+        total_opportunities: totalOpps.rows[0].cnt,
+        pending_moderation:  pendingQueue.rows[0].cnt,
       },
-      trend,
+      trend: trend.rows,
     });
   } catch (err) {
     logger.error('GET /api/admin/analytics', { message: err.message });
@@ -523,7 +531,7 @@ router.get('/analytics', (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// LIVE ALERTS  — PostgreSQL (audit_logs)
+// LIVE ALERTS
 // ─────────────────────────────────────────────────────────────
 
 // GET /api/admin/alerts
