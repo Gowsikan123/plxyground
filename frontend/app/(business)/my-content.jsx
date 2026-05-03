@@ -10,14 +10,12 @@ import { Badge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Toast } from '../../components/ui/Toast';
-import { useAuthStore } from '../../store/authStore';
-import { api } from '../../services/api';
+import { apiCall } from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { Spacing } from '../../constants/spacing';
 
 export default function MyContent() {
-  const { token } = useAuthStore();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -34,17 +32,16 @@ export default function MyContent() {
   };
 
   const load = useCallback(async () => {
-    try {
-      setError(null);
-      const res = await api.get('/api/business/content/mine', token);
-      setItems(res.data?.items ?? res.data ?? []);
-    } catch (e) {
-      setError(e.message || 'Failed to load content');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+    setError(null);
+    const { data, error: err } = await apiCall((api) => api.get('/api/business/content/mine'));
+    if (err) {
+      setError(err);
+    } else {
+      setItems(data?.data?.items ?? data?.data ?? []);
     }
-  }, [token]);
+    setLoading(false);
+    setRefreshing(false);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -58,28 +55,26 @@ export default function MyContent() {
 
   const openEdit = (item) => {
     setEditTarget(item);
-    setForm({ title: item.title, body: item.body || '', budget_range: item.budget_range || '', target_sport: item.target_sport || '' });
+    setForm({
+      title: item.title,
+      body: item.body || '',
+      budget_range: item.budget_range || '',
+      target_sport: item.target_sport || '',
+    });
     setModalVisible(true);
   };
 
   const handleSubmit = async () => {
     if (!form.title.trim()) { showToast('Title is required', 'error'); return; }
     setSubmitting(true);
-    try {
-      if (editTarget) {
-        await api.put(`/api/business/content/${editTarget.id}`, form, token);
-        showToast('Content updated', 'success');
-      } else {
-        await api.post('/api/business/content', form, token);
-        showToast('Submitted for review', 'success');
-      }
-      setModalVisible(false);
-      load();
-    } catch (e) {
-      showToast(e.message || 'Failed to save', 'error');
-    } finally {
-      setSubmitting(false);
-    }
+    const { error: err } = editTarget
+      ? await apiCall((api) => api.put(`/api/business/content/${editTarget.id}`, form))
+      : await apiCall((api) => api.post('/api/business/content', form));
+    setSubmitting(false);
+    if (err) { showToast(err, 'error'); return; }
+    showToast(editTarget ? 'Content updated' : 'Submitted for review', 'success');
+    setModalVisible(false);
+    load();
   };
 
   const handleDelete = (item) => {
@@ -88,13 +83,12 @@ export default function MyContent() {
       {
         text: 'Delete', style: 'destructive',
         onPress: async () => {
-          try {
-            await api.put(`/api/business/content/${item.id}`, { status: 'deleted' }, token);
-            showToast('Deleted', 'info');
-            load();
-          } catch (e) {
-            showToast(e.message || 'Delete failed', 'error');
-          }
+          const { error: err } = await apiCall((api) =>
+            api.put(`/api/business/content/${item.id}`, { status: 'deleted' })
+          );
+          if (err) { showToast(err, 'error'); return; }
+          showToast('Deleted', 'info');
+          load();
         },
       },
     ]);
@@ -152,12 +146,10 @@ export default function MyContent() {
         />
       )}
 
-      {/* FAB */}
       <TouchableOpacity style={styles.fab} onPress={openCreate} activeOpacity={0.85}>
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
 
-      {/* Submit / Edit Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
         <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.modalSheet}>
