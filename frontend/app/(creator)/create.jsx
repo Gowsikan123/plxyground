@@ -4,12 +4,22 @@ import {
   ScrollView, KeyboardAvoidingView, Platform, StatusBar,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { C, R, GRAD_ACCENT } from '../../components/theme';
 import { Header } from '../../components/layout/Header';
 import { apiRequest } from '../../components/ApiClient';
 import { useToastStore } from '../../components/ui/Toast';
+
+// expo-haptics is not available on web — use a safe shim so the
+// web bundler doesn't crash. On native the real module is used.
+let Haptics;
+if (Platform.OS !== 'web') {
+  try { Haptics = require('expo-haptics'); } catch (_) { Haptics = null; }
+}
+const ImpactStyle   = { Light: 'Light', Medium: 'Medium', Heavy: 'Heavy' };
+const NotifType     = { Error: 'Error', Success: 'Success', Warning: 'Warning' };
+const safeImpact    = (style)  => Haptics?.impactAsync?.(style);
+const safeNotif     = (type)   => Haptics?.notificationAsync?.(type);
 
 const CONTENT_TYPES   = ['Article', 'Video', 'Highlight', 'Opinion'];
 const TAG_SUGGESTIONS = ['football', 'nutrition', 'fitness', 'mindset', 'basketball', 'recovery'];
@@ -50,7 +60,7 @@ export default function CreatePost() {
     const current = tags.split(',').map(t => t.trim()).filter(Boolean);
     if (!current.includes(tag)) {
       setTags([...current, tag].join(', '));
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      safeImpact(ImpactStyle.Light);
     }
   };
 
@@ -59,7 +69,7 @@ export default function CreatePost() {
 
   const handleSubmit = async () => {
     if (!title.trim() || !body.trim()) { setError('Title and body are required.'); return; }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    safeImpact(ImpactStyle.Medium);
     setLoading(true); setError('');
     try {
       const tagArr = tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
@@ -79,7 +89,7 @@ export default function CreatePost() {
     } catch (e) {
       setError(e.message || 'Failed to post. Try again.');
       showToast('Failed to post. Try again.', 'error');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      safeNotif(NotifType.Error);
     } finally {
       setLoading(false);
     }
@@ -100,7 +110,7 @@ export default function CreatePost() {
             <TouchableOpacity
               key={t}
               style={[s.typeChip, type === t && s.typeChipActive]}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setType(t); }}
+              onPress={() => { safeImpact(ImpactStyle.Light); setType(t); }}
             >
               <Text style={[s.typeText, type === t && s.typeTextActive]}>{t}</Text>
             </TouchableOpacity>
