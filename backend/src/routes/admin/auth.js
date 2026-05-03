@@ -11,6 +11,7 @@ const { authLimiter } = require('../../middleware/rateLimiter');
 
 const router = express.Router();
 
+// POST /api/admin/auth/login
 router.post(
   '/login',
   authLimiter,
@@ -31,13 +32,32 @@ router.post(
       const token = signToken({ sub: admin.id, type: 'admin' });
       audit.log({ actor_type: 'admin', actor_id: admin.id, action: 'ADMIN_LOGIN', ip_address: req.ip });
 
-      return res.json({ success: true, data: { token, admin: { id: admin.id, email: admin.email } } });
+      return res.json({
+        success: true,
+        token,
+        admin: { id: admin.id, email: admin.email, username: admin.username || admin.email, role: 'admin' },
+      });
     } catch (err) {
       return res.status(500).json({ success: false, error: err.message });
     }
   }
 );
 
+// GET /api/admin/auth/me  — verify session token and return admin info
+router.get('/me', requireAdmin, (req, res) => {
+  try {
+    const admin = db.prepare('SELECT id, email, username, created_at FROM admins WHERE id = ?').get(req.admin.id);
+    if (!admin) return res.status(404).json({ success: false, error: 'Admin not found' });
+    return res.json({
+      success: true,
+      admin: { id: admin.id, email: admin.email, username: admin.username || admin.email, role: 'admin' },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/admin/auth/change-password
 router.post(
   '/change-password',
   requireAdmin,
