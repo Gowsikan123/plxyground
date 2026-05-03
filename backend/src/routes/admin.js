@@ -32,9 +32,30 @@ router.post('/auth/login', authLimiter, async (req, res) => {
     if (!valid) return res.status(401).json({ error: 'Invalid credentials.' });
     await pool.query('UPDATE admin_users SET last_login = NOW() WHERE id = $1', [admin.id]);
     const token = signToken({ sub: admin.id, type: 'admin', role: admin.role });
-    return res.json({ token, user: { id: admin.id, email: admin.email, role: admin.role } });
+    // Return both `token` and `admin` so the frontend verifySession call also works
+    return res.json({
+      token,
+      admin: { id: admin.id, email: admin.email, username: admin.email.split('@')[0], role: admin.role },
+      user:  { id: admin.id, email: admin.email, role: admin.role },
+    });
   } catch (err) {
     logger.error('POST /api/admin/auth/login', { message: err.message });
+    return res.status(500).json({ error: 'Server error.' });
+  }
+});
+
+// GET /api/admin/auth/me  — called by verifySession() on every page load
+router.get('/auth/me', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, email, role FROM admin_users WHERE id = $1 LIMIT 1',
+      [req.user.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Not found.' });
+    const a = rows[0];
+    return res.json({ admin: { id: a.id, email: a.email, username: a.email.split('@')[0], role: a.role } });
+  } catch (err) {
+    logger.error('GET /api/admin/auth/me', { message: err.message });
     return res.status(500).json({ error: 'Server error.' });
   }
 });
@@ -117,7 +138,6 @@ router.get('/moderation', async (req, res) => {
 });
 
 // GET /api/admin/queue  (called by admin panel)
-// Fixed: separate JOINs per content_type, no OR poison, WHERE status = 'pending'
 router.get('/queue', async (req, res) => {
   try {
     const { rows } = await pool.query(`
@@ -126,7 +146,7 @@ router.get('/queue', async (req, res) => {
         mq.content_type   AS type,
         mq.status,
         mq.created_at,
-        COALESCE(c.title, bc.title, o.title)                            AS title_or_name,
+        COALESCE(c.title, bc.title, o.title)  AS title_or_name,
         CASE
           WHEN mq.content_type = 'content'          THEN COALESCE(cr.display_name, 'Unknown')
           WHEN mq.content_type = 'business_content' THEN COALESCE(b_bc.company_name, 'Unknown')
@@ -147,6 +167,39 @@ router.get('/queue', async (req, res) => {
   } catch (err) {
     logger.error('GET /api/admin/queue', { message: err.message });
     return res.status(500).json({ error: 'Failed to fetch queue.' });
+  }
+});
+
+// PATCH /api/admin/queue/:id  — single-item approve / reject
+router.patch('/queue/:id', async (req, res) => {
+  const { status, moderation_note } = req.body;
+  if (!['approved', 'rejected', 'flagged'].includes(status)) {
+    return res.status(400).json({ error: 'status must be approved, rejected, or flagged.' });
+  }
+  try {
+    const { rows } = await pool.query('SELECT * FROM moderation_queue WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Not found.' });
+    const item = rows[0];
+    const table = item.content_type === 'business_content' ? 'business_content'
+                : item.content_type === 'opportunity'      ? 'opportunities'
+                : 'content';
+    const contentStatus = status === 'approved' ? 'published' : status === 'rejected' ? 'rejected' : 'flagged';
+    await pool.query(
+      'UPDATE moderation_queue SET status=$1, reviewed_by=$2, reviewed_at=NOW(), rejection_reason=$3 WHERE id=$4',
+      [status, req.user.id, moderation_note || null, req.params.id]
+    );
+    if (status !== 'flagged') {
+      await pool.query(`UPDATE ${table} SET status=$1 WHERE id=$2`, [contentStatus, item.content_id]);
+    }
+    await auditLogger.log({
+      actor_type: 'admin', actor_id: req.user.id,
+      action: status === 'approved' ? 'MODERATION_APPROVED' : status === 'rejected' ? 'MODERATION_REJECTED' : 'MODERATION_FLAGGED',
+      target_type: item.content_type, target_id: item.content_id, ip_address: req.ip,
+    });
+    return res.json({ success: true });
+  } catch (err) {
+    logger.error('PATCH /api/admin/queue/:id', { message: err.message });
+    return res.status(500).json({ error: 'Failed to moderate item.' });
   }
 });
 
@@ -333,47 +386,63 @@ router.delete('/opportunities/:id', async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────
 // USERS
-// Fixed: split UNION into two queries then merge in JS to avoid
-// PostgreSQL UNION column-count mismatch; also uses correct
-// column names from schema (company_name not organization_name).
+// Fixed: split into two queries (creators / businesses), merged
+// in JS. Creators query now returns username, sport, follower_count
+// so the admin panel tabs can render all fields correctly.
 // ─────────────────────────────────────────────────────────────
 
-// GET /api/admin/users?search=
+// GET /api/admin/users?type=creator|business&search=
 router.get('/users', async (req, res) => {
   try {
     const pattern = `%${req.query.search || ''}%`;
-    const [creatorRows, businessRows] = await Promise.all([
-      pool.query(`
+    const type    = req.query.type; // 'creator' | 'business' | undefined (all)
+
+    let creatorRows = { rows: [] };
+    let businessRows = { rows: [] };
+
+    if (!type || type === 'creator') {
+      creatorRows = await pool.query(`
         SELECT
-          ca.id,
-          cr.display_name AS name,
+          cr.id,
+          cr.display_name,
+          cr.username,
+          cr.sport,
+          cr.is_verified,
+          COALESCE(cr.follower_count, 0) AS follower_count,
           ca.email,
           'creator'       AS role,
           ca.is_suspended,
           ca.created_at
         FROM creator_accounts ca
         JOIN creators cr ON cr.id = ca.creator_id
-        WHERE cr.display_name ILIKE $1 OR ca.email ILIKE $1
+        WHERE cr.display_name ILIKE $1 OR cr.username ILIKE $1 OR ca.email ILIKE $1
         ORDER BY ca.created_at DESC
         LIMIT 500
-      `, [pattern]),
-      pool.query(`
+      `, [pattern]);
+    }
+
+    if (!type || type === 'business') {
+      businessRows = await pool.query(`
         SELECT
           b.id,
-          b.company_name AS name,
+          b.company_name  AS name,
           b.email,
-          'business'     AS role,
+          b.industry,
+          b.is_verified,
+          'business'      AS role,
           b.is_suspended,
           b.created_at
         FROM businesses b
         WHERE b.company_name ILIKE $1 OR b.email ILIKE $1
         ORDER BY b.created_at DESC
         LIMIT 500
-      `, [pattern]),
-    ]);
+      `, [pattern]);
+    }
+
     const combined = [...creatorRows.rows, ...businessRows.rows]
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       .slice(0, 500);
+
     return res.json({ data: combined });
   } catch (err) {
     logger.error('GET /api/admin/users', { message: err.message });
@@ -381,7 +450,40 @@ router.get('/users', async (req, res) => {
   }
 });
 
-// POST /api/admin/users/:id/suspend
+// PATCH /api/admin/users/:type/:id  — suspend / reactivate / verify
+router.patch('/users/:type/:id', async (req, res) => {
+  const { action } = req.body;
+  const { type, id } = req.params;
+  if (!['suspend', 'reactivate', 'verify'].includes(action)) {
+    return res.status(400).json({ error: 'action must be suspend, reactivate, or verify.' });
+  }
+  try {
+    if (action === 'verify') {
+      if (type === 'business') {
+        await pool.query('UPDATE businesses SET is_verified = TRUE WHERE id = $1', [id]);
+      } else {
+        await pool.query('UPDATE creators SET is_verified = TRUE WHERE id = $1', [id]);
+      }
+    } else {
+      const suspended = action === 'suspend';
+      if (type === 'creator') {
+        await pool.query('UPDATE creator_accounts SET is_suspended = $1 WHERE creator_id = $2', [suspended, id]);
+      } else {
+        await pool.query('UPDATE businesses SET is_suspended = $1 WHERE id = $2', [suspended, id]);
+      }
+    }
+    await auditLogger.log({
+      actor_type: 'admin', actor_id: req.user.id,
+      action: action.toUpperCase(), target_type: type, target_id: id, ip_address: req.ip,
+    });
+    return res.json({ success: true });
+  } catch (err) {
+    logger.error('PATCH /api/admin/users/:type/:id', { message: err.message });
+    return res.status(500).json({ error: 'Action failed.' });
+  }
+});
+
+// POST /api/admin/users/:id/suspend  (backward-compat)
 router.post('/users/:id/suspend', async (req, res) => {
   const { type, reason } = req.body;
   try {
@@ -398,7 +500,7 @@ router.post('/users/:id/suspend', async (req, res) => {
   }
 });
 
-// POST /api/admin/users/:id/reactivate
+// POST /api/admin/users/:id/reactivate  (backward-compat)
 router.post('/users/:id/reactivate', async (req, res) => {
   const { type } = req.body;
   try {
@@ -445,7 +547,7 @@ router.post('/users/reset-password', async (req, res) => {
   }
 });
 
-// POST /api/admin/users/:id/verify
+// POST /api/admin/users/:id/verify  (backward-compat)
 router.post('/users/:id/verify', async (req, res) => {
   try {
     await pool.query('UPDATE creators SET is_verified = TRUE WHERE id = $1', [req.params.id]);
@@ -464,12 +566,21 @@ router.post('/users/:id/verify', async (req, res) => {
 // GET /api/admin/audit
 router.get('/audit', async (req, res) => {
   try {
-    const lim = Math.min(parseInt(req.query.limit, 10) || 50, 200);
-    const off = parseInt(req.query.offset, 10) || 0;
-    const { rows } = await pool.query(
-      'SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT $1 OFFSET $2',
-      [lim, off]
-    );
+    const lim        = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+    const off        = parseInt(req.query.offset, 10) || 0;
+    const actor_type = req.query.actor_type || null;
+    const action     = req.query.action     || null;
+
+    let query  = 'SELECT * FROM audit_logs';
+    const args = [];
+    const conditions = [];
+    if (actor_type) { args.push(actor_type); conditions.push(`actor_type = $${args.length}`); }
+    if (action)     { args.push(`%${action}%`); conditions.push(`action ILIKE $${args.length}`); }
+    if (conditions.length) query += ' WHERE ' + conditions.join(' AND ');
+    args.push(lim); query += ` ORDER BY created_at DESC LIMIT $${args.length}`;
+    args.push(off); query += ` OFFSET $${args.length}`;
+
+    const { rows } = await pool.query(query, args);
     return res.json({ data: rows });
   } catch (err) {
     logger.error('GET /api/admin/audit', { message: err.message });
@@ -492,12 +603,15 @@ router.get('/audit/export', async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────
 // ANALYTICS
+// Fixed: expose both old and new KPI key names so the dashboard
+// frontend (which reads pending_queue / total_opps) works without
+// needing a separate frontend deploy.
 // ─────────────────────────────────────────────────────────────
 
 // GET /api/admin/analytics
 router.get('/analytics', async (req, res) => {
   try {
-    const [totalCreators, totalBusinesses, totalContent, totalOpps, pendingQueue, trend] =
+    const [totalCreators, totalBusinesses, totalContent, totalOpps, pendingQueue, trend, sportBreak] =
       await Promise.all([
         pool.query('SELECT COUNT(*)::int AS cnt FROM creators'),
         pool.query('SELECT COUNT(*)::int AS cnt FROM businesses'),
@@ -509,24 +623,70 @@ router.get('/analytics', async (req, res) => {
             TO_CHAR(DATE_TRUNC('day', created_at), 'YYYY-MM-DD') AS day,
             COUNT(*)::int AS posts
           FROM content
-          WHERE created_at >= NOW() - INTERVAL '14 days'
+          WHERE created_at >= NOW() - INTERVAL '7 days'
           GROUP BY day
           ORDER BY day ASC
+        `),
+        pool.query(`
+          SELECT sport, COUNT(*)::int AS count
+          FROM creators
+          WHERE sport IS NOT NULL
+          GROUP BY sport
+          ORDER BY count DESC
+          LIMIT 10
         `),
       ]);
     return res.json({
       kpis: {
+        // Canonical keys
         total_creators:      totalCreators.rows[0].cnt,
         total_businesses:    totalBusinesses.rows[0].cnt,
         total_content:       totalContent.rows[0].cnt,
         total_opportunities: totalOpps.rows[0].cnt,
         pending_moderation:  pendingQueue.rows[0].cnt,
+        // Aliases used by admin panel dashboard
+        total_opps:          totalOpps.rows[0].cnt,
+        pending_queue:       pendingQueue.rows[0].cnt,
+        flagged_queue:       0,
+        total_applications:  0,
       },
-      trend: trend.rows,
+      // Aliases for chart
+      content_last_7_days: trend.rows,
+      trend:               trend.rows,
+      sport_breakdown:     sportBreak.rows,
     });
   } catch (err) {
     logger.error('GET /api/admin/analytics', { message: err.message });
     return res.status(500).json({ error: 'Failed to fetch analytics.' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// SETTINGS
+// ─────────────────────────────────────────────────────────────
+
+// PATCH /api/admin/settings/password
+router.patch('/settings/password', async (req, res) => {
+  const { current_password, new_password } = req.body;
+  if (!current_password || !new_password) {
+    return res.status(400).json({ error: 'current_password and new_password required.' });
+  }
+  if (new_password.length < 8) {
+    return res.status(400).json({ error: 'New password must be at least 8 characters.' });
+  }
+  try {
+    const { rows } = await pool.query('SELECT * FROM admin_users WHERE id = $1 LIMIT 1', [req.user.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Admin not found.' });
+    const admin = rows[0];
+    const valid = await bcrypt.compare(current_password, admin.password_hash);
+    if (!valid) return res.status(401).json({ error: 'Current password is incorrect.' });
+    const hash = await bcrypt.hash(new_password, 12);
+    await pool.query('UPDATE admin_users SET password_hash = $1 WHERE id = $2', [hash, admin.id]);
+    await auditLogger.log({ actor_type: 'admin', actor_id: req.user.id, action: 'ADMIN_PASSWORD_CHANGED', target_type: 'admin', target_id: admin.id, ip_address: req.ip });
+    return res.json({ success: true });
+  } catch (err) {
+    logger.error('PATCH /api/admin/settings/password', { message: err.message });
+    return res.status(500).json({ error: 'Server error.' });
   }
 });
 

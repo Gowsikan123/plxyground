@@ -162,6 +162,9 @@
     .badge-suspended{ background: var(--red-dim);    color: var(--red); }
     .badge-active   { background: var(--green-dim);  color: var(--green); }
     .badge-admin    { background: var(--accent-dim); color: var(--accent); }
+    .badge-content  { background: var(--accent-dim); color: var(--accent); }
+    .badge-business_content { background: var(--orange-dim); color: var(--orange); }
+    .badge-opportunity { background: var(--green-dim); color: var(--green); }
 
     /* ── Login ───────────────────────────────────────────────────── */
     .login-card {
@@ -358,20 +361,20 @@
       <!-- ── Mod Queue ── -->
       <section id="section-queue" class="section">
         <div class="section-header">
-          <div><h2>Moderation Queue</h2><p>Pending and flagged content awaiting review</p></div>
+          <div><h2>Moderation Queue</h2><p>Pending content awaiting review</p></div>
           <button class="btn btn-secondary btn-sm" onclick="loadQueue()">&#8635; Refresh</button>
         </div>
         <div class="bulk-bar" id="bulk-bar">
           <strong id="bulk-count">0</strong> selected
-          <button class="btn btn-success btn-sm" onclick="bulkAction('approved')">Approve all</button>
-          <button class="btn btn-danger btn-sm" onclick="bulkAction('rejected')">Reject all</button>
+          <button class="btn btn-success btn-sm" onclick="bulkAction('approve')">Approve all</button>
+          <button class="btn btn-danger btn-sm" onclick="bulkAction('reject')">Reject all</button>
           <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="clearSelection()">Clear</button>
         </div>
         <div class="table-wrap">
           <table>
             <thead><tr>
               <th><input type="checkbox" id="select-all" onchange="toggleSelectAll(this)" /></th>
-              <th>Content</th><th>Creator</th><th>Sport</th><th>Status</th><th>Posted</th><th>Actions</th>
+              <th>Content</th><th>Submitted By</th><th>Type</th><th>Status</th><th>Posted</th><th>Actions</th>
             </tr></thead>
             <tbody id="queue-tbody"><tr><td colspan="7"><div class="empty"><p>Loading...</p></div></td></tr></tbody>
           </table>
@@ -387,7 +390,7 @@
         <div class="filters">
           <select id="content-status-filter" onchange="loadContent()">
             <option value="">All statuses</option>
-            <option value="approved">Approved</option>
+            <option value="published">Published</option>
             <option value="pending">Pending</option>
             <option value="rejected">Rejected</option>
             <option value="flagged">Flagged</option>
@@ -517,7 +520,7 @@
         <select id="modal-status">
           <option value="approved">Approve</option>
           <option value="rejected">Reject</option>
-          <option value="flagged">Flag</option>
+          <option value="flagged">Flag for review</option>
         </select>
       </div>
       <div class="form-group">
@@ -533,7 +536,7 @@
 </div>
 
 <script>
-// ── Config ──────────────────────────────────────────────────────────────
+// ── Config ────────────────────────────────────────────────────────────────
 let API_BASE = localStorage.getItem('px_api_base') || 'http://localhost:3011';
 let TOKEN = localStorage.getItem('px_admin_token') || null;
 let currentAdmin = null;
@@ -544,13 +547,11 @@ let currentUserTab = 'creator';
 let auditDebounce = null;
 let auditLogs = [];
 
-// ── Boot ─────────────────────────────────────────────────────────────────
+// ── Boot ──────────────────────────────────────────────────────────────────
 document.getElementById('api-base-display').textContent = API_BASE;
 document.getElementById('api-url-input').value = API_BASE;
 
-if (TOKEN) {
-  verifySession();
-} 
+if (TOKEN) verifySession();
 
 // ── API helper ────────────────────────────────────────────────────────────
 async function api(method, path, body) {
@@ -560,7 +561,7 @@ async function api(method, path, body) {
   };
   if (body) opts.body = JSON.stringify(body);
   try {
-    const res = await fetch(API_BASE + path, opts);
+    const res  = await fetch(API_BASE + path, opts);
     const data = await res.json();
     return { ok: res.ok, status: res.status, data };
   } catch (e) {
@@ -583,7 +584,7 @@ async function verifySession() {
 function showApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
-  document.getElementById('sidebar-admin-name').textContent = currentAdmin.username;
+  document.getElementById('sidebar-admin-name').textContent = currentAdmin.username || currentAdmin.email || 'Admin';
   document.getElementById('sidebar-admin-role').textContent = currentAdmin.role;
   document.getElementById('topbar-env').textContent = 'API: ' + API_BASE;
   navigate('dashboard');
@@ -613,7 +614,8 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 
   if (r.ok) {
     TOKEN = r.data.token;
-    currentAdmin = r.data.admin;
+    // Backend now returns both r.data.admin and r.data.user — prefer admin
+    currentAdmin = r.data.admin || r.data.user;
     localStorage.setItem('px_admin_token', TOKEN);
     showApp();
   } else {
@@ -641,7 +643,9 @@ function navigate(section) {
 async function loadDashboard() {
   const r = await api('GET', '/api/admin/analytics');
   if (!r.ok) { toast('Failed to load analytics', 'error'); return; }
-  const { kpis, content_last_7_days, sport_breakdown } = r.data;
+  const kpis              = r.data.kpis || {};
+  const content_last_7    = r.data.content_last_7_days || r.data.trend || [];
+  const sport_breakdown   = r.data.sport_breakdown || [];
 
   const kpiDefs = [
     { key: 'total_creators',    label: 'Creators',     cls: 'accent' },
@@ -656,16 +660,14 @@ async function loadDashboard() {
     `<div class="kpi-card"><div class="kpi-label">${k.label}</div><div class="kpi-value ${k.cls}">${(kpis[k.key]||0).toLocaleString()}</div></div>`
   ).join('');
 
-  // Update queue badge
   const queueCount = (kpis.pending_queue || 0) + (kpis.flagged_queue || 0);
   const badge = document.getElementById('queue-badge');
   badge.textContent = queueCount;
   badge.style.display = queueCount > 0 ? 'inline-block' : 'none';
 
-  // Mini chart
-  if (content_last_7_days && content_last_7_days.length) {
-    const max = Math.max(...content_last_7_days.map(d => parseInt(d.posts, 10)), 1);
-    document.getElementById('mini-chart').innerHTML = content_last_7_days.map(d => {
+  if (content_last_7.length) {
+    const max = Math.max(...content_last_7.map(d => parseInt(d.posts, 10)), 1);
+    document.getElementById('mini-chart').innerHTML = content_last_7.map(d => {
       const h = Math.max(4, Math.round((parseInt(d.posts,10) / max) * 56));
       const day = new Date(d.day).toLocaleDateString('en-GB', { weekday:'short' });
       return `<div class="bar-col"><div class="bar" style="height:${h}px" title="${d.posts} posts"></div><div class="bar-label">${day}</div></div>`;
@@ -674,11 +676,10 @@ async function loadDashboard() {
     document.getElementById('mini-chart').innerHTML = '<div style="color:var(--text-faint);font-size:12px">No data yet</div>';
   }
 
-  // Sport breakdown
-  if (sport_breakdown && sport_breakdown.length) {
+  if (sport_breakdown.length) {
     document.getElementById('sport-breakdown').innerHTML = sport_breakdown.map(s =>
       `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px">
-        <span style="text-transform:capitalize">${s.sport}</span>
+        <span style="text-transform:capitalize">${esc(s.sport)}</span>
         <span style="font-variant-numeric:tabular-nums;color:var(--text-muted)">${s.count}</span>
       </div>`
     ).join('');
@@ -691,12 +692,13 @@ async function loadDashboard() {
 async function loadQueue() {
   const r = await api('GET', '/api/admin/queue');
   if (!r.ok) { toast('Failed to load queue', 'error'); return; }
-  const { queue } = r.data;
+  // Backend returns { data: [...] }
+  const queue = r.data.data || [];
   const tbody = document.getElementById('queue-tbody');
   selectedIds.clear();
   updateBulkBar();
 
-  if (!queue || !queue.length) {
+  if (!queue.length) {
     tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg><p>Queue is clear — nothing to review</p></div></td></tr>`;
     return;
   }
@@ -705,15 +707,13 @@ async function loadQueue() {
     <tr>
       <td><input type="checkbox" class="row-check" data-id="${item.id}" onchange="toggleRow(this)" /></td>
       <td style="max-width:240px">
-        <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.title)}</div>
-        ${item.tags && item.tags.length ? `<div style="margin-top:3px">${item.tags.slice(0,3).map(t=>`<span class="badge badge-admin" style="margin-right:3px">${esc(t)}</span>`).join('')}</div>` : ''}
+        <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.title_or_name || '—')}</div>
       </td>
       <td>
-        <div style="font-weight:500">${esc(item.display_name)}</div>
-        <div style="font-size:11px;color:var(--text-muted)">@${esc(item.username)}</div>
+        <div style="font-weight:500">${esc(item.submitted_by || '—')}</div>
       </td>
-      <td style="text-transform:capitalize">${esc(item.sport||'—')}</td>
-      <td><span class="badge badge-${item.status}">${item.status}</span></td>
+      <td><span class="badge badge-${item.type || 'content'}">${esc(item.type || 'content')}</span></td>
+      <td><span class="badge badge-${item.status}">${esc(item.status)}</span></td>
       <td class="td-mono">${fmtDate(item.created_at)}</td>
       <td>
         <div style="display:flex;gap:4px">
@@ -726,6 +726,7 @@ async function loadQueue() {
 }
 
 async function quickModerate(id, status) {
+  // PATCH /api/admin/queue/:id
   const r = await api('PATCH', `/api/admin/queue/${id}`, { status });
   if (r.ok) { toast(`Content ${status}`, 'success'); loadQueue(); if (currentSection === 'dashboard') loadDashboard(); }
   else toast(r.data.error || 'Action failed', 'error');
@@ -735,6 +736,7 @@ function openModerate(id) {
   moderateTargetId = id;
   document.getElementById('modal-note').value = '';
   document.getElementById('modal-status').value = 'approved';
+  document.getElementById('modal-title').textContent = 'Moderate Item #' + id;
   document.getElementById('moderate-modal').classList.add('open');
 }
 
@@ -742,15 +744,17 @@ async function submitModerate() {
   if (!moderateTargetId) return;
   const status = document.getElementById('modal-status').value;
   const moderation_note = document.getElementById('modal-note').value;
+  // PATCH /api/admin/queue/:id
   const r = await api('PATCH', `/api/admin/queue/${moderateTargetId}`, { status, moderation_note });
   if (r.ok) { toast(`Content ${status}`, 'success'); closeModal('moderate-modal'); loadQueue(); }
   else toast(r.data.error || 'Action failed', 'error');
 }
 
-async function bulkAction(status) {
+async function bulkAction(action) {
   if (!selectedIds.size) return;
-  const r = await api('POST', '/api/admin/queue/bulk', { ids: [...selectedIds], status });
-  if (r.ok) { toast(`${r.data.updated} items ${status}`, 'success'); loadQueue(); }
+  // Backend expects POST /api/admin/queue/bulk-action with { action, ids }
+  const r = await api('POST', '/api/admin/queue/bulk-action', { action, ids: [...selectedIds] });
+  if (r.ok) { toast(`Items ${action}d`, 'success'); loadQueue(); }
   else toast(r.data.error || 'Bulk action failed', 'error');
 }
 
@@ -783,11 +787,13 @@ function updateBulkBar() {
 async function loadContent() {
   const status = document.getElementById('content-status-filter').value;
   const sport  = document.getElementById('content-sport-filter').value;
-  let url = '/api/content?limit=50';
-  if (sport) url += '&sport=' + encodeURIComponent(sport);
+  // Use the admin-protected endpoint, not the public /api/content
+  let url = '/api/admin/content?limit=50';
+  if (sport) url += '&search=' + encodeURIComponent(sport);
   const r = await api('GET', url);
   if (!r.ok) { toast('Failed to load content', 'error'); return; }
-  let items = r.data.content || [];
+  // Backend returns { data: [...] }
+  let items = r.data.data || [];
   if (status) items = items.filter(i => i.status === status);
   document.getElementById('content-count').textContent = items.length + ' items';
   const tbody = document.getElementById('content-tbody');
@@ -797,11 +803,11 @@ async function loadContent() {
   }
   tbody.innerHTML = items.map(item => `
     <tr>
-      <td style="max-width:200px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.title)}</td>
-      <td>${esc(item.display_name||'—')}</td>
+      <td style="max-width:200px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.title||'—')}</td>
+      <td>${esc(item.creator_name||item.display_name||'—')}</td>
       <td style="text-transform:capitalize">${esc(item.sport||'—')}</td>
       <td>${esc(item.media_type||'text')}</td>
-      <td><span class="badge badge-${item.status||'pending'}">${item.status||'pending'}</span></td>
+      <td><span class="badge badge-${item.status||'pending'}">${esc(item.status||'pending')}</span></td>
       <td class="td-mono">${fmtDate(item.created_at)}</td>
       <td>
         <button class="btn btn-secondary btn-sm" onclick="openModerateFromContent(${item.id})">Moderate</button>
@@ -826,9 +832,11 @@ function switchUserTab(el) {
 }
 
 async function loadUsers() {
+  // Pass type so backend filters the query
   const r = await api('GET', '/api/admin/users?type=' + currentUserTab);
   if (!r.ok) { toast('Failed to load users', 'error'); return; }
-  const users = r.data.users || [];
+  // Backend returns { data: [...] }
+  const users = r.data.data || [];
   const thead = document.getElementById('users-thead');
   const tbody = document.getElementById('users-tbody');
 
@@ -838,16 +846,16 @@ async function loadUsers() {
       ? `<tr><td colspan="8"><div class="empty"><p>No creators found</p></div></td></tr>`
       : users.map(u => `
         <tr>
-          <td style="font-weight:500">${esc(u.display_name||u.username)}</td>
-          <td class="td-mono">@${esc(u.username)}</td>
-          <td style="font-size:12px;color:var(--text-muted)">${esc(u.email)}</td>
+          <td style="font-weight:500">${esc(u.display_name || u.name || u.username || '—')}</td>
+          <td class="td-mono">${u.username ? '@' + esc(u.username) : '—'}</td>
+          <td style="font-size:12px;color:var(--text-muted)">${esc(u.email||'—')}</td>
           <td style="text-transform:capitalize">${esc(u.sport||'—')}</td>
           <td>${u.is_suspended ? '<span class="badge badge-suspended">Suspended</span>' : '<span class="badge badge-active">Active</span>'}</td>
           <td class="td-mono">${(u.follower_count||0).toLocaleString()}</td>
           <td class="td-mono">${fmtDate(u.created_at)}</td>
           <td>
             <div style="display:flex;gap:4px">
-              ${!u.is_verified ? `<button class="btn btn-secondary btn-sm" onclick="userAction('creator',${u.id},'verify')">Verify</button>` : ''}
+              ${!u.is_verified ? `<button class="btn btn-secondary btn-sm" onclick="userAction('creator',${u.id},'verify')">Verify</button>` : '<span style="font-size:11px;color:var(--green)">✓ Verified</span>'}
               ${u.is_suspended
                 ? `<button class="btn btn-success btn-sm" onclick="userAction('creator',${u.id},'reactivate')">Reactivate</button>`
                 : `<button class="btn btn-danger btn-sm" onclick="userAction('creator',${u.id},'suspend')">Suspend</button>`}
@@ -855,19 +863,19 @@ async function loadUsers() {
           </td>
         </tr>`).join('');
   } else {
-    thead.innerHTML = '<tr><th>Name</th><th>Email</th><th>Industry</th><th>Status</th><th>Joined</th><th>Actions</th></tr>';
+    thead.innerHTML = '<tr><th>Company</th><th>Email</th><th>Industry</th><th>Status</th><th>Joined</th><th>Actions</th></tr>';
     tbody.innerHTML = !users.length
       ? `<tr><td colspan="6"><div class="empty"><p>No businesses found</p></div></td></tr>`
       : users.map(u => `
         <tr>
-          <td style="font-weight:500">${esc(u.name)}</td>
-          <td style="font-size:12px;color:var(--text-muted)">${esc(u.email)}</td>
+          <td style="font-weight:500">${esc(u.name||u.company_name||'—')}</td>
+          <td style="font-size:12px;color:var(--text-muted)">${esc(u.email||'—')}</td>
           <td style="text-transform:capitalize">${esc(u.industry||'—')}</td>
           <td>${u.is_suspended ? '<span class="badge badge-suspended">Suspended</span>' : '<span class="badge badge-active">Active</span>'}</td>
           <td class="td-mono">${fmtDate(u.created_at)}</td>
           <td>
             <div style="display:flex;gap:4px">
-              ${!u.is_verified ? `<button class="btn btn-secondary btn-sm" onclick="userAction('business',${u.id},'verify')">Verify</button>` : ''}
+              ${!u.is_verified ? `<button class="btn btn-secondary btn-sm" onclick="userAction('business',${u.id},'verify')">Verify</button>` : '<span style="font-size:11px;color:var(--green)">✓ Verified</span>'}
               ${u.is_suspended
                 ? `<button class="btn btn-success btn-sm" onclick="userAction('business',${u.id},'reactivate')">Reactivate</button>`
                 : `<button class="btn btn-danger btn-sm" onclick="userAction('business',${u.id},'suspend')">Suspend</button>`}
@@ -878,8 +886,9 @@ async function loadUsers() {
 }
 
 async function userAction(type, id, action) {
+  // PATCH /api/admin/users/:type/:id
   const r = await api('PATCH', `/api/admin/users/${type}/${id}`, { action });
-  if (r.ok) { toast(`User ${action}d`, 'success'); loadUsers(); }
+  if (r.ok) { toast(`User ${action}d successfully`, 'success'); loadUsers(); }
   else toast(r.data.error || 'Action failed', 'error');
 }
 
@@ -892,7 +901,8 @@ async function loadAudit() {
   if (action) url += '&action=' + encodeURIComponent(action);
   const r = await api('GET', url);
   if (!r.ok) { toast('Failed to load audit log', 'error'); return; }
-  auditLogs = r.data.logs || [];
+  // Backend returns { data: [...] }
+  auditLogs = r.data.data || [];
   document.getElementById('audit-count').textContent = auditLogs.length + ' entries';
   const tbody = document.getElementById('audit-tbody');
   if (!auditLogs.length) {
@@ -903,10 +913,10 @@ async function loadAudit() {
     <tr>
       <td class="td-mono" style="font-size:11px">${l.id}</td>
       <td class="td-mono">${l.actor_id || '—'}</td>
-      <td><span class="badge badge-${l.actor_type === 'admin' ? 'admin' : l.actor_type === 'user' ? 'active' : 'pending'}">${l.actor_type||'—'}</span></td>
+      <td><span class="badge badge-${l.actor_type === 'admin' ? 'admin' : l.actor_type === 'user' ? 'active' : 'pending'}">${esc(l.actor_type||'—')}</span></td>
       <td style="font-family:var(--mono);font-size:12px;color:var(--accent)">${esc(l.action)}</td>
       <td class="td-mono">${l.target_type ? esc(l.target_type) + ' #' + l.target_id : '—'}</td>
-      <td class="td-mono" style="font-size:11px">${l.ip || '—'}</td>
+      <td class="td-mono" style="font-size:11px">${esc(l.ip_address || l.ip || '—')}</td>
       <td><pre class="json-pre">${esc(JSON.stringify(l.meta || {}, null, 1))}</pre></td>
       <td class="td-mono">${fmtDate(l.created_at)}</td>
     </tr>`).join('');
@@ -937,6 +947,7 @@ document.getElementById('password-form').addEventListener('submit', async (e) =>
   errEl.style.display = 'none';
   if (newPw !== confirm) { errEl.textContent = 'Passwords do not match'; errEl.style.display = 'block'; return; }
   btn.disabled = true; btn.textContent = 'Updating…';
+  // PATCH /api/admin/settings/password
   const r = await api('PATCH', '/api/admin/settings/password', { current_password: current, new_password: newPw });
   btn.disabled = false; btn.textContent = 'Update password';
   if (r.ok) { toast('Password updated', 'success'); e.target.reset(); }
@@ -950,7 +961,7 @@ function setApiBase() {
   localStorage.setItem('px_api_base', val);
   document.getElementById('api-base-display').textContent = val;
   document.getElementById('topbar-env').textContent = 'API: ' + val;
-  toast('API base URL updated', 'success');
+  toast('API base URL updated — refresh to reconnect', 'success');
 }
 
 // ── Modal ─────────────────────────────────────────────────────────────────
@@ -961,7 +972,9 @@ function closeModal(id) {
 document.querySelectorAll('.modal-overlay').forEach(m => {
   m.addEventListener('click', e => { if (e.target === m) closeModal(m.id); });
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => closeModal(m.id)); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => closeModal(m.id));
+});
 
 // ── Toast ─────────────────────────────────────────────────────────────────
 function toast(msg, type = 'info') {
