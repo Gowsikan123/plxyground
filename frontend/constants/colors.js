@@ -12,4 +12,14 @@ export const Colors = {
   success: '#44BB44',
   warning: '#FFAA00',
   overlay: 'rgba(0,0,0,0.7)',
+  // Spec aliases
+  primary: '#FF6B00',
+  primaryDark: '#CC5500',
+  primarySubtle: '#FF6B0020',
+  primaryAlpha: '#FF6B0033',
+  background: '#0A0A0A',
+  textPrimary: '#FFFFFF',
 };
+
+// Uppercase alias used by auth screens
+export const COLORS = Colors;
