@@ -8,42 +8,99 @@ const { validationErrorHandler } = require('../../middleware/validate');
 
 const router = express.Router();
 
+// GET /api/admin/queue?status=pending&content_type=&limit=&offset=
+// Frontend reads: r.data.data (array), item.title_or_name, item.submitted_by, item.type, item.status, item.created_at
 router.get('/', requireAdmin, (req, res) => {
   try {
-    const status = req.query.status || 'pending';
+    const status       = req.query.status || 'pending';
     const content_type = req.query.content_type || '';
-    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
-    const offset = parseInt(req.query.offset) || 0;
+    const limit        = Math.min(parseInt(req.query.limit)  || 50, 200);
+    const offset       = parseInt(req.query.offset) || 0;
 
-    let where = 'WHERE mq.status = ?';
+    let where  = 'WHERE mq.status = ?';
     const params = [status];
     if (content_type) {
       where += ' AND mq.content_type = ?';
       params.push(content_type);
     }
 
-    const rows = db
-      .prepare(
-        `SELECT mq.*, 
-          CASE WHEN mq.content_type = 'creator_content' THEN c.title ELSE bc.title END as content_title,
-          CASE WHEN mq.content_type = 'creator_content' THEN cr.display_name ELSE b.company_name END as author_name
-        FROM moderation_queue mq
-        LEFT JOIN content c ON mq.content_type = 'creator_content' AND mq.content_id = c.id
-        LEFT JOIN creators cr ON c.creator_id = cr.id
-        LEFT JOIN business_content bc ON mq.content_type = 'business_content' AND mq.content_id = bc.id
-        LEFT JOIN businesses b ON bc.business_id = b.id
-        ${where}
-        ORDER BY mq.submitted_at DESC LIMIT ? OFFSET ?`
-      )
-      .all(...params, limit, offset);
+    const rows = db.prepare(
+      `SELECT
+         mq.id,
+         mq.content_id,
+         mq.content_type,
+         mq.status,
+         mq.review_note,
+         mq.reviewed_at,
+         mq.submitted_at          AS created_at,
+         CASE
+           WHEN mq.content_type = 'creator_content' THEN c.title
+           ELSE bc.title
+         END                      AS title_or_name,
+         CASE
+           WHEN mq.content_type = 'creator_content' THEN cr.display_name
+           ELSE b.company_name
+         END                      AS submitted_by,
+         CASE
+           WHEN mq.content_type = 'creator_content' THEN 'creator'
+           ELSE 'business'
+         END                      AS type
+       FROM moderation_queue mq
+       LEFT JOIN content          c  ON mq.content_type = 'creator_content'  AND mq.content_id = c.id
+       LEFT JOIN creators         cr ON c.creator_id = cr.id
+       LEFT JOIN business_content bc ON mq.content_type = 'business_content' AND mq.content_id = bc.id
+       LEFT JOIN businesses       b  ON bc.business_id = b.id
+       ${where}
+       ORDER BY mq.submitted_at DESC
+       LIMIT ? OFFSET ?`
+    ).all(...params, limit, offset);
 
-    const total = db.prepare(`SELECT COUNT(*) as n FROM moderation_queue mq ${where}`).get(...params).n;
-    return res.json({ success: true, data: { items: rows, total, limit, offset } });
+    const total = db.prepare(
+      `SELECT COUNT(*) as n FROM moderation_queue mq ${where}`
+    ).get(...params).n;
+
+    // Frontend: const queue = r.data.data || []
+    return res.json({ success: true, data: rows, total, limit, offset });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
 });
 
+// PATCH /api/admin/queue/:id  { status, moderation_note }
+// Called by quickModerate() and submitModerate() in the admin panel
+router.patch('/:id', requireAdmin, [
+  body('status').isIn(['approved', 'rejected']).withMessage('status must be approved or rejected'),
+], validationErrorHandler, (req, res) => {
+  try {
+    const { status, moderation_note = '' } = req.body;
+    const item = db.prepare('SELECT * FROM moderation_queue WHERE id = ?').get(req.params.id);
+    if (!item) return res.status(404).json({ success: false, error: 'Queue item not found' });
+
+    db.prepare(
+      'UPDATE moderation_queue SET status=?, reviewed_by=?, review_note=?, reviewed_at=CURRENT_TIMESTAMP WHERE id=?'
+    ).run(status, req.admin.id, moderation_note, item.id);
+
+    const contentStatus = status === 'approved' ? 'published' : 'rejected';
+    const table = item.content_type === 'creator_content' ? 'content' : 'business_content';
+    db.prepare(`UPDATE ${table} SET status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`).run(contentStatus, item.content_id);
+
+    audit.log({
+      actor_type : 'admin',
+      actor_id   : req.admin.id,
+      action     : status === 'approved' ? 'QUEUE_APPROVED' : 'QUEUE_REJECTED',
+      target_type: item.content_type,
+      target_id  : item.content_id,
+      metadata   : { queue_id: item.id, note: moderation_note },
+      ip_address : req.ip,
+    });
+
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/admin/queue/bulk-action
 router.post(
   '/bulk-action',
   requireAdmin,
@@ -66,20 +123,21 @@ router.post(
           else if (action === 'reject') { queueStatus = 'rejected'; contentStatus = 'rejected'; }
           else { queueStatus = 'rejected'; contentStatus = 'deleted'; }
 
-          db.prepare('UPDATE moderation_queue SET status=?, reviewed_by=?, review_note=?, reviewed_at=CURRENT_TIMESTAMP WHERE id=?')
-            .run(queueStatus, req.admin.id, note, id);
+          db.prepare(
+            'UPDATE moderation_queue SET status=?, reviewed_by=?, review_note=?, reviewed_at=CURRENT_TIMESTAMP WHERE id=?'
+          ).run(queueStatus, req.admin.id, note, id);
 
           const table = item.content_type === 'creator_content' ? 'content' : 'business_content';
           db.prepare(`UPDATE ${table} SET status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`).run(contentStatus, item.content_id);
 
           audit.log({
-            actor_type: 'admin',
-            actor_id: req.admin.id,
-            action: `QUEUE_${action.toUpperCase()}`,
+            actor_type : 'admin',
+            actor_id   : req.admin.id,
+            action     : `QUEUE_${action.toUpperCase()}`,
             target_type: item.content_type,
-            target_id: item.content_id,
-            metadata: { queue_id: id, note },
-            ip_address: req.ip,
+            target_id  : item.content_id,
+            metadata   : { queue_id: id, note },
+            ip_address : req.ip,
           });
         }
       });
