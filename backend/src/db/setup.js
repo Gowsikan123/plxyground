@@ -121,10 +121,14 @@ function setupDatabase() {
     );
   `);
 
-  logger.info('Database schema ready.');
+  logger.info('Database schema initialised');
+  autoSeed();
+}
 
-  const adminCount = db.prepare('SELECT COUNT(*) as c FROM admins').get().c;
-  if (adminCount === 0) {
+function autoSeed() {
+  const count = db.prepare('SELECT COUNT(*) as c FROM admins').get();
+  if (count.c === 0) {
+    logger.info('Empty database detected — running seed...');
     const { seedDatabase } = require('./seed');
     seedDatabase();
   }
