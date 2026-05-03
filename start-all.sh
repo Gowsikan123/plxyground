@@ -1,43 +1,51 @@
 #!/usr/bin/env bash
 set -e
 
-ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
-
-echo "[PLXYGROUND] Starting all services..."
+echo ""
+echo "=== PLXYGROUND — Starting all services ==="
+echo ""
 
 # Backend
-cd "$ROOT_DIR/backend"
-if [ ! -d node_modules ]; then
-  echo "[backend] Installing dependencies..."
-  npm install
+if [ ! -f backend/.env ]; then
+  cp backend/.env.example backend/.env
+  echo "  Created backend/.env from example"
 fi
-npm run start > "$ROOT_DIR/backend.log" 2>&1 &
-BACKEND_PID=$!
-echo "[backend] Started (PID $BACKEND_PID) → http://localhost:3011"
-
-# Admin panel
-cd "$ROOT_DIR/admin-panel"
-if [ ! -d node_modules ]; then
-  echo "[admin-panel] Installing dependencies..."
-  npm install
-fi
-npm run start > "$ROOT_DIR/admin-panel.log" 2>&1 &
-ADMIN_PID=$!
-echo "[admin-panel] Started (PID $ADMIN_PID) → http://localhost:3012"
 
 # Frontend
-cd "$ROOT_DIR/frontend"
-if [ ! -d node_modules ]; then
-  echo "[frontend] Installing dependencies..."
-  npm install
+if [ ! -f frontend/.env ]; then
+  cp frontend/.env.example frontend/.env
+  echo "  Created frontend/.env from example"
 fi
-npm run start > "$ROOT_DIR/frontend.log" 2>&1 &
-FRONTEND_PID=$!
-echo "[frontend] Started (PID $FRONTEND_PID) → http://localhost:19006"
+
+echo "  Installing backend deps..."
+(cd backend && npm install --silent)
+
+echo "  Installing frontend deps..."
+(cd frontend && npm install --silent)
+
+echo "  Installing admin-panel deps..."
+(cd admin-panel && npm install --silent)
 
 echo ""
-echo "All services running. Logs: backend.log | admin-panel.log | frontend.log"
-echo "Press Ctrl+C to stop all."
+echo "  Starting backend on port 3011..."
+(cd backend && npm run dev) &
+BACKEND_PID=$!
 
-trap "kill $BACKEND_PID $ADMIN_PID $FRONTEND_PID 2>/dev/null; echo 'All services stopped.'" INT
+echo "  Starting admin-panel on port 3012..."
+(cd admin-panel && node server.js) &
+ADMIN_PID=$!
+
+echo "  Starting frontend (Expo)..."
+(cd frontend && npx expo start) &
+FRONTEND_PID=$!
+
+echo ""
+echo "  Backend:      http://localhost:3011"
+echo "  Admin Panel:  http://localhost:3012"
+echo "  Frontend:     http://localhost:19006 (Expo)"
+echo ""
+echo "  Press Ctrl+C to stop all services"
+echo ""
+
+trap "kill $BACKEND_PID $ADMIN_PID $FRONTEND_PID 2>/dev/null; echo 'All services stopped.'; exit 0" INT TERM
 wait
