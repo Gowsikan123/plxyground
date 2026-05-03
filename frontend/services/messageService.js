@@ -1,39 +1,21 @@
-import api from './api';
+import { apiCall } from './api';
 
 export const messageService = {
-  async getConversations() {
-    try {
-      const { data } = await api.get('/messages/conversations');
-      return { data: data.data, error: null };
-    } catch (e) {
-      return { data: null, error: e.response?.data?.error ?? e.message };
-    }
-  },
+  getConversations: () =>
+    apiCall((api) => api.get('/api/messages/conversations')),
 
-  async getThread(receiverType, receiverId) {
-    try {
-      const { data } = await api.get(`/messages/${receiverType}/${receiverId}`);
-      return { data: data.data, error: null };
-    } catch (e) {
-      return { data: null, error: e.response?.data?.error ?? e.message };
-    }
-  },
+  getThread: (receiverType, receiverId) =>
+    apiCall((api) => api.get(`/api/messages/${receiverType}/${receiverId}`)),
 
-  async send({ receiverType, receiverId, body }) {
-    try {
-      const { data } = await api.post('/messages', { receiver_type: receiverType, receiver_id: receiverId, body });
-      return { data: data.data, error: null };
-    } catch (e) {
-      return { data: null, error: e.response?.data?.error ?? e.message };
-    }
-  },
+  send: ({ receiverType, receiverId, body }) =>
+    apiCall((api) =>
+      api.post('/api/messages', {
+        receiver_type: receiverType,
+        receiver_id: receiverId,
+        body,
+      })
+    ),
 
-  async markRead(messageId) {
-    try {
-      const { data } = await api.patch(`/messages/${messageId}/read`);
-      return { data: data.data, error: null };
-    } catch (e) {
-      return { data: null, error: e.response?.data?.error ?? e.message };
-    }
-  },
+  markRead: (messageId) =>
+    apiCall((api) => api.patch(`/api/messages/${messageId}/read`)),
 };

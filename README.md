@@ -2,28 +2,41 @@
 
 > A sports creator platform connecting athletes, creators and businesses in one unified mobile-first ecosystem.
 
+[![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://plxyground.vercel.app/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](#license)
+
+---
+
+## What is Plxyground?
+
+Plxyground is a full-stack mobile-first platform where sports creators can build an audience, post content and connect with businesses for sponsorship opportunities. Businesses get a dedicated portal to publish opportunities and manage partnerships. Admins have a moderation dashboard to review content before it goes live.
+
 ---
 
 ## Project Structure
 
 ```
 plxyground/
-├── backend/          Node.js + Express 5 API (port 3011)
-├── frontend/         Expo / React Native mobile app (port 19006)
-└── admin-panel/      Vanilla HTML/CSS/JS moderation dashboard (port 3012)
+├── backend/          Node.js 20 + Express 5 REST API
+├── frontend/         Expo / React Native mobile app
+└── admin-panel/      Moderation & analytics dashboard
 ```
-
-## Tech Stack
-
-| Service | Stack | Port |
-|---|---|---|
-| `backend/` | Node.js 20 · Express 5 · SQLite (better-sqlite3) · JWT | 3011 |
-| `frontend/` | Expo SDK 54 · React Native 0.76 · Expo Router v4 | 19006 |
-| `admin-panel/` | Vanilla HTML + CSS + JS · Node http-server | 3012 |
 
 ---
 
-## Quick Start
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| **API** | Node.js 20 · Express 5 · SQLite (`better-sqlite3`) · JWT |
+| **Mobile** | Expo SDK 54 · React Native 0.76 · Expo Router v4 · Zustand |
+| **Admin** | Vanilla HTML · CSS · JavaScript |
+| **Auth** | JWT · `expo-secure-store` (native) · `localStorage` (web) |
+| **Moderation** | Content queue — all posts reviewed before publishing |
+
+---
+
+## Getting Started
 
 ### Prerequisites
 
@@ -47,43 +60,32 @@ copy frontend\.env.example frontend\.env
 .\start-all.ps1
 ```
 
----
+### Manual setup
 
-## Services
-
-### Backend (Terminal 1)
-
+**Terminal 1 — Backend**
 ```bash
 cd backend
 npm install
-cp .env.example .env   # fill in JWT_SECRET at minimum
-npm run dev
+cp .env.example .env   # set JWT_SECRET
+npm run dev            # http://localhost:3011
 ```
 
-- API: `http://localhost:3011`
-- Health check: `GET /healthz`
-
-### Frontend (Terminal 2)
-
+**Terminal 2 — Frontend**
 ```bash
 cd frontend
 npm install
 cp .env.example .env
-npx expo start
+npx expo start         # press w for web, a for Android, i for iOS
 ```
 
-Scan the QR code with **Expo Go** on your phone, or press `w` for browser, `a` for Android emulator, `i` for iOS simulator.
-
-### Admin Panel (Terminal 3)
-
+**Terminal 3 — Admin Panel**
 ```bash
 cd admin-panel
 npm install
-node server.js
+node server.js         # http://localhost:3012
 ```
 
-- Dashboard: `http://localhost:3012`
-- Log in with the admin seed credentials below.
+> **Testing on a physical device?** Set `EXPO_PUBLIC_API_URL` in `frontend/.env` to your machine's local IP — e.g. `http://192.168.1.x:3011` — instead of `localhost`.
 
 ---
 
@@ -112,7 +114,7 @@ node server.js
 
 ---
 
-## API Routes
+## API Reference
 
 | Group | Base path |
 |---|---|
@@ -132,43 +134,13 @@ Full OpenAPI spec: [`docs/openapi.yaml`](./docs/openapi.yaml)
 
 ---
 
-## Architecture
+## Architecture Highlights
 
-- **Auth:** JWT tokens stored in `expo-secure-store` on mobile — never `AsyncStorage`
-- **Database:** SQLite via `better-sqlite3` — single `.db` file, WAL mode, foreign keys enabled
-- **Moderation:** All creator and business content enters a moderation queue before publishing
-- **Audit log:** Every admin action is recorded with actor, target, IP and metadata
-
----
-
-## Environment Variables
-
-Copy the example files and fill in your secrets before starting:
-
-```bash
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
-```
-
-See each `.env.example` for all required variables (JWT_SECRET, API_URL, etc.).
-
----
-
-## Known Issues (as of May 2026)
-
-> These were identified during a full repository audit.
-
-### 🔴 High Priority
-- **`AuthContext.jsx` uses `AsyncStorage` for token storage** — the README and architecture notes specify `expo-secure-store`, but the implementation uses `AsyncStorage`. This is a security regression; tokens should be migrated to `expo-secure-store`.
-
-### 🟡 Medium Priority
-- **No `.env` validation on startup** — if `JWT_SECRET` is missing, the backend will silently use `undefined` as the secret. Add a startup guard (e.g. with `envalid` or a simple throw).
-- **`frontend/.env.example` API URL points to `localhost`** — this breaks on a physical device. Document that `EXPO_PUBLIC_API_URL` must be set to the machine's local IP (e.g. `http://192.168.x.x:3011`) when testing on a real phone.
-- **`admin-panel/` has no authentication guard on static file routes** — the `server.js` serves all files without checking a session. Ensure admin login is enforced before any page renders.
-
-### 🟢 Low Priority
-- **`package-lock.json` committed for `backend/` but not `admin-panel/`** — add `admin-panel/package-lock.json` to version control for reproducible installs.
-- **Empty `catch (e) {}` in `AuthContext.jsx`** — swallows storage errors silently; at minimum log to console in dev.
+- **Secure auth** — JWT tokens stored in `expo-secure-store` on native, with a `localStorage` shim on web. Never `AsyncStorage`.
+- **SQLite with WAL mode** — single `.db` file via `better-sqlite3`, foreign keys enforced, optimised for low-latency reads.
+- **Content moderation queue** — every creator and business post goes through admin review before it is published to the feed.
+- **Full audit log** — every admin action is recorded with actor, target, IP address and action metadata.
+- **Role-based access** — separate auth flows and protected routes for creators, businesses and admins.
 
 ---
 

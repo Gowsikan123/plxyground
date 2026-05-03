@@ -1,58 +1,25 @@
-import api from './api';
+import { apiCall } from './api';
 
 export const businessService = {
-  /**
-   * Business me — own profile.
-   */
-  async getMe() {
-    const res = await api.get('/api/business/auth/me');
-    return res.data;
-  },
+  getMe: () =>
+    apiCall((api) => api.get('/api/business/auth/me')),
 
-  /**
-   * Update business account details.
-   * @param {Partial<{ company_name, industry, location, bio, website_url, logo_url }>} data
-   */
-  async updateAccount(data) {
-    const res = await api.patch('/api/business/auth/me', data);
-    return res.data;
-  },
+  updateAccount: (data) =>
+    apiCall((api) => api.patch('/api/business/auth/me', data)),
 
-  /**
-   * Fetch own business content.
-   * @param {{ page?, limit? }} params
-   */
-  async getMyContent(params = {}) {
-    const res = await api.get('/api/business/content', { params });
-    return res.data;
-  },
+  getMyContent: (params = {}) =>
+    apiCall((api) => api.get('/api/business/content', { params })),
 
-  /**
-   * Create business content post.
-   * @param {{ title, body, media_url?, media_type? }} data
-   */
-  async createContent(data) {
-    const res = await api.post('/api/business/content', data);
-    return res.data;
-  },
+  createContent: (data) =>
+    apiCall((api) => api.post('/api/business/content', data)),
 
-  /**
-   * Delete business content.
-   * @param {number} id
-   */
-  async deleteContent(id) {
-    const res = await api.delete(`/api/business/content/${id}`);
-    return res.data;
-  },
+  deleteContent: (id) =>
+    apiCall((api) => api.delete(`/api/business/content/${id}`)),
 
-  /**
-   * Fetch own business opportunities.
-   * @param {{ page?, limit? }} params
-   */
-  async getMyOpportunities(params = {}) {
-    const res = await api.get('/api/opportunities', { params: { ...params, type: 'business' } });
-    return res.data;
-  },
+  getMyOpportunities: (params = {}) =>
+    apiCall((api) =>
+      api.get('/api/opportunities', { params: { ...params, type: 'business' } })
+    ),
 };
 
 export default businessService;

@@ -19,8 +19,10 @@ export function useFeed() {
     if (err) {
       setError(err);
     } else {
-      setPosts(reset ? data.data : (prev) => [...prev, ...data.data]);
-      setTotal(data.meta.total);
+      const items = data?.data ?? [];
+      const metaTotal = data?.meta?.total ?? 0;
+      setPosts(reset ? items : (prev) => [...prev, ...items]);
+      setTotal(metaTotal);
       setPage(targetPage + 1);
     }
     reset ? setIsRefreshing(false) : setIsLoading(false);

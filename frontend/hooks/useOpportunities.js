@@ -19,8 +19,10 @@ export function useOpportunities() {
     if (err) {
       setError(err);
     } else {
-      setItems(reset ? data.data : (prev) => [...prev, ...data.data]);
-      setTotal(data.meta.total);
+      const fetched = data?.data ?? [];
+      const metaTotal = data?.meta?.total ?? 0;
+      setItems(reset ? fetched : (prev) => [...prev, ...fetched]);
+      setTotal(metaTotal);
       setPage(targetPage + 1);
     }
     reset ? setIsRefreshing(false) : setIsLoading(false);

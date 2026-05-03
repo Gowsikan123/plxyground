@@ -1,39 +1,15 @@
-import api from './api';
+import { apiCall } from './api';
 
 export const notificationService = {
-  async getAll() {
-    try {
-      const { data } = await api.get('/notifications');
-      return { data: data.data, error: null };
-    } catch (e) {
-      return { data: null, error: e.response?.data?.error ?? e.message };
-    }
-  },
+  getAll: () =>
+    apiCall((api) => api.get('/api/notifications')),
 
-  async markRead(id) {
-    try {
-      const { data } = await api.patch(`/notifications/${id}/read`);
-      return { data: data.data, error: null };
-    } catch (e) {
-      return { data: null, error: e.response?.data?.error ?? e.message };
-    }
-  },
+  markRead: (id) =>
+    apiCall((api) => api.patch(`/api/notifications/${id}/read`)),
 
-  async markAllRead() {
-    try {
-      const { data } = await api.patch('/notifications/read-all');
-      return { data: data.data, error: null };
-    } catch (e) {
-      return { data: null, error: e.response?.data?.error ?? e.message };
-    }
-  },
+  markAllRead: () =>
+    apiCall((api) => api.patch('/api/notifications/read-all')),
 
-  async deleteNotification(id) {
-    try {
-      const { data } = await api.delete(`/notifications/${id}`);
-      return { data: data.data, error: null };
-    } catch (e) {
-      return { data: null, error: e.response?.data?.error ?? e.message };
-    }
-  },
+  deleteNotification: (id) =>
+    apiCall((api) => api.delete(`/api/notifications/${id}`)),
 };
