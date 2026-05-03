@@ -1,40 +1,49 @@
 import { useAuthStore } from '../store/authStore';
-import { authService } from '../services/authService';
+import {
+  creatorLogin as svcCreatorLogin,
+  businessLogin as svcBusinessLogin,
+  creatorSignup as svcCreatorSignup,
+  businessSignup as svcBusinessSignup,
+} from '../services/authService';
 
 /**
  * Convenience hook that surfaces everything auth screens need.
- * Aliases signIn → login and adds a loading state.
+ * All service calls return { data, error } from apiCall().
  */
 export function useAuth() {
   const store = useAuthStore();
 
   const creatorLogin = async (email, password) => {
-    const { data } = await authService.creatorLogin(email, password);
-    await store.signIn(data.token, data.user, 'creator');
-    return data;
+    const { data, error } = await svcCreatorLogin(email, password);
+    if (error) throw new Error(error);
+    await store.signIn(data.data.token, data.data.user, 'creator');
+    return data.data;
   };
 
   const businessLogin = async (email, password) => {
-    const { data } = await authService.businessLogin(email, password);
-    await store.signIn(data.token, data.user, 'business');
-    return data;
+    const { data, error } = await svcBusinessLogin(email, password);
+    if (error) throw new Error(error);
+    await store.signIn(data.data.token, data.data.user, 'business');
+    return data.data;
   };
 
   const creatorSignup = async (payload) => {
-    const { data } = await authService.creatorSignup(payload);
-    await store.signIn(data.token, data.user, 'creator');
-    return data;
+    const { data, error } = await svcCreatorSignup(payload);
+    if (error) throw new Error(error);
+    await store.signIn(data.data.token, data.data.user, 'creator');
+    return data.data;
   };
 
   const businessSignup = async (payload) => {
-    const { data } = await authService.businessSignup(payload);
-    await store.signIn(data.token, data.user, 'business');
-    return data;
+    const { data, error } = await svcBusinessSignup(payload);
+    if (error) throw new Error(error);
+    await store.signIn(data.data.token, data.data.user, 'business');
+    return data.data;
   };
 
   return {
     ...store,
-    // alias so screens that call useAuth().login() still work
+    // alias so any screen calling useAuth().login() still works
     login: creatorLogin,
     loading: store.isLoading,
     creatorLogin,
