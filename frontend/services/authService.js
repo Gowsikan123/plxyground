@@ -10,13 +10,24 @@ export const creatorMe = () =>
   apiCall((api) => api.get('/api/auth/me'));
 
 export const businessSignup = (payload) =>
-  apiCall((api) => api.post('/api/business-auth/signup', payload));
+  apiCall((api) => api.post('/api/business/auth/signup', payload));
 
 export const businessLogin = (email, password) =>
-  apiCall((api) => api.post('/api/business-auth/login', { email, password }));
+  apiCall((api) => api.post('/api/business/auth/login', { email, password }));
 
 export const businessMe = () =>
-  apiCall((api) => api.get('/api/business-auth/me'));
+  apiCall((api) => api.get('/api/business/auth/me'));
 
 export const updateBusinessProfile = (payload) =>
-  apiCall((api) => api.patch('/api/business-auth/me', payload));
+  apiCall((api) => api.put('/api/business/auth/me', payload));
+
+// Named object so hooks can do: authService.creatorLogin(...)
+export const authService = {
+  creatorSignup,
+  creatorLogin,
+  creatorMe,
+  businessSignup,
+  businessLogin,
+  businessMe,
+  updateBusinessProfile,
+};
