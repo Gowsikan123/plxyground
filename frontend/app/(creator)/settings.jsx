@@ -1,78 +1,189 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Switch } from 'react-native';
+import {
+  View, Text, TouchableOpacity, StyleSheet,
+  ScrollView, StatusBar,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../store/authStore';
 import BottomNav from '../../components/BottomNav';
 import { C, R } from '../../components/theme';
 
-export default function Settings() {
-  const logout = useAuthStore((s) => s.logout);
-  const router = useRouter();
-
-  const Row = ({ label, onPress, danger, right }) => (
-    <TouchableOpacity style={[s.row, danger && s.dangerRow]} onPress={onPress} activeOpacity={0.7}>
-      <Text style={[s.rowLabel, danger && s.dangerLabel]}>{label}</Text>
-      {right ?? <Text style={s.chevron}>›</Text>}
+function SettingRow({ icon, label, onPress, danger, right, subtitle }) {
+  return (
+    <TouchableOpacity
+      style={[s.row, danger && s.dangerRow]}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
+      {icon ? (
+        <View style={[s.rowIcon, danger && s.rowIconDanger]}>
+          <Text style={s.rowIconText}>{icon}</Text>
+        </View>
+      ) : null}
+      <View style={{ flex: 1 }}>
+        <Text style={[s.rowLabel, danger && s.dangerLabel]}>{label}</Text>
+        {subtitle ? <Text style={s.rowSub}>{subtitle}</Text> : null}
+      </View>
+      {right !== null && (
+        right ?? <Text style={s.chevron}>›</Text>
+      )}
     </TouchableOpacity>
   );
+}
+
+export default function Settings() {
+  const logout = useAuthStore(s => s.logout);
+  const user   = useAuthStore(s => s.user);
+  const router = useRouter();
 
   return (
-    <SafeAreaView style={s.safe}>
-      <View style={s.topBar}>
+    <View style={s.page}>
+      <StatusBar barStyle="light-content" backgroundColor={C.bg} />
+
+      {/* ── Header ── */}
+      <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
-          <Text style={s.back}>‹ Back</Text>
+          <Text style={s.backText}>‹ Back</Text>
         </TouchableOpacity>
-        <Text style={s.title}>Settings</Text>
+        <View style={s.headerCenter}>
+          <View style={s.accentBar} />
+          <Text style={s.headerTitle}>SETTINGS</Text>
+        </View>
         <View style={{ width: 60 }} />
       </View>
 
-      <ScrollView contentContainerStyle={s.scroll}>
-        <Text style={s.groupLabel}>Account</Text>
-        <View style={s.group}>
-          <Row label="Edit Profile"       onPress={() => {}} />
-          <Row label="Change Password"    onPress={() => {}} />
-          <Row label="Notifications"      onPress={() => {}} />
+      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+
+        {/* ── User card ── */}
+        <View style={s.userCard}>
+          <View style={s.userAvatarPlaceholder}>
+            <Text style={s.userAvatarInitial}>
+              {(user?.display_name || user?.username || 'U')[0].toUpperCase()}
+            </Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.userName}>{user?.display_name || user?.username || 'Creator'}</Text>
+            <Text style={s.userHandle}>@{user?.username}</Text>
+            {user?.sport ? <Text style={s.userSport}>{user.sport}</Text> : null}
+          </View>
+          <View style={s.planBadge}>
+            <Text style={s.planText}>CREATOR</Text>
+          </View>
         </View>
 
-        <Text style={s.groupLabel}>Content</Text>
+        {/* ── Account ── */}
+        <Text style={s.groupLabel}>ACCOUNT</Text>
         <View style={s.group}>
-          <Row label="My Posts"           onPress={() => {}} />
-          <Row label="Drafts"             onPress={() => {}} />
+          <SettingRow
+            icon="✏️"
+            label="Edit Profile"
+            subtitle="Name, bio, sport, location"
+            onPress={() => router.push('/(creator)/profile')}
+          />
+          <SettingRow
+            icon="🔒"
+            label="Change Password"
+            subtitle="Update your login credentials"
+            onPress={() => {}}
+          />
+          <SettingRow
+            icon="🔔"
+            label="Notifications"
+            subtitle="Push, email preferences"
+            onPress={() => {}}
+          />
         </View>
 
-        <Text style={s.groupLabel}>Legal</Text>
+        {/* ── Content ── */}
+        <Text style={s.groupLabel}>CONTENT</Text>
         <View style={s.group}>
-          <Row label="Terms of Service"   onPress={() => router.push('/terms')} />
-          <Row label="Privacy Policy"     onPress={() => router.push('/privacy')} />
+          <SettingRow
+            icon="📝"
+            label="My Posts"
+            subtitle="View and manage your content"
+            onPress={() => router.push('/(creator)/profile')}
+          />
+          <SettingRow
+            icon="📂"
+            label="Drafts"
+            subtitle="Continue unfinished posts"
+            onPress={() => {}}
+          />
         </View>
 
-        <Text style={s.groupLabel}>Session</Text>
+        {/* ── Legal ── */}
+        <Text style={s.groupLabel}>LEGAL</Text>
         <View style={s.group}>
-          <Row
+          <SettingRow
+            icon="📄"
+            label="Terms of Service"
+            onPress={() => {}}
+          />
+          <SettingRow
+            icon="🔐"
+            label="Privacy Policy"
+            onPress={() => {}}
+          />
+        </View>
+
+        {/* ── Session ── */}
+        <Text style={s.groupLabel}>SESSION</Text>
+        <View style={s.group}>
+          <SettingRow
+            icon="🚪"
             label="Sign Out"
             danger
             onPress={() => { logout(); router.replace('/'); }}
             right={null}
           />
         </View>
+
+        {/* ── Version ── */}
+        <Text style={s.versionText}>PLXYGROUND · v1.0.0</Text>
+
       </ScrollView>
 
       <BottomNav />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  safe:        { flex: 1, backgroundColor: C.bg },
-  topBar:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border },
-  back:        { color: C.accent, fontSize: 16, fontWeight: '600' },
-  title:       { color: C.text, fontSize: 17, fontWeight: '800' },
-  scroll:      { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 120 },
-  groupLabel:  { color: C.textFaint, fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8, marginTop: 20 },
-  group:       { backgroundColor: C.surface, borderRadius: R.lg, borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
-  row:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: C.border },
-  rowLabel:    { color: C.text, fontSize: 15 },
-  chevron:     { color: C.textFaint, fontSize: 20 },
-  dangerRow:   { backgroundColor: 'rgba(255,60,60,0.05)' },
-  dangerLabel: { color: '#FF6060' },
+  page:              { flex: 1, backgroundColor: C.bg },
+
+  // Header
+  header:            { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 56, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: C.border },
+  backText:          { color: C.accent, fontSize: 16, fontWeight: '700', width: 60 },
+  headerCenter:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  accentBar:         { width: 3, height: 16, backgroundColor: C.accent, borderRadius: 2 },
+  headerTitle:       { color: C.text, fontSize: 13, fontWeight: '900', letterSpacing: 2 },
+
+  scroll:            { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 120 },
+
+  // User card
+  userCard:          { flexDirection: 'row', alignItems: 'center', backgroundColor: C.surface, borderRadius: R.xl, padding: 16, borderWidth: 1, borderColor: C.border, gap: 14, marginBottom: 24 },
+  userAvatarPlaceholder: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,107,0,0.3)' },
+  userAvatarInitial: { color: C.accent, fontSize: 22, fontWeight: '900' },
+  userName:          { color: C.text, fontSize: 16, fontWeight: '900' },
+  userHandle:        { color: C.textMuted, fontSize: 12, marginTop: 1 },
+  userSport:         { color: C.accent, fontSize: 11, fontWeight: '700', marginTop: 2 },
+  planBadge:         { backgroundColor: C.accentDim, borderRadius: R.full, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(255,107,0,0.25)' },
+  planText:          { color: C.accent, fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+
+  // Groups
+  groupLabel:        { color: C.textFaint, fontSize: 10, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
+  group:             { backgroundColor: C.surface, borderRadius: R.xl, borderWidth: 1, borderColor: C.border, overflow: 'hidden', marginBottom: 12 },
+
+  // Rows
+  row:               { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border, gap: 12 },
+  rowIcon:           { width: 34, height: 34, borderRadius: R.md, backgroundColor: C.surface2, alignItems: 'center', justifyContent: 'center' },
+  rowIconDanger:     { backgroundColor: 'rgba(239,68,68,0.10)' },
+  rowIconText:       { fontSize: 16 },
+  rowLabel:          { color: C.text, fontSize: 15, fontWeight: '600' },
+  rowSub:            { color: C.textFaint, fontSize: 11, marginTop: 1 },
+  chevron:           { color: C.textFaint, fontSize: 22, fontWeight: '300' },
+  dangerRow:         { backgroundColor: 'rgba(239,68,68,0.04)' },
+  dangerLabel:       { color: '#FF5555', fontWeight: '700' },
+
+  versionText:       { color: C.textFaint, fontSize: 11, textAlign: 'center', marginTop: 16, letterSpacing: 1.5, fontWeight: '600' },
 });
