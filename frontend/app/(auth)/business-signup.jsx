@@ -3,7 +3,7 @@ import { ScrollView, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
-import { Toast } from '../../components/ui/Toast';
+import { useToastStore } from '../../components/ui/Toast';
 import { businessSignup } from '../../services/authService';
 import { useAuthStore } from '../../store/authStore';
 import { Colors } from '../../constants/colors';
@@ -13,9 +13,9 @@ import { Spacing } from '../../constants/spacing';
 export default function BusinessSignup() {
   const router = useRouter();
   const signIn = useAuthStore((s) => s.signIn);
+  const showToast = useToastStore((s) => s.show);
   const [form, setForm] = useState({ email: '', password: '', company_name: '', industry: '', website: '', location: '', bio: '' });
   const [loading, setLoading] = useState(false);
-  const [toast, setToast] = useState({ visible: false, message: '' });
   const [errors, setErrors] = useState({});
 
   const set = (key) => (val) => setForm((f) => ({ ...f, [key]: val }));
@@ -34,7 +34,7 @@ export default function BusinessSignup() {
     setLoading(true);
     const { data, error } = await businessSignup({ ...form, email: form.email.trim() });
     setLoading(false);
-    if (error) { setToast({ visible: true, message: error }); return; }
+    if (error) { showToast(error, 'error'); return; }
     await signIn(data.token, data.business, 'business');
     router.replace('/(business)/dashboard');
   };
@@ -53,7 +53,6 @@ export default function BusinessSignup() {
       <TouchableOpacity onPress={() => router.push('/(auth)/business-login')}>
         <Text style={styles.link}>Already have an account? Log in</Text>
       </TouchableOpacity>
-      <Toast message={toast.message} visible={toast.visible} type="error" onHide={() => setToast({ visible: false, message: '' })} />
     </ScrollView>
   );
 }

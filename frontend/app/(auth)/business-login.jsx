@@ -3,7 +3,7 @@ import { ScrollView, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
-import { Toast } from '../../components/ui/Toast';
+import { useToastStore } from '../../components/ui/Toast';
 import { businessLogin } from '../../services/authService';
 import { useAuthStore } from '../../store/authStore';
 import { Colors } from '../../constants/colors';
@@ -13,10 +13,10 @@ import { Spacing } from '../../constants/spacing';
 export default function BusinessLogin() {
   const router = useRouter();
   const signIn = useAuthStore((s) => s.signIn);
+  const showToast = useToastStore((s) => s.show);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [toast, setToast] = useState({ visible: false, message: '' });
   const [errors, setErrors] = useState({});
 
   const validate = () => {
@@ -32,7 +32,7 @@ export default function BusinessLogin() {
     setLoading(true);
     const { data, error } = await businessLogin(email.trim(), password);
     setLoading(false);
-    if (error) { setToast({ visible: true, message: error }); return; }
+    if (error) { showToast(error, 'error'); return; }
     await signIn(data.token, data.business, 'business');
     router.replace('/(business)/dashboard');
   };
@@ -45,12 +45,11 @@ export default function BusinessLogin() {
       <Input label="Password" value={password} onChangeText={setPassword} secureTextEntry error={errors.password} />
       <Button title="Log In" onPress={handleLogin} loading={loading} style={styles.btn} />
       <TouchableOpacity onPress={() => router.push('/(auth)/business-signup')}>
-        <Text style={styles.link}>Don’t have an account? Sign up</Text>
+        <Text style={styles.link}>Don't have an account? Sign up</Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
         <Text style={styles.link}>Log in as Creator instead</Text>
       </TouchableOpacity>
-      <Toast message={toast.message} visible={toast.visible} type="error" onHide={() => setToast({ visible: false, message: '' })} />
     </ScrollView>
   );
 }

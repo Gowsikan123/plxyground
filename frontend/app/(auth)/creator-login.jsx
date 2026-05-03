@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { COLORS } from '../../constants/colors';
 import { TYPOGRAPHY } from '../../constants/typography';
 import { SPACING } from '../../constants/spacing';
-import Input from '../../components/ui/Input';
+import { Input } from '../../components/ui/Input';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function CreatorLoginScreen() {
