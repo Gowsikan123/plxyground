@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator,
+  View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Header } from '../../components/layout/Header';
@@ -9,14 +9,14 @@ import { Badge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { useAuthStore } from '../../store/authStore';
-import { api } from '../../services/api';
+import { apiCall } from '../../services/api';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { Spacing } from '../../constants/spacing';
 
 export default function Dashboard() {
   const router = useRouter();
-  const { user, token } = useAuthStore();
+  const { user } = useAuthStore();
   const [stats, setStats] = useState(null);
   const [recentContent, setRecentContent] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -24,24 +24,20 @@ export default function Dashboard() {
   const [error, setError] = useState(null);
 
   const load = useCallback(async () => {
-    try {
-      setError(null);
-      const [contentRes] = await Promise.all([
-        api.get('/api/business/auth/me', token),
-      ]);
-      const myContentRes = await api.get('/api/business/content/mine', token);
-      const items = myContentRes.data?.items ?? myContentRes.data ?? [];
+    setError(null);
+    const { data, error: err } = await apiCall((api) => api.get('/api/business/content/mine'));
+    if (err) {
+      setError(err);
+    } else {
+      const items = data?.data?.items ?? data?.data ?? [];
       const published = items.filter((i) => i.status === 'published').length;
       const pending = items.filter((i) => i.status === 'pending').length;
       setStats({ published, pending, total: items.length });
       setRecentContent(items.slice(0, 5));
-    } catch (e) {
-      setError(e.message || 'Failed to load dashboard');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
-  }, [token]);
+    setLoading(false);
+    setRefreshing(false);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -60,8 +56,8 @@ export default function Dashboard() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
       >
-        <Text style={styles.welcome}>Welcome back,{' '}
-          <Text style={styles.accentText}>{user?.company_name}</Text>
+        <Text style={styles.welcome}>
+          Welcome back, <Text style={styles.accentText}>{user?.company_name}</Text>
         </Text>
 
         {error ? (
@@ -95,10 +91,7 @@ export default function Dashboard() {
         {loading ? (
           [0, 1, 2].map((i) => <Skeleton key={i} style={styles.rowSkeleton} />)
         ) : recentContent.length === 0 ? (
-          <EmptyState
-            title="No content yet"
-            message="Submit your first campaign to get started."
-          />
+          <EmptyState title="No content yet" message="Submit your first campaign to get started." />
         ) : (
           recentContent.map((item) => (
             <Card key={item.id} style={styles.row}>
@@ -120,7 +113,10 @@ export default function Dashboard() {
           <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/(business)/my-content')}>
             <Text style={styles.actionBtnText}>+ New Campaign</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, styles.actionBtnSecondary]} onPress={() => router.push('/(business)/search-creators')}>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionBtnSecondary]}
+            onPress={() => router.push('/(business)/search-creators')}
+          >
             <Text style={styles.actionBtnTextSecondary}>Find Creators</Text>
           </TouchableOpacity>
         </View>
