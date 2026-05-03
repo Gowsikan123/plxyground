@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, StatusBar, ScrollV
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useAuth } from '../components/AuthContext';
+import { useAuthStore } from '../store/authStore';
 import { apiRequest } from '../components/ApiClient';
 import { C, R, GRAD_LIME } from '../components/theme';
 
@@ -12,7 +12,7 @@ export default function BusinessSignup() {
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
-  const { login } = useAuth();
+  const signIn = useAuthStore((s) => s.signIn);
   const router = useRouter();
 
   const handleSignup = async () => {
@@ -21,7 +21,7 @@ export default function BusinessSignup() {
     setLoading(true); setError('');
     try {
       const data = await apiRequest('/api/business/signup', { method: 'POST', body: { name: name.trim(), email: email.trim().toLowerCase(), password } });
-      await login(data.token, data.user);
+      await signIn(data.token, data.user, 'BUSINESS');
       router.replace('/business/dashboard');
     } catch (e) {
       setError(e.message || 'Signup failed. Try again.');

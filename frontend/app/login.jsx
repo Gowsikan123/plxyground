@@ -1,8 +1,8 @@
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, StatusBar, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, StatusBar, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useAuth } from '../components/AuthContext';
+import { useAuthStore } from '../store/authStore';
 import { apiRequest } from '../components/ApiClient';
 import { C, R, GRAD_HERO } from '../components/theme';
 
@@ -11,7 +11,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
-  const { login } = useAuth();
+  const signIn = useAuthStore((s) => s.signIn);
   const router = useRouter();
 
   const handleLogin = async () => {
@@ -19,7 +19,7 @@ export default function Login() {
     setLoading(true); setError('');
     try {
       const data = await apiRequest('/api/auth/login', { method: 'POST', body: { email: email.trim().toLowerCase(), password } });
-      await login(data.token, data.user);
+      await signIn(data.token, data.user, 'CREATOR');
       router.replace('/feed');
     } catch (e) {
       setError(e.message || 'Login failed. Check your credentials.');
@@ -33,12 +33,10 @@ export default function Login() {
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       <View style={s.blobTL} />
       <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        {/* Back */}
         <TouchableOpacity style={s.back} onPress={() => router.back()} activeOpacity={0.7}>
           <Text style={s.backText}>← Back</Text>
         </TouchableOpacity>
 
-        {/* Header */}
         <View style={s.headWrap}>
           <LinearGradient colors={GRAD_HERO} style={s.headIcon} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
             <Text style={s.headIconText}>👋</Text>
@@ -47,7 +45,6 @@ export default function Login() {
           <Text style={s.sub}>Sign in to your creator account</Text>
         </View>
 
-        {/* Form */}
         <View style={s.form}>
           {error ? <View style={s.errorBox}><Text style={s.errorText}>{error}</Text></View> : null}
 

@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, StatusBar, ScrollV
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useAuth } from '../components/AuthContext';
+import { useAuthStore } from '../store/authStore';
 import { apiRequest } from '../components/ApiClient';
 import { C, R, GRAD_LIME } from '../components/theme';
 
@@ -11,7 +11,7 @@ export default function BusinessLogin() {
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
-  const { login } = useAuth();
+  const signIn = useAuthStore((s) => s.signIn);
   const router = useRouter();
 
   const handleLogin = async () => {
@@ -19,7 +19,7 @@ export default function BusinessLogin() {
     setLoading(true); setError('');
     try {
       const data = await apiRequest('/api/business/login', { method: 'POST', body: { email: email.trim().toLowerCase(), password } });
-      await login(data.token, data.user);
+      await signIn(data.token, data.user, 'BUSINESS');
       router.replace('/business/dashboard');
     } catch (e) {
       setError(e.message || 'Login failed. Check your credentials.');
@@ -37,7 +37,6 @@ export default function BusinessLogin() {
           <Text style={s.backText}>← Back</Text>
         </TouchableOpacity>
 
-        {/* Header */}
         <View style={s.headWrap}>
           <LinearGradient colors={GRAD_LIME} style={s.headIcon} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
             <Text style={s.headIconText}>🏢</Text>
