@@ -6,6 +6,11 @@
  * Signature kept backward-compatible:
  *   apiRequest(path, options?)              — preferred
  *   apiRequest(path, method, body, token)   — legacy positional form still works
+ *
+ * Body handling:
+ *   - If body is already a string (caller did JSON.stringify) it is sent as-is.
+ *   - If body is an object/array it is serialised here.
+ *   This prevents double-stringify when callers pass JSON.stringify(payload).
  */
 import { useAuthStore } from '../store/authStore';
 
@@ -70,7 +75,12 @@ export async function apiRequest(path, optionsOrMethod = 'GET', legacyBody = nul
   try {
     const headers = { 'Content-Type': 'application/json', ...extraHeaders };
     const options = { method, headers, signal: controller.signal };
-    if (body) options.body = JSON.stringify(body);
+
+    if (body != null) {
+      // If caller already serialised the body (typeof string), send it as-is.
+      // Otherwise serialise here. This prevents double-stringify.
+      options.body = typeof body === 'string' ? body : JSON.stringify(body);
+    }
 
     let res;
     try {
