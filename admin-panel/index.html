@@ -488,7 +488,7 @@
           <div style="margin-top:8px">
             <label class="form-label" style="margin-bottom:5px;display:block">Override API base URL</label>
             <div style="display:flex;gap:8px">
-              <input type="text" id="api-url-input" placeholder="http://localhost:3001" style="flex:1" />
+              <input type="text" id="api-url-input" placeholder="http://localhost:3011" style="flex:1" />
               <button class="btn btn-secondary btn-sm" onclick="setApiBase()">Save</button>
             </div>
           </div>
@@ -534,7 +534,7 @@
 
 <script>
 // ── Config ──────────────────────────────────────────────────────────────
-let API_BASE = localStorage.getItem('px_api_base') || 'http://localhost:3001';
+let API_BASE = localStorage.getItem('px_api_base') || 'http://localhost:3011';
 let TOKEN = localStorage.getItem('px_admin_token') || null;
 let currentAdmin = null;
 let currentSection = 'dashboard';
