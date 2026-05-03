@@ -1,43 +1,78 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Header } from '../../components/layout/Header';
 import { useAuthStore } from '../../store/authStore';
-import { Colors } from '../../constants/colors';
-import { Typography } from '../../constants/typography';
-import { Spacing, Radius } from '../../constants/spacing';
+import BottomNav from '../../components/BottomNav';
+import { C, R } from '../../components/theme';
 
 export default function Settings() {
+  const logout = useAuthStore((s) => s.logout);
   const router = useRouter();
-  const signOut = useAuthStore((s) => s.signOut);
 
-  const handleSignOut = async () => {
-    await signOut();
-    router.replace('/');
-  };
+  const Row = ({ label, onPress, danger, right }) => (
+    <TouchableOpacity style={[s.row, danger && s.dangerRow]} onPress={onPress} activeOpacity={0.7}>
+      <Text style={[s.rowLabel, danger && s.dangerLabel]}>{label}</Text>
+      {right ?? <Text style={s.chevron}>›</Text>}
+    </TouchableOpacity>
+  );
 
   return (
-    <View style={styles.page}>
-      <Header title="Settings" />
-      <View style={styles.content}>
-        <TouchableOpacity style={styles.item} onPress={() => router.push('/terms')}>
-          <Text style={styles.itemText}>Terms of Service</Text>
+    <SafeAreaView style={s.safe}>
+      <View style={s.topBar}>
+        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
+          <Text style={s.back}>‹ Back</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.item} onPress={() => router.push('/privacy')}>
-          <Text style={styles.itemText}>Privacy Policy</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.item, styles.danger]} onPress={handleSignOut}>
-          <Text style={[styles.itemText, { color: Colors.error }]}>Sign Out</Text>
-        </TouchableOpacity>
+        <Text style={s.title}>Settings</Text>
+        <View style={{ width: 60 }} />
       </View>
-    </View>
+
+      <ScrollView contentContainerStyle={s.scroll}>
+        <Text style={s.groupLabel}>Account</Text>
+        <View style={s.group}>
+          <Row label="Edit Profile"       onPress={() => {}} />
+          <Row label="Change Password"    onPress={() => {}} />
+          <Row label="Notifications"      onPress={() => {}} />
+        </View>
+
+        <Text style={s.groupLabel}>Content</Text>
+        <View style={s.group}>
+          <Row label="My Posts"           onPress={() => {}} />
+          <Row label="Drafts"             onPress={() => {}} />
+        </View>
+
+        <Text style={s.groupLabel}>Legal</Text>
+        <View style={s.group}>
+          <Row label="Terms of Service"   onPress={() => router.push('/terms')} />
+          <Row label="Privacy Policy"     onPress={() => router.push('/privacy')} />
+        </View>
+
+        <Text style={s.groupLabel}>Session</Text>
+        <View style={s.group}>
+          <Row
+            label="Sign Out"
+            danger
+            onPress={() => { logout(); router.replace('/'); }}
+            right={null}
+          />
+        </View>
+      </ScrollView>
+
+      <BottomNav />
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: Colors.bg },
-  content: { padding: Spacing[4], gap: Spacing[2] },
-  item: { backgroundColor: Colors.surface, borderRadius: Radius.md, padding: Spacing[4], borderWidth: 1, borderColor: Colors.border },
-  danger: { borderColor: Colors.error + '44' },
-  itemText: { fontFamily: Typography.fontBodyMedium, fontSize: Typography.sizes.base, color: Colors.text },
+const s = StyleSheet.create({
+  safe:        { flex: 1, backgroundColor: C.bg },
+  topBar:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border },
+  back:        { color: C.accent, fontSize: 16, fontWeight: '600' },
+  title:       { color: C.text, fontSize: 17, fontWeight: '800' },
+  scroll:      { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 120 },
+  groupLabel:  { color: C.textFaint, fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8, marginTop: 20 },
+  group:       { backgroundColor: C.surface, borderRadius: R.lg, borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
+  row:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: C.border },
+  rowLabel:    { color: C.text, fontSize: 15 },
+  chevron:     { color: C.textFaint, fontSize: 20 },
+  dangerRow:   { backgroundColor: 'rgba(255,60,60,0.05)' },
+  dangerLabel: { color: '#FF6060' },
 });
