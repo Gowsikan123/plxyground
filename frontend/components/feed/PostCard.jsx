@@ -17,20 +17,20 @@ export function PostCard({ post }) {
       style={styles.card}
     >
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.push(`/creator/${post.creator_slug}`)} style={styles.creatorRow}>
+        <TouchableOpacity onPress={() => router.push(`/creator/${post.creator_id}`)} style={styles.creatorRow}>
           <Avatar uri={post.avatar_url} name={post.display_name} size={36} />
           <View>
             <Text style={styles.name}>{post.display_name}</Text>
             <Text style={styles.meta}>@{post.username}</Text>
           </View>
         </TouchableOpacity>
-        {post.is_verified ? <Badge label="✓ Verified" color={Colors.accent} /> : null}
+        {post.is_verified ? <Badge label="Verified" color={Colors.accent} /> : null}
       </View>
       <Text style={styles.title}>{post.title}</Text>
       {post.body ? <Text style={styles.body} numberOfLines={3}>{post.body}</Text> : null}
       <View style={styles.footer}>
-        {(post.tags || []).slice(0, 3).map((t) => (
-          <Badge key={t} label={`#${t}`} color={Colors.textMuted} />
+        {(post.tags || []).slice(0, 3).map((tag) => (
+          <Badge key={tag} label={`#${tag}`} color={Colors.textMuted} />
         ))}
         <Text style={styles.views}>{post.view_count} views</Text>
       </View>

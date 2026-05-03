@@ -45,6 +45,22 @@ router.get('/', (req, res) => {
   }
 });
 
+router.get('/mine/list', requireAuth, (req, res) => {
+  try {
+    const postedById = req.userType === 'creator' ? req.user.creator_id : req.user.id;
+    const rows = db
+      .prepare(
+        'SELECT * FROM opportunities WHERE posted_by_type = ? AND posted_by_id = ? AND status != ? ORDER BY created_at DESC'
+      )
+      .all(req.userType, postedById, 'deleted')
+      .map(attachPoster);
+
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.get('/:id', (req, res) => {
   try {
     const opp = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(req.params.id);

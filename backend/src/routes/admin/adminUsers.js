@@ -176,7 +176,7 @@ router.post('/reset-password', async (req, res) => {
     if (!account) return res.status(404).json({ error: 'User not found' });
 
     // TODO: send real email via SendGrid/Resend in production
-    console.log(`[STUB EMAIL] Password reset requested for ${email}`);
+    process.stdout.write(`[STUB EMAIL] Password reset requested for ${email}\n`);
 
     await pool.query(
       `INSERT INTO audit_log (action_type, actor, target) VALUES ('RESET_PASSWORD', $1, $2)`,

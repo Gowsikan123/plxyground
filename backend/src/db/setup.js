@@ -2,7 +2,32 @@
 const db = require('./client');
 const logger = require('../logger');
 
-function setupDatabase() {
+function hasExpectedAuditLogSchema() {
+  try {
+    const columns = db.prepare("PRAGMA table_info(audit_log)").all();
+    return columns.some((column) => column.name === 'actor_type');
+  } catch {
+    return false;
+  }
+}
+
+function resetManagedTables() {
+  db.pragma('foreign_keys = OFF');
+  db.exec(`
+    DROP TABLE IF EXISTS moderation_queue;
+    DROP TABLE IF EXISTS audit_log;
+    DROP TABLE IF EXISTS business_content;
+    DROP TABLE IF EXISTS content;
+    DROP TABLE IF EXISTS opportunities;
+    DROP TABLE IF EXISTS creator_accounts;
+    DROP TABLE IF EXISTS creators;
+    DROP TABLE IF EXISTS businesses;
+    DROP TABLE IF EXISTS admins;
+  `);
+  db.pragma('foreign_keys = ON');
+}
+
+function createTables() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS admins (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -120,6 +145,15 @@ function setupDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
+}
+
+function setupDatabase() {
+  if (!hasExpectedAuditLogSchema()) {
+    logger.warn('Existing SQLite schema is outdated. Rebuilding managed tables.');
+    resetManagedTables();
+  }
+
+  createTables();
 
   logger.info('Database schema ready.');
 

@@ -13,7 +13,7 @@ async function migrate() {
   try {
     await pool.query(sql);
     await pool.query('COMMIT');
-    console.log('Migration complete.');
+    process.stdout.write('Migration complete.\n');
   } catch (err) {
     await pool.query('ROLLBACK');
     throw err;

@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, TextInput, StyleSheet } from 'react-native';
+import { View, TextInput, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { Header } from '../../components/layout/Header';
 import { Avatar } from '../../components/ui/Avatar';
 import { Badge } from '../../components/ui/Badge';
-import { Card } from '../../components/ui/Card';
-import { Text, TouchableOpacity } from 'react-native';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { getCreators } from '../../services/creatorService';
@@ -24,20 +22,24 @@ export default function SearchCreators() {
   const search = async (query) => {
     setLoading(true);
     setError(null);
-    const { data, error: err } = await getCreators({ q: query, limit: 30 });
-    if (err) setError(err);
-    else setCreators(data.data);
+    const { data, error: requestError } = await getCreators({ q: query, limit: 30 });
+    if (requestError) setError(requestError);
+    else setCreators(data?.creators || []);
     setLoading(false);
   };
 
-  useEffect(() => { search(''); }, []);
+  useEffect(() => {
+    search('');
+  }, []);
 
-  if (loading) return (
-    <View style={styles.page}>
-      <Header title="Find Creators" />
-      <View style={{ padding: Spacing[4] }}>{[1, 2, 3].map((k) => <SkeletonCard key={k} />)}</View>
-    </View>
-  );
+  if (loading) {
+    return (
+      <View style={styles.page}>
+        <Header title="Find Creators" />
+        <View style={{ padding: Spacing[4] }}>{[1, 2, 3].map((key) => <SkeletonCard key={key} />)}</View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.page}>
@@ -45,22 +47,27 @@ export default function SearchCreators() {
       <View style={styles.searchBar}>
         <TextInput
           value={q}
-          onChangeText={(v) => { setQ(v); search(v); }}
+          onChangeText={(value) => {
+            setQ(value);
+            search(value);
+          }}
           placeholder="Search by name or username..."
           placeholderTextColor={Colors.textFaint}
           style={styles.input}
         />
       </View>
-      {creators.length === 0 ? (
+      {error ? (
+        <EmptyState title="Could not load creators" message={error} actionLabel="Retry" onAction={() => search(q)} />
+      ) : creators.length === 0 ? (
         <EmptyState title="No creators found" message="Try a different search." />
       ) : (
         <FlashList
           data={creators}
-          keyExtractor={(c) => String(c.id)}
+          keyExtractor={(creator) => String(creator.id)}
           estimatedItemSize={80}
           contentContainerStyle={{ padding: Spacing[4] }}
           renderItem={({ item }) => (
-            <TouchableOpacity onPress={() => router.push(`/creator/${item.slug}`)} style={styles.row}>
+            <TouchableOpacity onPress={() => router.push(`/creator/${item.id}`)} style={styles.row}>
               <Avatar uri={item.avatar_url} name={item.display_name} size={44} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.display_name}</Text>

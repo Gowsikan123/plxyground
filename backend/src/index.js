@@ -3,6 +3,7 @@ require('dotenv').config();
 const config = require('./config');
 const logger = require('./logger');
 const { setupDatabase } = require('./db/setup');
+const db = require('./db/client');
 
 setupDatabase();
 
@@ -52,6 +53,16 @@ app.use('/api/admin/content', adminContentRoutes);
 app.use('/api/admin/users', adminUsersRoutes);
 app.use('/api/admin/analytics', adminAnalyticsRoutes);
 app.use('/api/admin/audit', adminAuditRoutes);
+
+app.get('/api/admin/alerts', (req, res) => {
+  try {
+    const alerts = db.prepare('SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 10').all();
+    return res.json({ success: true, data: alerts });
+  } catch (err) {
+    logger.error(err.message);
+    return res.status(500).json({ success: false, error: 'Failed to load alerts' });
+  }
+});
 
 app.use((_req, res) => {
   res.status(404).json({ success: false, error: 'Route not found' });

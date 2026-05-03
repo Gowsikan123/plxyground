@@ -8,6 +8,24 @@ const { validationErrorHandler } = require('../middleware/validate');
 
 const router = express.Router();
 
+function mapContentRow(row) {
+  if (!row) {
+    return null;
+  }
+
+  let parsedTags = [];
+  try {
+    parsedTags = JSON.parse(row.tags || '[]');
+  } catch {
+    parsedTags = [];
+  }
+
+  return {
+    ...row,
+    tags: Array.isArray(parsedTags) ? parsedTags : [],
+  };
+}
+
 router.get('/', (req, res) => {
   try {
     const search = req.query.search || '';
@@ -34,7 +52,8 @@ router.get('/', (req, res) => {
          ${where}
          ORDER BY c.created_at DESC LIMIT ? OFFSET ?`
       )
-      .all(...params, limit, offset);
+      .all(...params, limit, offset)
+      .map(mapContentRow);
 
     const total = db
       .prepare(
@@ -48,15 +67,50 @@ router.get('/', (req, res) => {
   }
 });
 
-router.get('/:id', (req, res) => {
+router.get('/mine/list', requireAuth, (req, res) => {
   try {
-    const post = db
+    if (req.userType !== 'creator') {
+      return res.status(403).json({ success: false, error: 'Creator access required' });
+    }
+
+    const status = req.query.status || '';
+    const params = [req.user.creator_id];
+    let where = 'WHERE c.creator_id = ? AND c.status != ?';
+    params.push('deleted');
+
+    if (status) {
+      where += ' AND c.status = ?';
+      params.push(status);
+    }
+
+    const posts = db
       .prepare(
         `SELECT c.*, cr.display_name, cr.username, cr.slug as creator_slug, cr.avatar_url, cr.sport
-         FROM content c JOIN creators cr ON c.creator_id = cr.id
-         WHERE c.id = ? AND c.status = 'published'`
+         FROM content c
+         JOIN creators cr ON c.creator_id = cr.id
+         ${where}
+         ORDER BY c.created_at DESC`
       )
-      .get(req.params.id);
+      .all(...params)
+      .map(mapContentRow);
+
+    return res.json({ success: true, data: posts });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/:id', (req, res) => {
+  try {
+    const post = mapContentRow(
+      db
+        .prepare(
+          `SELECT c.*, cr.display_name, cr.username, cr.slug as creator_slug, cr.avatar_url, cr.sport
+           FROM content c JOIN creators cr ON c.creator_id = cr.id
+           WHERE c.id = ? AND c.status = 'published'`
+        )
+        .get(req.params.id)
+    );
 
     if (!post) return res.status(404).json({ success: false, error: 'Post not found' });
 
@@ -90,7 +144,7 @@ router.post(
       db.prepare("INSERT INTO moderation_queue (content_type, content_id) VALUES ('creator_content', ?)").run(row.lastInsertRowid);
       audit.log({ actor_type: 'creator', actor_id: req.user.id, action: 'CONTENT_CREATED', target_type: 'content', target_id: row.lastInsertRowid, ip_address: req.ip });
 
-      const created = db.prepare('SELECT * FROM content WHERE id = ?').get(row.lastInsertRowid);
+      const created = mapContentRow(db.prepare('SELECT * FROM content WHERE id = ?').get(row.lastInsertRowid));
       return res.status(201).json({ success: true, data: created });
     } catch (err) {
       return res.status(500).json({ success: false, error: err.message });
@@ -123,8 +177,25 @@ router.put('/:id', requireAuth, (req, res) => {
     db.prepare('UPDATE content SET title=?, body=?, media_url=?, media_type=?, tags=?, status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?')
       .run(newTitle, newBody, newMedia, newType, newTags, newStatus, post.id);
 
-    const updated = db.prepare('SELECT * FROM content WHERE id = ?').get(post.id);
+    const updated = mapContentRow(db.prepare('SELECT * FROM content WHERE id = ?').get(post.id));
     return res.json({ success: true, data: updated });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/:id/like', requireAuth, (req, res) => {
+  try {
+    const post = db.prepare('SELECT * FROM content WHERE id = ? AND status != ?').get(req.params.id, 'deleted');
+    if (!post) {
+      return res.status(404).json({ success: false, error: 'Post not found' });
+    }
+
+    const delta = req.body && req.body.liked === false ? -1 : 1;
+    const nextLikeCount = Math.max(0, post.like_count + delta);
+    db.prepare('UPDATE content SET like_count = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(nextLikeCount, post.id);
+
+    return res.json({ success: true, data: { id: post.id, like_count: nextLikeCount } });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }

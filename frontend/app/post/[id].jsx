@@ -19,26 +19,30 @@ export default function PostDetail() {
 
   useEffect(() => {
     (async () => {
-      const { data, error: err } = await getPost(id);
-      if (err) setError(err);
-      else setPost(data.data);
+      const { data, error: requestError } = await getPost(id);
+      if (requestError) setError(requestError);
+      else setPost(data);
       setLoading(false);
     })();
   }, [id]);
 
-  if (loading) return (
-    <View style={styles.page}>
-      <Header title="Post" showBack />
-      <SkeletonCard />
-    </View>
-  );
+  if (loading) {
+    return (
+      <View style={styles.page}>
+        <Header title="Post" showBack />
+        <SkeletonCard />
+      </View>
+    );
+  }
 
-  if (error || !post) return (
-    <View style={styles.page}>
-      <Header title="Post" showBack />
-      <EmptyState title="Post not found" message={error || 'This post may have been removed.'} />
-    </View>
-  );
+  if (error || !post) {
+    return (
+      <View style={styles.page}>
+        <Header title="Post" showBack />
+        <EmptyState title="Post not found" message={error || 'This post may have been removed.'} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.page}>
@@ -50,14 +54,14 @@ export default function PostDetail() {
             <Text style={styles.creatorName}>{post.display_name}</Text>
             <Text style={styles.creatorHandle}>@{post.username}</Text>
           </View>
-          {post.is_verified ? <Badge label="✓ Verified" /> : null}
+          {post.is_verified ? <Badge label="Verified" /> : null}
         </View>
         <Text style={styles.title}>{post.title}</Text>
         {post.body ? <Text style={styles.body}>{post.body}</Text> : null}
         <View style={styles.tags}>
-          {(post.tags || []).map((t) => <Badge key={t} label={`#${t}`} color={Colors.textMuted} />)}
+          {(post.tags || []).map((tag) => <Badge key={tag} label={`#${tag}`} color={Colors.textMuted} />)}
         </View>
-        <Text style={styles.meta}>{post.view_count} views · {new Date(post.created_at).toLocaleDateString()}</Text>
+        <Text style={styles.meta}>{post.view_count} views | {new Date(post.created_at).toLocaleDateString()}</Text>
       </ScrollView>
     </View>
   );

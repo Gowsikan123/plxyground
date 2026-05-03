@@ -24,7 +24,7 @@ export default function EditProfile() {
     const { data, error } = await updateBusinessProfile(form);
     setLoading(false);
     if (error) { setToast({ visible: true, message: error, type: 'error' }); return; }
-    updateUser(data.business);
+    updateUser(data);
     setToast({ visible: true, message: 'Profile updated.', type: 'success' });
     setTimeout(() => router.back(), 1200);
   };

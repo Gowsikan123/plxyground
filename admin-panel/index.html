@@ -1,986 +1,219 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PLXYGROUND — Admin</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <title>PLXYGROUND Admin</title>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg:          #0d0d0f;
-      --surface:     #141416;
-      --surface-2:   #1a1a1e;
-      --surface-3:   #202026;
-      --border:      rgba(255,255,255,0.07);
-      --border-2:    rgba(255,255,255,0.12);
-      --text:        #e8e8ea;
-      --text-muted:  #8a8a92;
-      --text-faint:  #4a4a52;
-      --accent:      #6c63ff;
-      --accent-h:    #8b84ff;
-      --accent-dim:  rgba(108,99,255,0.15);
-      --green:       #22c55e;
-      --green-dim:   rgba(34,197,94,0.12);
-      --yellow:      #eab308;
-      --yellow-dim:  rgba(234,179,8,0.12);
-      --red:         #ef4444;
-      --red-dim:     rgba(239,68,68,0.12);
-      --orange:      #f97316;
-      --orange-dim:  rgba(249,115,22,0.12);
-      --radius:      8px;
-      --radius-lg:   12px;
-      --radius-sm:   5px;
-      --sidebar-w:   240px;
-      --header-h:    56px;
-      --font:        'Inter', system-ui, sans-serif;
-      --mono:        'JetBrains Mono', monospace;
-      --ease:        cubic-bezier(0.16,1,0.3,1);
+      --bg: #0a0a0a;
+      --sidebar: #111111;
+      --card: #1a1a1a;
+      --border: #2a2a2a;
+      --accent: #ff3c3c;
+      --accent-dark: #8d1515;
+      --text: #ffffff;
+      --text-secondary: #9a9a9a;
+      --success: #2fbf71;
+      --warning: #f4b942;
+      --danger: #ff5656;
+      --muted: #202020;
+      --radius: 16px;
+      --shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
     }
-    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.5; }
-    button { cursor: pointer; font: inherit; border: none; background: none; color: inherit; }
-    input, textarea, select { font: inherit; color: inherit; background: var(--surface-3); border: 1px solid var(--border-2); border-radius: var(--radius-sm); padding: 8px 12px; outline: none; width: 100%; }
-    input:focus, textarea:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
-    a { color: inherit; text-decoration: none; }
-    img, svg { display: block; }
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 9999px; }
-
-    /* ── Layout ──────────────────────────────────────────────────── */
-    #app { display: flex; height: 100vh; overflow: hidden; }
-    #login-screen { display: flex; align-items: center; justify-content: center; height: 100vh; background: var(--bg); }
-
-    /* ── Sidebar ─────────────────────────────────────────────────── */
-    .sidebar {
-      width: var(--sidebar-w); min-width: var(--sidebar-w);
-      background: var(--surface);
-      border-right: 1px solid var(--border);
-      display: flex; flex-direction: column;
-      height: 100vh; overflow-y: auto;
-    }
-    .sidebar-logo {
-      display: flex; align-items: center; gap: 10px;
-      padding: 18px 20px;
-      border-bottom: 1px solid var(--border);
-      font-weight: 700; font-size: 15px; letter-spacing: -0.3px;
-    }
-    .logo-mark {
-      width: 28px; height: 28px; border-radius: 7px;
-      background: var(--accent);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 13px; font-weight: 800; color: #fff; flex-shrink: 0;
-    }
-    .sidebar-nav { padding: 8px 0; flex: 1; }
-    .nav-section-label { font-size: 11px; font-weight: 600; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.8px; padding: 12px 20px 4px; }
-    .nav-item {
-      display: flex; align-items: center; gap: 10px;
-      padding: 9px 20px;
-      border-radius: 0;
-      color: var(--text-muted);
-      font-size: 13.5px;
-      transition: all 160ms var(--ease);
-      position: relative;
-      cursor: pointer;
-    }
-    .nav-item:hover { color: var(--text); background: var(--surface-2); }
-    .nav-item.active { color: var(--text); background: var(--accent-dim); }
-    .nav-item.active::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 3px; background: var(--accent); border-radius: 0 2px 2px 0; }
-    .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
-    .nav-badge { margin-left: auto; background: var(--red); color: #fff; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 9999px; min-width: 18px; text-align: center; }
-    .sidebar-footer { padding: 12px 20px; border-top: 1px solid var(--border); }
-    .admin-info { font-size: 12px; color: var(--text-muted); }
-    .admin-info strong { display: block; color: var(--text); font-size: 13px; }
-
-    /* ── Main area ───────────────────────────────────────────────── */
-    .main-wrap { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-    .topbar {
-      height: var(--header-h);
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0 24px; flex-shrink: 0;
-    }
-    .topbar-title { font-weight: 600; font-size: 15px; }
-    .topbar-actions { display: flex; align-items: center; gap: 8px; }
-    .content-area { flex: 1; overflow-y: auto; padding: 24px; }
-
-    /* ── Buttons ─────────────────────────────────────────────────── */
-    .btn {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 7px 14px; border-radius: var(--radius-sm);
-      font-size: 13px; font-weight: 500;
-      transition: all 160ms var(--ease); border: 1px solid transparent;
-    }
-    .btn svg { width: 14px; height: 14px; }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-primary:hover { background: var(--accent-h); }
-    .btn-secondary { background: var(--surface-3); color: var(--text); border-color: var(--border-2); }
-    .btn-secondary:hover { border-color: var(--border-2); background: var(--surface-2); color: var(--text); }
-    .btn-danger { background: var(--red-dim); color: var(--red); border-color: rgba(239,68,68,0.2); }
-    .btn-danger:hover { background: var(--red); color: #fff; }
-    .btn-success { background: var(--green-dim); color: var(--green); border-color: rgba(34,197,94,0.2); }
-    .btn-success:hover { background: var(--green); color: #fff; }
-    .btn-sm { padding: 5px 10px; font-size: 12px; }
-    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-    /* ── Cards ───────────────────────────────────────────────────── */
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; }
-    .card-title { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
-
-    /* ── KPI grid ────────────────────────────────────────────────── */
-    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
-    .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 18px; }
-    .kpi-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 6px; }
-    .kpi-value { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
-    .kpi-value.accent  { color: var(--accent); }
-    .kpi-value.green   { color: var(--green); }
-    .kpi-value.yellow  { color: var(--yellow); }
-    .kpi-value.red     { color: var(--red); }
-    .kpi-value.orange  { color: var(--orange); }
-
-    /* ── Table ───────────────────────────────────────────────────── */
-    .table-wrap { overflow-x: auto; border-radius: var(--radius-lg); border: 1px solid var(--border); background: var(--surface); }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    thead th { padding: 11px 16px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
-    tbody tr { border-bottom: 1px solid var(--border); transition: background 120ms; }
-    tbody tr:last-child { border-bottom: none; }
-    tbody tr:hover { background: var(--surface-2); }
-    tbody td { padding: 11px 16px; color: var(--text); vertical-align: middle; }
-    .td-mono { font-family: var(--mono); font-size: 12px; color: var(--text-muted); }
-
-    /* ── Badges ──────────────────────────────────────────────────── */
-    .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; }
-    .badge-pending  { background: var(--yellow-dim); color: var(--yellow); }
-    .badge-approved { background: var(--green-dim);  color: var(--green); }
-    .badge-rejected { background: var(--red-dim);    color: var(--red); }
-    .badge-flagged  { background: var(--orange-dim); color: var(--orange); }
-    .badge-open     { background: var(--green-dim);  color: var(--green); }
-    .badge-closed   { background: var(--surface-3);  color: var(--text-muted); }
-    .badge-suspended{ background: var(--red-dim);    color: var(--red); }
-    .badge-active   { background: var(--green-dim);  color: var(--green); }
-    .badge-admin    { background: var(--accent-dim); color: var(--accent); }
-
-    /* ── Login ───────────────────────────────────────────────────── */
-    .login-card {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius-lg); padding: 40px 36px;
-      width: 360px;
-    }
-    .login-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; font-weight: 700; font-size: 16px; }
-    .login-card h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
-    .login-card p { color: var(--text-muted); font-size: 13px; margin-bottom: 24px; }
-    .form-group { margin-bottom: 14px; }
-    .form-label { display: block; font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 5px; }
-    .form-error { color: var(--red); font-size: 12px; margin-top: 8px; }
-
-    /* ── Filters bar ─────────────────────────────────────────────── */
-    .filters { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-    .filters select, .filters input { width: auto; min-width: 140px; font-size: 13px; }
-    .filter-sep { flex: 1; }
-
-    /* ── Bulk bar ────────────────────────────────────────────────── */
-    .bulk-bar {
-      display: none; align-items: center; gap: 10px;
-      background: var(--accent-dim); border: 1px solid rgba(108,99,255,0.3);
-      border-radius: var(--radius); padding: 10px 16px;
-      margin-bottom: 14px; font-size: 13px;
-    }
-    .bulk-bar.visible { display: flex; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    button, input, select, textarea { font: inherit; }
+    .app-shell { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+    nav { background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 24px 0 18px; }
+    .logo { padding: 0 24px 20px; font-size: 22px; font-weight: 800; letter-spacing: 0.08em; }
+    .nav-item { background: transparent; color: var(--text-secondary); border: 0; border-left: 3px solid transparent; text-align: left; padding: 14px 24px; cursor: pointer; transition: 120ms ease; }
+    .nav-item:hover, .nav-item.active { color: var(--accent); border-left-color: var(--accent); background: rgba(255, 60, 60, 0.08); }
+    .logout { margin-top: auto; margin-left: 24px; margin-right: 24px; }
+    main { position: relative; padding: 28px; }
+    #login-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(10, 10, 10, 0.94); z-index: 30; }
+    #login-overlay.hidden { display: none; }
+    .login-card, .card, .table-wrap, .bulk-bar { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .login-card { width: min(440px, calc(100vw - 32px)); padding: 28px; }
+    .login-card h1 { margin: 0 0 8px; font-size: 28px; }
+    .login-card p { margin: 0 0 24px; color: var(--text-secondary); }
+    .field { display: grid; gap: 8px; margin-bottom: 16px; }
+    .field label { font-size: 14px; color: var(--text-secondary); }
+    input, select, textarea { width: 100%; background: #111111; border: 1px solid var(--border); border-radius: 12px; color: var(--text); padding: 12px 14px; }
+    button.primary, button.secondary, button.success, button.danger { border: 0; border-radius: 12px; padding: 12px 16px; cursor: pointer; font-weight: 700; }
+    button.primary { background: var(--accent); color: var(--text); }
+    button.secondary { background: var(--muted); color: var(--text); }
+    button.success { background: var(--success); color: #07140d; }
+    button.danger { background: var(--accent-dark); color: var(--text); }
+    .page-header { margin-bottom: 24px; }
+    .page-header h2 { margin: 0 0 6px; font-size: 30px; }
+    .page-header p { margin: 0; color: var(--text-secondary); }
+    .section { display: none; gap: 18px; }
+    .section.active { display: grid; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+    .card { padding: 18px; }
+    .kpi-label { color: var(--text-secondary); font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+    .kpi-value { font-size: 36px; font-weight: 800; }
+    .split { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 16px; }
+    .chart-row { display: flex; align-items: end; gap: 10px; min-height: 190px; margin-top: 18px; }
+    .bar-col { flex: 1; display: grid; gap: 8px; justify-items: center; }
+    .bar { width: 100%; max-width: 36px; border-radius: 10px 10px 4px 4px; background: linear-gradient(180deg, #ff7979, var(--accent)); }
+    .bar-label { color: var(--text-secondary); font-size: 12px; }
+    .filters, .settings-form, .action-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .filters input, .filters select, .filters textarea { width: auto; min-width: 180px; }
+    .filters textarea, .bulk-bar textarea { min-width: 280px; min-height: 46px; }
+    .bulk-bar { padding: 14px; display: none; gap: 12px; align-items: center; }
+    .bulk-bar.visible { display: flex; flex-wrap: wrap; }
     .bulk-bar strong { color: var(--accent); }
-
-    /* ── Empty state ─────────────────────────────────────────────── */
-    .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; color: var(--text-muted); gap: 8px; }
-    .empty svg { width: 40px; height: 40px; color: var(--text-faint); }
-    .empty p { font-size: 13px; }
-
-    /* ── Toast ───────────────────────────────────────────────────── */
-    #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
-    .toast {
-      background: var(--surface-2); border: 1px solid var(--border-2);
-      border-radius: var(--radius); padding: 12px 16px;
-      font-size: 13px; min-width: 240px; pointer-events: all;
-      animation: slideIn 220ms var(--ease);
-      display: flex; align-items: center; gap: 8px;
+    .table-wrap { overflow: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 14px 16px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { color: var(--text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+    tr:last-child td { border-bottom: 0; }
+    .badge { display: inline-block; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700; }
+    .badge.pending { background: rgba(244, 185, 66, 0.14); color: var(--warning); }
+    .badge.published, .badge.approved, .badge.verified, .badge.active, .badge.creator { background: rgba(47, 191, 113, 0.14); color: var(--success); }
+    .badge.rejected, .badge.deleted, .badge.suspended { background: rgba(255, 86, 86, 0.14); color: var(--danger); }
+    .badge.business, .badge.closed, .badge.admin { background: rgba(255, 255, 255, 0.1); color: var(--text); }
+    .pager { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; color: var(--text-secondary); }
+    .error-text, .info-text { color: var(--text-secondary); font-size: 14px; }
+    .error-text { color: var(--danger); }
+    .toast-stack { position: fixed; right: 20px; bottom: 20px; display: grid; gap: 10px; z-index: 50; }
+    .toast { min-width: 240px; background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 12px; padding: 12px 14px; }
+    .toast.success { border-left-color: var(--success); }
+    .toast.error { border-left-color: var(--danger); }
+    @media (max-width: 980px) {
+      .app-shell { grid-template-columns: 1fr; }
+      nav { position: sticky; top: 0; z-index: 10; flex-direction: row; overflow: auto; padding: 12px; }
+      .logo { display: none; }
+      .nav-item { white-space: nowrap; border-left: 0; border-bottom: 3px solid transparent; }
+      .nav-item.active { border-bottom-color: var(--accent); }
+      .logout { margin: 0 0 0 auto; }
+      .split { grid-template-columns: 1fr; }
     }
-    .toast.success { border-left: 3px solid var(--green); }
-    .toast.error   { border-left: 3px solid var(--red); }
-    .toast.info    { border-left: 3px solid var(--accent); }
-    @keyframes slideIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: translateY(0); } }
-
-    /* ── Modal ───────────────────────────────────────────────────── */
-    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center; }
-    .modal-overlay.open { display:flex; }
-    .modal { background: var(--surface); border:1px solid var(--border-2); border-radius:var(--radius-lg); width:480px; max-width:95vw; max-height:90vh; overflow-y:auto; }
-    .modal-header { display:flex; align-items:center; justify-content:space-between; padding:18px 20px; border-bottom:1px solid var(--border); }
-    .modal-header h3 { font-size:15px; font-weight:600; }
-    .modal-body { padding:20px; }
-    .modal-footer { padding:14px 20px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px; }
-    .btn-icon { width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:var(--radius-sm); color:var(--text-muted); transition:all 120ms; }
-    .btn-icon:hover { background:var(--surface-3); color:var(--text); }
-    .btn-icon svg { width:15px; height:15px; }
-
-    /* ── Sections ────────────────────────────────────────────────── */
-    .section { display: none; }
-    .section.active { display: block; }
-    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-    .section-header h2 { font-size: 18px; font-weight: 700; }
-    .section-header p { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
-
-    /* ── Chart bar ───────────────────────────────────────────────── */
-    .mini-chart { display:flex; align-items:flex-end; gap:4px; height:60px; margin-top:16px; }
-    .bar-col { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; }
-    .bar { background: var(--accent-dim); border-radius:3px 3px 0 0; width:100%; transition: background 160ms; border-bottom: 2px solid var(--accent); min-height: 4px; }
-    .bar:hover { background: rgba(108,99,255,0.3); }
-    .bar-label { font-size:10px; color:var(--text-faint); }
-
-    /* ── Settings form ───────────────────────────────────────────── */
-    .settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; max-width:640px; }
-    @media (max-width:600px) { .settings-grid { grid-template-columns:1fr; } }
-
-    /* ── Tabs ────────────────────────────────────────────────────── */
-    .tabs { display:flex; gap:2px; background:var(--surface-2); border-radius:var(--radius-sm); padding:3px; margin-bottom:16px; width:fit-content; }
-    .tab { padding:6px 14px; border-radius:4px; font-size:13px; font-weight:500; color:var(--text-muted); cursor:pointer; transition:all 140ms; }
-    .tab.active { background:var(--surface-3); color:var(--text); }
-
-    /* ── Audit JSON ──────────────────────────────────────────────── */
-    .json-pre { font-family:var(--mono); font-size:11px; background:var(--surface-3); border-radius:var(--radius-sm); padding:8px 10px; color:var(--text-muted); overflow-x:auto; max-width:200px; white-space:pre; }
   </style>
 </head>
 <body>
-
-<!-- ── Login Screen ────────────────────────────────────────────── -->
-<div id="login-screen">
-  <div class="login-card">
-    <div class="login-logo">
-      <div class="logo-mark">PX</div>
-      PLXYGROUND
-    </div>
-    <h2>Admin Login</h2>
-    <p>Sign in to the admin panel</p>
-    <form id="login-form">
-      <div class="form-group">
-        <label class="form-label">Email</label>
-        <input type="email" id="login-email" placeholder="admin@plxyground.com" required />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Password</label>
-        <input type="password" id="login-password" placeholder="••••••••" required />
-      </div>
-      <div class="form-error" id="login-error" style="display:none"></div>
-      <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;justify-content:center" id="login-btn">Sign in</button>
-    </form>
-  </div>
-</div>
-
-<!-- ── App Shell ────────────────────────────────────────────────── -->
-<div id="app" style="display:none">
-  <!-- Sidebar -->
-  <aside class="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-mark">PX</div>
-      PLXYGROUND
-    </div>
-    <nav class="sidebar-nav">
-      <div class="nav-section-label">Overview</div>
-      <div class="nav-item active" data-section="dashboard">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-        Dashboard
-      </div>
-
-      <div class="nav-section-label">Moderation</div>
-      <div class="nav-item" data-section="queue">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12h6M9 8h6M9 16h4"/><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/></svg>
-        Mod Queue
-        <span class="nav-badge" id="queue-badge" style="display:none">0</span>
-      </div>
-      <div class="nav-item" data-section="content">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-        Content
-      </div>
-
-      <div class="nav-section-label">Users</div>
-      <div class="nav-item" data-section="users">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        Users
-      </div>
-
-      <div class="nav-section-label">System</div>
-      <div class="nav-item" data-section="audit">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
-        Audit Log
-      </div>
-      <div class="nav-item" data-section="settings">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M4.93 19.07l1.41-1.41M19.07 19.07l-1.41-1.41M1 12h2M21 12h2M12 1v2M12 21v2"/></svg>
-        Settings
-      </div>
+  <div class="app-shell">
+    <nav>
+      <div class="logo">PLXYGROUND</div>
+      <button class="nav-item active" data-section="dashboard">Dashboard</button>
+      <button class="nav-item" data-section="queue">Queue</button>
+      <button class="nav-item" data-section="content">Content</button>
+      <button class="nav-item" data-section="users">Users</button>
+      <button class="nav-item" data-section="audit">Audit</button>
+      <button class="nav-item" data-section="settings">Settings</button>
+      <button class="danger logout" id="logout-button">Log Out</button>
     </nav>
-    <div class="sidebar-footer">
-      <div class="admin-info">
-        <strong id="sidebar-admin-name">Admin</strong>
-        <span id="sidebar-admin-role">admin</span>
+    <main>
+      <div id="login-overlay">
+        <div class="login-card">
+          <h1>PLXYGROUND</h1>
+          <p>Admin sign in to review creators, campaigns, and platform activity.</p>
+          <div class="field">
+            <label for="login-email">Email</label>
+            <input id="login-email" type="email" value="admin@plxyground.local" />
+          </div>
+          <div class="field">
+            <label for="login-password">Password</label>
+            <input id="login-password" type="password" value="Internet2026@" />
+          </div>
+          <button class="primary" id="login-button">Log In</button>
+          <div class="error-text" id="login-error" style="margin-top: 14px;"></div>
+        </div>
       </div>
-      <button class="btn btn-secondary btn-sm" style="margin-top:10px;width:100%;justify-content:center" onclick="logout()">Sign out</button>
-    </div>
-  </aside>
-
-  <!-- Main -->
-  <div class="main-wrap">
-    <div class="topbar">
-      <span class="topbar-title" id="topbar-title">Dashboard</span>
-      <div class="topbar-actions">
-        <span style="font-size:12px;color:var(--text-muted)" id="topbar-env">API: connecting...</span>
-      </div>
-    </div>
-    <div class="content-area">
-
-      <!-- ── Dashboard ── -->
-      <section id="section-dashboard" class="section active">
-        <div class="section-header">
-          <div><h2>Dashboard</h2><p>Platform overview</p></div>
-          <button class="btn btn-secondary btn-sm" onclick="loadDashboard()">&#8635; Refresh</button>
+      <section class="section active" id="dashboard">
+        <div class="page-header"><h2>Dashboard</h2><p>Monitor growth, moderation pressure, and recent platform activity.</p></div>
+        <div class="kpi-grid" id="kpi-grid"></div>
+        <div class="split">
+          <div class="card"><div class="kpi-label">Weekly Signups</div><div class="chart-row" id="weekly-chart"></div></div>
+          <div class="card"><div class="kpi-label">Recent Alerts</div><div id="alerts-table"></div></div>
         </div>
-        <div class="kpi-grid" id="kpi-grid"><!-- JS --></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-          <div class="card">
-            <div class="card-title">Content (last 7 days)</div>
-            <div class="mini-chart" id="mini-chart"></div>
+      </section>
+      <section class="section" id="queue">
+        <div class="page-header"><h2>Moderation Queue</h2><p>Review pending creator and business content.</p></div>
+        <div class="filters"><select id="queue-status"><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select><button class="secondary" data-refresh="queue">Refresh</button></div>
+        <div class="bulk-bar" id="bulk-bar"><strong id="bulk-count">0 selected</strong><textarea id="bulk-note" placeholder="Optional moderation note"></textarea><button class="success" data-bulk="approve">Approve</button><button class="danger" data-bulk="reject">Reject</button><button class="danger" data-bulk="delete">Delete</button></div>
+        <div class="table-wrap"><table><thead><tr><th><input type="checkbox" id="queue-select-all" /></th><th>ID</th><th>Type</th><th>Content Title</th><th>Submitted</th><th>Actions</th></tr></thead><tbody id="queue-body"></tbody></table></div>
+        <div class="pager"><button class="secondary" id="queue-prev">Previous</button><span id="queue-page-info">Showing 0-0 of 0</span><button class="secondary" id="queue-next">Next</button></div>
+      </section>
+      <section class="section" id="content">
+        <div class="page-header"><h2>Content Library</h2><p>Publish or remove creator posts and business campaigns.</p></div>
+        <div class="filters"><input id="content-search" placeholder="Search title" /><select id="content-status"><option value="">All statuses</option><option value="published">Published</option><option value="pending">Pending</option><option value="rejected">Rejected</option><option value="deleted">Deleted</option></select><button class="secondary" data-refresh="content">Apply</button></div>
+        <div class="table-wrap"><table><thead><tr><th>ID</th><th>Type</th><th>Title</th><th>Status</th><th>Views</th><th>Date</th><th>Actions</th></tr></thead><tbody id="content-body"></tbody></table></div>
+        <div class="pager"><button class="secondary" id="content-prev">Previous</button><span id="content-page-info">Showing 0-0 of 0</span><button class="secondary" id="content-next">Next</button></div>
+      </section>
+      <section class="section" id="users">
+        <div class="page-header"><h2>Users</h2><p>Manage creators, businesses, verification, and roles.</p></div>
+        <div class="filters"><input id="users-search" placeholder="Search name or email" /><button class="secondary" data-refresh="users">Search</button></div>
+        <div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Email</th><th>Role</th><th>Suspended</th><th>Verified</th><th>Joined</th><th>Actions</th></tr></thead><tbody id="users-body"></tbody></table></div>
+        <div class="pager"><button class="secondary" id="users-prev">Previous</button><span id="users-page-info">Showing 0-0 of 0</span><button class="secondary" id="users-next">Next</button></div>
+      </section>
+      <section class="section" id="audit">
+        <div class="page-header"><h2>Audit Trail</h2><p>Track moderation, logins, and account actions across the platform.</p></div>
+        <div class="filters"><select id="audit-actor-type"><option value="">All actors</option><option value="admin">Admin</option><option value="creator">Creator</option><option value="business">Business</option><option value="system">System</option></select><button class="secondary" data-refresh="audit">Apply</button><button class="primary" id="audit-export">Export JSON</button></div>
+        <div class="table-wrap"><table><thead><tr><th>ID</th><th>Actor Type</th><th>Actor ID</th><th>Action</th><th>Target</th><th>Date</th></tr></thead><tbody id="audit-body"></tbody></table></div>
+        <div class="pager"><button class="secondary" id="audit-prev">Previous</button><span id="audit-page-info">Showing 0-0 of 0</span><button class="secondary" id="audit-next">Next</button></div>
+      </section>
+      <section class="section" id="settings">
+        <div class="page-header"><h2>Settings</h2><p>Change the admin password for this environment.</p></div>
+        <div class="card">
+          <div class="settings-form">
+            <div class="field" style="flex: 1 1 220px;"><label for="current-password">Current password</label><input id="current-password" type="password" /></div>
+            <div class="field" style="flex: 1 1 220px;"><label for="new-password">New password</label><input id="new-password" type="password" /></div>
+            <div class="field" style="flex: 1 1 220px;"><label for="confirm-password">Confirm new password</label><input id="confirm-password" type="password" /></div>
           </div>
-          <div class="card">
-            <div class="card-title">Top Sports</div>
-            <div id="sport-breakdown" style="margin-top:12px"></div>
-          </div>
+          <div class="action-row"><button class="primary" id="change-password-button">Change Password</button><span class="info-text" id="settings-message"></span></div>
         </div>
       </section>
-
-      <!-- ── Mod Queue ── -->
-      <section id="section-queue" class="section">
-        <div class="section-header">
-          <div><h2>Moderation Queue</h2><p>Pending and flagged content awaiting review</p></div>
-          <button class="btn btn-secondary btn-sm" onclick="loadQueue()">&#8635; Refresh</button>
-        </div>
-        <div class="bulk-bar" id="bulk-bar">
-          <strong id="bulk-count">0</strong> selected
-          <button class="btn btn-success btn-sm" onclick="bulkAction('approved')">Approve all</button>
-          <button class="btn btn-danger btn-sm" onclick="bulkAction('rejected')">Reject all</button>
-          <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="clearSelection()">Clear</button>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr>
-              <th><input type="checkbox" id="select-all" onchange="toggleSelectAll(this)" /></th>
-              <th>Content</th><th>Creator</th><th>Sport</th><th>Status</th><th>Posted</th><th>Actions</th>
-            </tr></thead>
-            <tbody id="queue-tbody"><tr><td colspan="7"><div class="empty"><p>Loading...</p></div></td></tr></tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- ── Content ── -->
-      <section id="section-content" class="section">
-        <div class="section-header">
-          <div><h2>Content</h2><p>All content across the platform</p></div>
-          <button class="btn btn-secondary btn-sm" onclick="loadContent()">&#8635; Refresh</button>
-        </div>
-        <div class="filters">
-          <select id="content-status-filter" onchange="loadContent()">
-            <option value="">All statuses</option>
-            <option value="approved">Approved</option>
-            <option value="pending">Pending</option>
-            <option value="rejected">Rejected</option>
-            <option value="flagged">Flagged</option>
-          </select>
-          <select id="content-sport-filter" onchange="loadContent()">
-            <option value="">All sports</option>
-            <option value="basketball">Basketball</option>
-            <option value="football">Football</option>
-            <option value="tennis">Tennis</option>
-            <option value="athletics">Athletics</option>
-            <option value="swimming">Swimming</option>
-          </select>
-          <div class="filter-sep"></div>
-          <span id="content-count" style="font-size:12px;color:var(--text-muted)"></span>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Title</th><th>Creator</th><th>Sport</th><th>Type</th><th>Status</th><th>Posted</th><th>Actions</th></tr></thead>
-            <tbody id="content-tbody"><tr><td colspan="7"><div class="empty"><p>Loading...</p></div></td></tr></tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- ── Users ── -->
-      <section id="section-users" class="section">
-        <div class="section-header">
-          <div><h2>Users</h2><p>Creators and business accounts</p></div>
-          <button class="btn btn-secondary btn-sm" onclick="loadUsers()">&#8635; Refresh</button>
-        </div>
-        <div class="tabs" id="user-tabs">
-          <div class="tab active" data-type="creator" onclick="switchUserTab(this)">Creators</div>
-          <div class="tab" data-type="business" onclick="switchUserTab(this)">Businesses</div>
-        </div>
-        <div class="table-wrap">
-          <table id="users-table">
-            <thead id="users-thead"></thead>
-            <tbody id="users-tbody"><tr><td colspan="7"><div class="empty"><p>Loading...</p></div></td></tr></tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- ── Audit Log ── -->
-      <section id="section-audit" class="section">
-        <div class="section-header">
-          <div><h2>Audit Log</h2><p>Full action history</p></div>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-secondary btn-sm" onclick="exportAudit()">&#8595; Export JSON</button>
-            <button class="btn btn-secondary btn-sm" onclick="loadAudit()">&#8635; Refresh</button>
-          </div>
-        </div>
-        <div class="filters">
-          <select id="audit-actor-filter" onchange="loadAudit()">
-            <option value="">All actors</option>
-            <option value="user">User</option>
-            <option value="business">Business</option>
-            <option value="admin">Admin</option>
-            <option value="system">System</option>
-          </select>
-          <input type="text" id="audit-action-filter" placeholder="Filter by action…" style="max-width:200px" oninput="debounceAudit()" />
-          <div class="filter-sep"></div>
-          <span id="audit-count" style="font-size:12px;color:var(--text-muted)"></span>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>#</th><th>Actor</th><th>Type</th><th>Action</th><th>Target</th><th>IP</th><th>Meta</th><th>Time</th></tr></thead>
-            <tbody id="audit-tbody"><tr><td colspan="8"><div class="empty"><p>Loading...</p></div></td></tr></tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- ── Settings ── -->
-      <section id="section-settings" class="section">
-        <div class="section-header"><div><h2>Settings</h2><p>Admin account settings</p></div></div>
-        <div class="card" style="max-width:480px">
-          <div class="card-title">Change Password</div>
-          <form id="password-form" style="margin-top:16px">
-            <div class="form-group">
-              <label class="form-label">Current password</label>
-              <input type="password" id="pw-current" required />
-            </div>
-            <div class="form-group">
-              <label class="form-label">New password</label>
-              <input type="password" id="pw-new" required minlength="8" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Confirm new password</label>
-              <input type="password" id="pw-confirm" required />
-            </div>
-            <div class="form-error" id="pw-error" style="display:none"></div>
-            <button type="submit" class="btn btn-primary" id="pw-btn">Update password</button>
-          </form>
-        </div>
-        <div class="card" style="max-width:480px;margin-top:16px">
-          <div class="card-title">API Connection</div>
-          <div style="margin-top:12px;font-size:13px;color:var(--text-muted)">
-            Base URL: <code style="font-family:var(--mono);color:var(--accent)" id="api-base-display"></code>
-          </div>
-          <div style="margin-top:8px">
-            <label class="form-label" style="margin-bottom:5px;display:block">Override API base URL</label>
-            <div style="display:flex;gap:8px">
-              <input type="text" id="api-url-input" placeholder="http://localhost:3001" style="flex:1" />
-              <button class="btn btn-secondary btn-sm" onclick="setApiBase()">Save</button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-    </div>
+    </main>
   </div>
-</div>
-
-<!-- Toast container -->
-<div id="toast-container"></div>
-
-<!-- Moderate modal -->
-<div class="modal-overlay" id="moderate-modal">
-  <div class="modal">
-    <div class="modal-header">
-      <h3 id="modal-title">Moderate Content</h3>
-      <button class="btn-icon" onclick="closeModal('moderate-modal')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-      </button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label">Action</label>
-        <select id="modal-status">
-          <option value="approved">Approve</option>
-          <option value="rejected">Reject</option>
-          <option value="flagged">Flag</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Moderation note (optional)</label>
-        <textarea id="modal-note" rows="3" placeholder="Reason for this decision…"></textarea>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('moderate-modal')">Cancel</button>
-      <button class="btn btn-primary" onclick="submitModerate()">Confirm</button>
-    </div>
-  </div>
-</div>
-
-<script>
-// ── Config ──────────────────────────────────────────────────────────────
-let API_BASE = localStorage.getItem('px_api_base') || 'http://localhost:3001';
-let TOKEN = localStorage.getItem('px_admin_token') || null;
-let currentAdmin = null;
-let currentSection = 'dashboard';
-let moderateTargetId = null;
-let selectedIds = new Set();
-let currentUserTab = 'creator';
-let auditDebounce = null;
-let auditLogs = [];
-
-// ── Boot ─────────────────────────────────────────────────────────────────
-document.getElementById('api-base-display').textContent = API_BASE;
-document.getElementById('api-url-input').value = API_BASE;
-
-if (TOKEN) {
-  verifySession();
-} 
-
-// ── API helper ────────────────────────────────────────────────────────────
-async function api(method, path, body) {
-  const opts = {
-    method,
-    headers: { 'Content-Type': 'application/json', ...(TOKEN ? { Authorization: 'Bearer ' + TOKEN } : {}) },
-  };
-  if (body) opts.body = JSON.stringify(body);
-  try {
-    const res = await fetch(API_BASE + path, opts);
-    const data = await res.json();
-    return { ok: res.ok, status: res.status, data };
-  } catch (e) {
-    return { ok: false, status: 0, data: { error: 'Network error — is the API running?' } };
-  }
-}
-
-// ── Session ───────────────────────────────────────────────────────────────
-async function verifySession() {
-  const r = await api('GET', '/api/admin/auth/me');
-  if (r.ok) {
-    currentAdmin = r.data.admin;
-    showApp();
-  } else {
-    TOKEN = null;
-    localStorage.removeItem('px_admin_token');
-  }
-}
-
-function showApp() {
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('app').style.display = 'flex';
-  document.getElementById('sidebar-admin-name').textContent = currentAdmin.username;
-  document.getElementById('sidebar-admin-role').textContent = currentAdmin.role;
-  document.getElementById('topbar-env').textContent = 'API: ' + API_BASE;
-  navigate('dashboard');
-}
-
-function logout() {
-  TOKEN = null;
-  currentAdmin = null;
-  localStorage.removeItem('px_admin_token');
-  document.getElementById('app').style.display = 'none';
-  document.getElementById('login-screen').style.display = 'flex';
-  toast('Signed out', 'info');
-}
-
-// ── Login ─────────────────────────────────────────────────────────────────
-document.getElementById('login-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const email    = document.getElementById('login-email').value;
-  const password = document.getElementById('login-password').value;
-  const btn      = document.getElementById('login-btn');
-  const errEl    = document.getElementById('login-error');
-  btn.disabled = true; btn.textContent = 'Signing in…';
-  errEl.style.display = 'none';
-
-  const r = await api('POST', '/api/admin/auth/login', { email, password });
-  btn.disabled = false; btn.textContent = 'Sign in';
-
-  if (r.ok) {
-    TOKEN = r.data.token;
-    currentAdmin = r.data.admin;
-    localStorage.setItem('px_admin_token', TOKEN);
-    showApp();
-  } else {
-    errEl.textContent = r.data.error || 'Login failed';
-    errEl.style.display = 'block';
-  }
-});
-
-// ── Navigation ────────────────────────────────────────────────────────────
-document.querySelectorAll('.nav-item').forEach(el => {
-  el.addEventListener('click', () => navigate(el.dataset.section));
-});
-
-function navigate(section) {
-  currentSection = section;
-  document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.section === section));
-  document.querySelectorAll('.section').forEach(el => el.classList.toggle('active', el.id === 'section-' + section));
-  const titles = { dashboard:'Dashboard', queue:'Moderation Queue', content:'Content', users:'Users', audit:'Audit Log', settings:'Settings' };
-  document.getElementById('topbar-title').textContent = titles[section] || section;
-  const loaders = { dashboard: loadDashboard, queue: loadQueue, content: loadContent, users: loadUsers, audit: loadAudit };
-  if (loaders[section]) loaders[section]();
-}
-
-// ── Dashboard ─────────────────────────────────────────────────────────────
-async function loadDashboard() {
-  const r = await api('GET', '/api/admin/analytics');
-  if (!r.ok) { toast('Failed to load analytics', 'error'); return; }
-  const { kpis, content_last_7_days, sport_breakdown } = r.data;
-
-  const kpiDefs = [
-    { key: 'total_creators',    label: 'Creators',     cls: 'accent' },
-    { key: 'total_businesses',  label: 'Businesses',   cls: 'green' },
-    { key: 'total_content',     label: 'Total Content',cls: 'accent' },
-    { key: 'total_opps',        label: 'Opportunities',cls: 'green' },
-    { key: 'pending_queue',     label: 'Pending',      cls: 'yellow' },
-    { key: 'flagged_queue',     label: 'Flagged',      cls: 'orange' },
-    { key: 'total_applications',label: 'Applications', cls: 'accent' },
-  ];
-  document.getElementById('kpi-grid').innerHTML = kpiDefs.map(k =>
-    `<div class="kpi-card"><div class="kpi-label">${k.label}</div><div class="kpi-value ${k.cls}">${(kpis[k.key]||0).toLocaleString()}</div></div>`
-  ).join('');
-
-  // Update queue badge
-  const queueCount = (kpis.pending_queue || 0) + (kpis.flagged_queue || 0);
-  const badge = document.getElementById('queue-badge');
-  badge.textContent = queueCount;
-  badge.style.display = queueCount > 0 ? 'inline-block' : 'none';
-
-  // Mini chart
-  if (content_last_7_days && content_last_7_days.length) {
-    const max = Math.max(...content_last_7_days.map(d => parseInt(d.posts, 10)), 1);
-    document.getElementById('mini-chart').innerHTML = content_last_7_days.map(d => {
-      const h = Math.max(4, Math.round((parseInt(d.posts,10) / max) * 56));
-      const day = new Date(d.day).toLocaleDateString('en-GB', { weekday:'short' });
-      return `<div class="bar-col"><div class="bar" style="height:${h}px" title="${d.posts} posts"></div><div class="bar-label">${day}</div></div>`;
-    }).join('');
-  } else {
-    document.getElementById('mini-chart').innerHTML = '<div style="color:var(--text-faint);font-size:12px">No data yet</div>';
-  }
-
-  // Sport breakdown
-  if (sport_breakdown && sport_breakdown.length) {
-    document.getElementById('sport-breakdown').innerHTML = sport_breakdown.map(s =>
-      `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px">
-        <span style="text-transform:capitalize">${s.sport}</span>
-        <span style="font-variant-numeric:tabular-nums;color:var(--text-muted)">${s.count}</span>
-      </div>`
-    ).join('');
-  } else {
-    document.getElementById('sport-breakdown').innerHTML = '<div style="color:var(--text-faint);font-size:12px;padding-top:8px">No data yet</div>';
-  }
-}
-
-// ── Mod Queue ─────────────────────────────────────────────────────────────
-async function loadQueue() {
-  const r = await api('GET', '/api/admin/queue');
-  if (!r.ok) { toast('Failed to load queue', 'error'); return; }
-  const { queue } = r.data;
-  const tbody = document.getElementById('queue-tbody');
-  selectedIds.clear();
-  updateBulkBar();
-
-  if (!queue || !queue.length) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg><p>Queue is clear — nothing to review</p></div></td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = queue.map(item => `
-    <tr>
-      <td><input type="checkbox" class="row-check" data-id="${item.id}" onchange="toggleRow(this)" /></td>
-      <td style="max-width:240px">
-        <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.title)}</div>
-        ${item.tags && item.tags.length ? `<div style="margin-top:3px">${item.tags.slice(0,3).map(t=>`<span class="badge badge-admin" style="margin-right:3px">${esc(t)}</span>`).join('')}</div>` : ''}
-      </td>
-      <td>
-        <div style="font-weight:500">${esc(item.display_name)}</div>
-        <div style="font-size:11px;color:var(--text-muted)">@${esc(item.username)}</div>
-      </td>
-      <td style="text-transform:capitalize">${esc(item.sport||'—')}</td>
-      <td><span class="badge badge-${item.status}">${item.status}</span></td>
-      <td class="td-mono">${fmtDate(item.created_at)}</td>
-      <td>
-        <div style="display:flex;gap:4px">
-          <button class="btn btn-success btn-sm" onclick="quickModerate(${item.id},'approved')">Approve</button>
-          <button class="btn btn-danger btn-sm" onclick="quickModerate(${item.id},'rejected')">Reject</button>
-          <button class="btn btn-secondary btn-sm" onclick="openModerate(${item.id})">More</button>
-        </div>
-      </td>
-    </tr>`).join('');
-}
-
-async function quickModerate(id, status) {
-  const r = await api('PATCH', `/api/admin/queue/${id}`, { status });
-  if (r.ok) { toast(`Content ${status}`, 'success'); loadQueue(); if (currentSection === 'dashboard') loadDashboard(); }
-  else toast(r.data.error || 'Action failed', 'error');
-}
-
-function openModerate(id) {
-  moderateTargetId = id;
-  document.getElementById('modal-note').value = '';
-  document.getElementById('modal-status').value = 'approved';
-  document.getElementById('moderate-modal').classList.add('open');
-}
-
-async function submitModerate() {
-  if (!moderateTargetId) return;
-  const status = document.getElementById('modal-status').value;
-  const moderation_note = document.getElementById('modal-note').value;
-  const r = await api('PATCH', `/api/admin/queue/${moderateTargetId}`, { status, moderation_note });
-  if (r.ok) { toast(`Content ${status}`, 'success'); closeModal('moderate-modal'); loadQueue(); }
-  else toast(r.data.error || 'Action failed', 'error');
-}
-
-async function bulkAction(status) {
-  if (!selectedIds.size) return;
-  const r = await api('POST', '/api/admin/queue/bulk', { ids: [...selectedIds], status });
-  if (r.ok) { toast(`${r.data.updated} items ${status}`, 'success'); loadQueue(); }
-  else toast(r.data.error || 'Bulk action failed', 'error');
-}
-
-function toggleRow(cb) {
-  const id = parseInt(cb.dataset.id, 10);
-  cb.checked ? selectedIds.add(id) : selectedIds.delete(id);
-  updateBulkBar();
-}
-
-function toggleSelectAll(cb) {
-  document.querySelectorAll('.row-check').forEach(el => { el.checked = cb.checked; toggleRow(el); });
-}
-
-function clearSelection() {
-  selectedIds.clear();
-  document.querySelectorAll('.row-check').forEach(el => el.checked = false);
-  const sa = document.getElementById('select-all');
-  if (sa) sa.checked = false;
-  updateBulkBar();
-}
-
-function updateBulkBar() {
-  const bar = document.getElementById('bulk-bar');
-  const count = document.getElementById('bulk-count');
-  count.textContent = selectedIds.size;
-  bar.classList.toggle('visible', selectedIds.size > 0);
-}
-
-// ── Content ───────────────────────────────────────────────────────────────
-async function loadContent() {
-  const status = document.getElementById('content-status-filter').value;
-  const sport  = document.getElementById('content-sport-filter').value;
-  let url = '/api/content?limit=50';
-  if (sport) url += '&sport=' + encodeURIComponent(sport);
-  const r = await api('GET', url);
-  if (!r.ok) { toast('Failed to load content', 'error'); return; }
-  let items = r.data.content || [];
-  if (status) items = items.filter(i => i.status === status);
-  document.getElementById('content-count').textContent = items.length + ' items';
-  const tbody = document.getElementById('content-tbody');
-  if (!items.length) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><p>No content found</p></div></td></tr>`;
-    return;
-  }
-  tbody.innerHTML = items.map(item => `
-    <tr>
-      <td style="max-width:200px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.title)}</td>
-      <td>${esc(item.display_name||'—')}</td>
-      <td style="text-transform:capitalize">${esc(item.sport||'—')}</td>
-      <td>${esc(item.media_type||'text')}</td>
-      <td><span class="badge badge-${item.status||'pending'}">${item.status||'pending'}</span></td>
-      <td class="td-mono">${fmtDate(item.created_at)}</td>
-      <td>
-        <button class="btn btn-secondary btn-sm" onclick="openModerateFromContent(${item.id})">Moderate</button>
-      </td>
-    </tr>`).join('');
-}
-
-function openModerateFromContent(id) {
-  moderateTargetId = id;
-  document.getElementById('modal-note').value = '';
-  document.getElementById('modal-status').value = 'approved';
-  document.getElementById('modal-title').textContent = 'Moderate Content #' + id;
-  document.getElementById('moderate-modal').classList.add('open');
-}
-
-// ── Users ─────────────────────────────────────────────────────────────────
-function switchUserTab(el) {
-  document.querySelectorAll('#user-tabs .tab').forEach(t => t.classList.remove('active'));
-  el.classList.add('active');
-  currentUserTab = el.dataset.type;
-  loadUsers();
-}
-
-async function loadUsers() {
-  const r = await api('GET', '/api/admin/users?type=' + currentUserTab);
-  if (!r.ok) { toast('Failed to load users', 'error'); return; }
-  const users = r.data.users || [];
-  const thead = document.getElementById('users-thead');
-  const tbody = document.getElementById('users-tbody');
-
-  if (currentUserTab === 'creator') {
-    thead.innerHTML = '<tr><th>Name</th><th>Username</th><th>Email</th><th>Sport</th><th>Status</th><th>Followers</th><th>Joined</th><th>Actions</th></tr>';
-    tbody.innerHTML = !users.length
-      ? `<tr><td colspan="8"><div class="empty"><p>No creators found</p></div></td></tr>`
-      : users.map(u => `
-        <tr>
-          <td style="font-weight:500">${esc(u.display_name||u.username)}</td>
-          <td class="td-mono">@${esc(u.username)}</td>
-          <td style="font-size:12px;color:var(--text-muted)">${esc(u.email)}</td>
-          <td style="text-transform:capitalize">${esc(u.sport||'—')}</td>
-          <td>${u.is_suspended ? '<span class="badge badge-suspended">Suspended</span>' : '<span class="badge badge-active">Active</span>'}</td>
-          <td class="td-mono">${(u.follower_count||0).toLocaleString()}</td>
-          <td class="td-mono">${fmtDate(u.created_at)}</td>
-          <td>
-            <div style="display:flex;gap:4px">
-              ${!u.is_verified ? `<button class="btn btn-secondary btn-sm" onclick="userAction('creator',${u.id},'verify')">Verify</button>` : ''}
-              ${u.is_suspended
-                ? `<button class="btn btn-success btn-sm" onclick="userAction('creator',${u.id},'reactivate')">Reactivate</button>`
-                : `<button class="btn btn-danger btn-sm" onclick="userAction('creator',${u.id},'suspend')">Suspend</button>`}
-            </div>
-          </td>
-        </tr>`).join('');
-  } else {
-    thead.innerHTML = '<tr><th>Name</th><th>Email</th><th>Industry</th><th>Status</th><th>Joined</th><th>Actions</th></tr>';
-    tbody.innerHTML = !users.length
-      ? `<tr><td colspan="6"><div class="empty"><p>No businesses found</p></div></td></tr>`
-      : users.map(u => `
-        <tr>
-          <td style="font-weight:500">${esc(u.name)}</td>
-          <td style="font-size:12px;color:var(--text-muted)">${esc(u.email)}</td>
-          <td style="text-transform:capitalize">${esc(u.industry||'—')}</td>
-          <td>${u.is_suspended ? '<span class="badge badge-suspended">Suspended</span>' : '<span class="badge badge-active">Active</span>'}</td>
-          <td class="td-mono">${fmtDate(u.created_at)}</td>
-          <td>
-            <div style="display:flex;gap:4px">
-              ${!u.is_verified ? `<button class="btn btn-secondary btn-sm" onclick="userAction('business',${u.id},'verify')">Verify</button>` : ''}
-              ${u.is_suspended
-                ? `<button class="btn btn-success btn-sm" onclick="userAction('business',${u.id},'reactivate')">Reactivate</button>`
-                : `<button class="btn btn-danger btn-sm" onclick="userAction('business',${u.id},'suspend')">Suspend</button>`}
-            </div>
-          </td>
-        </tr>`).join('');
-  }
-}
-
-async function userAction(type, id, action) {
-  const r = await api('PATCH', `/api/admin/users/${type}/${id}`, { action });
-  if (r.ok) { toast(`User ${action}d`, 'success'); loadUsers(); }
-  else toast(r.data.error || 'Action failed', 'error');
-}
-
-// ── Audit Log ─────────────────────────────────────────────────────────────
-async function loadAudit() {
-  const actor  = document.getElementById('audit-actor-filter').value;
-  const action = document.getElementById('audit-action-filter').value;
-  let url = '/api/admin/audit?limit=100';
-  if (actor)  url += '&actor_type=' + encodeURIComponent(actor);
-  if (action) url += '&action=' + encodeURIComponent(action);
-  const r = await api('GET', url);
-  if (!r.ok) { toast('Failed to load audit log', 'error'); return; }
-  auditLogs = r.data.logs || [];
-  document.getElementById('audit-count').textContent = auditLogs.length + ' entries';
-  const tbody = document.getElementById('audit-tbody');
-  if (!auditLogs.length) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><p>No audit entries found</p></div></td></tr>`;
-    return;
-  }
-  tbody.innerHTML = auditLogs.map(l => `
-    <tr>
-      <td class="td-mono" style="font-size:11px">${l.id}</td>
-      <td class="td-mono">${l.actor_id || '—'}</td>
-      <td><span class="badge badge-${l.actor_type === 'admin' ? 'admin' : l.actor_type === 'user' ? 'active' : 'pending'}">${l.actor_type||'—'}</span></td>
-      <td style="font-family:var(--mono);font-size:12px;color:var(--accent)">${esc(l.action)}</td>
-      <td class="td-mono">${l.target_type ? esc(l.target_type) + ' #' + l.target_id : '—'}</td>
-      <td class="td-mono" style="font-size:11px">${l.ip || '—'}</td>
-      <td><pre class="json-pre">${esc(JSON.stringify(l.meta || {}, null, 1))}</pre></td>
-      <td class="td-mono">${fmtDate(l.created_at)}</td>
-    </tr>`).join('');
-}
-
-function debounceAudit() {
-  clearTimeout(auditDebounce);
-  auditDebounce = setTimeout(loadAudit, 400);
-}
-
-function exportAudit() {
-  const blob = new Blob([JSON.stringify(auditLogs, null, 2)], { type: 'application/json' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url; a.download = `audit-log-${Date.now()}.json`;
-  a.click(); URL.revokeObjectURL(url);
-  toast('Audit log exported', 'success');
-}
-
-// ── Settings ──────────────────────────────────────────────────────────────
-document.getElementById('password-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const current  = document.getElementById('pw-current').value;
-  const newPw    = document.getElementById('pw-new').value;
-  const confirm  = document.getElementById('pw-confirm').value;
-  const errEl    = document.getElementById('pw-error');
-  const btn      = document.getElementById('pw-btn');
-  errEl.style.display = 'none';
-  if (newPw !== confirm) { errEl.textContent = 'Passwords do not match'; errEl.style.display = 'block'; return; }
-  btn.disabled = true; btn.textContent = 'Updating…';
-  const r = await api('PATCH', '/api/admin/settings/password', { current_password: current, new_password: newPw });
-  btn.disabled = false; btn.textContent = 'Update password';
-  if (r.ok) { toast('Password updated', 'success'); e.target.reset(); }
-  else { errEl.textContent = r.data.error || 'Update failed'; errEl.style.display = 'block'; }
-});
-
-function setApiBase() {
-  const val = document.getElementById('api-url-input').value.trim();
-  if (!val) return;
-  API_BASE = val;
-  localStorage.setItem('px_api_base', val);
-  document.getElementById('api-base-display').textContent = val;
-  document.getElementById('topbar-env').textContent = 'API: ' + val;
-  toast('API base URL updated', 'success');
-}
-
-// ── Modal ─────────────────────────────────────────────────────────────────
-function closeModal(id) {
-  document.getElementById(id).classList.remove('open');
-  moderateTargetId = null;
-}
-document.querySelectorAll('.modal-overlay').forEach(m => {
-  m.addEventListener('click', e => { if (e.target === m) closeModal(m.id); });
-});
-document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => closeModal(m.id)); });
-
-// ── Toast ─────────────────────────────────────────────────────────────────
-function toast(msg, type = 'info') {
-  const el = document.createElement('div');
-  el.className = `toast ${type}`;
-  el.textContent = msg;
-  document.getElementById('toast-container').appendChild(el);
-  setTimeout(() => el.remove(), 3500);
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────
-function esc(str) {
-  if (str == null) return '';
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-function fmtDate(iso) {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
-}
-</script>
+  <div class="toast-stack" id="toast-stack"></div>
+  <script>
+    const API_BASE = 'http://localhost:3011';
+    let adminToken = localStorage.getItem('adminToken') || null;
+    const pageState = { queue: { offset: 0, limit: 10, total: 0 }, content: { offset: 0, limit: 10, total: 0 }, users: { offset: 0, limit: 10, total: 0 }, audit: { offset: 0, limit: 12, total: 0 } };
+    let selectedQueueIds = new Set();
+    function showToast(message, type = 'info') { const toast = document.createElement('div'); toast.className = `toast ${type}`; toast.textContent = message; document.getElementById('toast-stack').appendChild(toast); setTimeout(() => toast.remove(), 3000); }
+    function formatDate(value) { if (!value) return 'N/A'; return new Date(value).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+    function escapeHtml(value) { return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;'); }
+    async function apiFetch(path, options = {}) { const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) }; if (adminToken) headers.Authorization = `Bearer ${adminToken}`; const response = await fetch(`${API_BASE}${path}`, { ...options, headers }); let data = null; try { data = await response.json(); } catch { data = null; } if (!response.ok) throw new Error(data?.error || data?.message || 'Request failed'); return data; }
+    function badgeClass(value) { return String(value || '').toLowerCase().replaceAll('_', '-'); }
+    function showSection(id) { document.querySelectorAll('.section').forEach((section) => section.classList.toggle('active', section.id === id)); document.querySelectorAll('.nav-item').forEach((button) => button.classList.toggle('active', button.dataset.section === id)); loadSection(id); }
+    function updatePager(key, count) { const state = pageState[key]; const start = state.total === 0 ? 0 : state.offset + 1; const end = Math.min(state.offset + count, state.total); document.getElementById(`${key}-page-info`).textContent = `Showing ${start}-${end} of ${state.total}`; }
+    function stepPage(key, direction) { const state = pageState[key]; const nextOffset = state.offset + direction * state.limit; if (nextOffset < 0 || (nextOffset >= state.total && direction > 0)) return; state.offset = nextOffset; loadSection(key); }
+    async function loadDashboard() { const analytics = await apiFetch('/api/admin/analytics'); const alerts = await apiFetch('/api/admin/alerts'); const data = analytics.data; const kpis = [['Creators', data.total_creators], ['Businesses', data.total_businesses], ['Content', data.total_content], ['Published', data.published_content], ['Pending Review', data.pending_moderation], ['Opportunities', data.total_opportunities]]; document.getElementById('kpi-grid').innerHTML = kpis.map(([label, value]) => `<div class="card"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div></div>`).join(''); const max = Math.max(...data.weekly_signups.map((item) => item.creators + item.businesses), 1); document.getElementById('weekly-chart').innerHTML = data.weekly_signups.map((item) => { const total = item.creators + item.businesses; const height = Math.max(12, Math.round((total / max) * 150)); const label = new Date(item.date).toLocaleDateString('en-GB', { weekday: 'short' }); return `<div class="bar-col"><div class="bar" style="height:${height}px" title="${total} signups"></div><div class="bar-label">${label}</div></div>`; }).join(''); const rows = alerts.data || []; document.getElementById('alerts-table').innerHTML = rows.length ? `<table><thead><tr><th>Actor</th><th>Action</th><th>Date</th></tr></thead><tbody>${rows.map((item) => `<tr><td>${escapeHtml(item.actor_type)} ${item.actor_id ?? ''}</td><td>${escapeHtml(item.action)}</td><td>${formatDate(item.created_at)}</td></tr>`).join('')}</tbody></table>` : '<div class="info-text">No recent alerts.</div>'; }
+    async function loadQueue() { const state = pageState.queue; const status = document.getElementById('queue-status').value; const result = await apiFetch(`/api/admin/queue?status=${encodeURIComponent(status)}&limit=${state.limit}&offset=${state.offset}`); const items = result.data.items || []; state.total = result.data.total || 0; selectedQueueIds = new Set(); syncBulkBar(); document.getElementById('queue-select-all').checked = false; document.getElementById('queue-body').innerHTML = items.length ? items.map((item) => `<tr><td><input type="checkbox" data-id="${item.id}" class="queue-check" /></td><td>${item.id}</td><td><span class="badge ${badgeClass(item.content_type)}">${escapeHtml(item.content_type)}</span></td><td>${escapeHtml(item.content_title || 'Untitled')}</td><td>${formatDate(item.submitted_at)}</td><td><button class="success" data-queue-action="approve" data-id="${item.id}">Approve</button> <button class="danger" data-queue-action="reject" data-id="${item.id}">Reject</button></td></tr>`).join('') : '<tr><td colspan="6" class="info-text">Nothing to show here.</td></tr>'; updatePager('queue', items.length); }
+    async function runQueueBulkAction(action) { if (!selectedQueueIds.size) { showToast('Select at least one queue item.', 'error'); return; } if (!window.confirm(`Apply "${action}" to ${selectedQueueIds.size} item(s)?`)) return; await apiFetch('/api/admin/queue/bulk-action', { method: 'POST', body: JSON.stringify({ ids: Array.from(selectedQueueIds), action, note: document.getElementById('bulk-note').value.trim() }) }); showToast(`Queue updated: ${action}`, 'success'); loadQueue(); loadDashboard(); }
+    function syncBulkBar() { const bulkBar = document.getElementById('bulk-bar'); bulkBar.classList.toggle('visible', selectedQueueIds.size > 0); document.getElementById('bulk-count').textContent = `${selectedQueueIds.size} selected`; }
+    async function loadContent() { const state = pageState.content; const status = document.getElementById('content-status').value; const search = document.getElementById('content-search').value.trim(); const params = new URLSearchParams({ limit: state.limit, offset: state.offset }); if (status) params.set('status', status); if (search) params.set('search', search); const result = await apiFetch(`/api/admin/content?${params.toString()}`); const items = result.data.items || []; state.total = result.data.total || 0; document.getElementById('content-body').innerHTML = items.length ? items.map((item) => `<tr><td>${item.id}</td><td><span class="badge ${badgeClass(item.type)}">${escapeHtml(item.type)}</span></td><td>${escapeHtml(item.title)}</td><td><span class="badge ${badgeClass(item.status)}">${escapeHtml(item.status)}</span></td><td>${item.view_count ?? 0}</td><td>${formatDate(item.created_at)}</td><td>${item.status !== 'published' ? `<button class="success" data-content-publish="${item.id}" data-type="${item.type}">Publish</button>` : ''} <button class="danger" data-content-delete="${item.id}" data-type="${item.type}">Delete</button></td></tr>`).join('') : '<tr><td colspan="7" class="info-text">No content found.</td></tr>'; updatePager('content', items.length); }
+    async function loadUsers() { const state = pageState.users; const search = document.getElementById('users-search').value.trim(); const params = new URLSearchParams({ limit: state.limit, offset: state.offset }); if (search) params.set('search', search); const result = await apiFetch(`/api/admin/users?${params.toString()}`); const users = result.data.users || []; state.total = result.data.total || 0; document.getElementById('users-body').innerHTML = users.length ? users.map((user) => `<tr><td>${user.id}</td><td>${escapeHtml(user.name)}</td><td><span class="badge ${badgeClass(user.type)}">${escapeHtml(user.type)}</span></td><td>${escapeHtml(user.email)}</td><td>${user.type === 'creator' ? `<select data-role-user="${user.id}"><option value="creator" ${user.role === 'creator' ? 'selected' : ''}>creator</option><option value="admin" ${user.role === 'admin' ? 'selected' : ''}>admin</option></select>` : 'business'}</td><td><span class="badge ${user.is_suspended ? 'suspended' : 'active'}">${user.is_suspended ? 'Yes' : 'No'}</span></td><td><span class="badge ${user.is_email_verified ? 'verified' : 'pending'}">${user.is_email_verified ? 'Yes' : 'No'}</span></td><td>${formatDate(user.created_at)}</td><td><button class="${user.is_suspended ? 'success' : 'danger'}" data-user-toggle="${user.id}" data-user-type="${user.type}" data-user-suspended="${user.is_suspended}">${user.is_suspended ? 'Reactivate' : 'Suspend'}</button> ${user.is_email_verified ? '' : `<button class="secondary" data-user-verify="${user.id}" data-user-type="${user.type}">Verify Email</button>`}</td></tr>`).join('') : '<tr><td colspan="9" class="info-text">No users found.</td></tr>'; updatePager('users', users.length); }
+    async function loadAudit() { const state = pageState.audit; const actorType = document.getElementById('audit-actor-type').value; const params = new URLSearchParams({ limit: state.limit, offset: state.offset }); if (actorType) params.set('actor_type', actorType); const result = await apiFetch(`/api/admin/audit?${params.toString()}`); const logs = result.data.logs || []; state.total = result.data.total || 0; document.getElementById('audit-body').innerHTML = logs.length ? logs.map((item) => `<tr><td>${item.id}</td><td>${escapeHtml(item.actor_type)}</td><td>${item.actor_id ?? ''}</td><td>${escapeHtml(item.action)}</td><td>${escapeHtml(item.target_type || '')} ${item.target_id ?? ''}</td><td>${formatDate(item.created_at)}</td></tr>`).join('') : '<tr><td colspan="6" class="info-text">No audit entries found.</td></tr>'; updatePager('audit', logs.length); }
+    async function loadSection(id) { try { if (id === 'dashboard') await loadDashboard(); if (id === 'queue') await loadQueue(); if (id === 'content') await loadContent(); if (id === 'users') await loadUsers(); if (id === 'audit') await loadAudit(); } catch (error) { showToast(error.message, 'error'); } }
+    async function handleLogin() { const email = document.getElementById('login-email').value.trim(); const password = document.getElementById('login-password').value; const errorNode = document.getElementById('login-error'); errorNode.textContent = ''; try { const result = await apiFetch('/api/admin/auth/login', { method: 'POST', body: JSON.stringify({ email, password }), headers: {} }); adminToken = result.data.token; localStorage.setItem('adminToken', adminToken); document.getElementById('login-overlay').classList.add('hidden'); showToast('Welcome back.', 'success'); loadDashboard(); } catch (error) { errorNode.textContent = error.message; } }
+    async function handlePasswordChange() { const currentPassword = document.getElementById('current-password').value; const newPassword = document.getElementById('new-password').value; const confirmPassword = document.getElementById('confirm-password').value; const messageNode = document.getElementById('settings-message'); messageNode.textContent = ''; if (newPassword !== confirmPassword) { messageNode.textContent = 'New password and confirmation must match.'; return; } try { await apiFetch('/api/admin/auth/change-password', { method: 'POST', body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }) }); messageNode.textContent = 'Password updated successfully.'; showToast('Password changed.', 'success'); } catch (error) { messageNode.textContent = error.message; } }
+    document.getElementById('login-button').addEventListener('click', handleLogin);
+    document.getElementById('logout-button').addEventListener('click', () => { adminToken = null; localStorage.removeItem('adminToken'); document.getElementById('login-overlay').classList.remove('hidden'); });
+    document.getElementById('change-password-button').addEventListener('click', handlePasswordChange);
+    document.getElementById('audit-export').addEventListener('click', () => { window.open(`${API_BASE}/api/admin/audit/export`, '_blank'); });
+    document.querySelectorAll('.nav-item').forEach((button) => { button.addEventListener('click', () => showSection(button.dataset.section)); });
+    document.querySelectorAll('[data-refresh]').forEach((button) => { button.addEventListener('click', () => { const key = button.dataset.refresh; pageState[key].offset = 0; loadSection(key); }); });
+    document.getElementById('queue-select-all').addEventListener('change', (event) => { document.querySelectorAll('.queue-check').forEach((checkbox) => { checkbox.checked = event.target.checked; const id = Number(checkbox.dataset.id); if (checkbox.checked) selectedQueueIds.add(id); else selectedQueueIds.delete(id); }); syncBulkBar(); });
+    document.getElementById('queue-body').addEventListener('change', (event) => { if (!event.target.classList.contains('queue-check')) return; const id = Number(event.target.dataset.id); if (event.target.checked) selectedQueueIds.add(id); else selectedQueueIds.delete(id); syncBulkBar(); });
+    document.querySelectorAll('[data-bulk]').forEach((button) => { button.addEventListener('click', () => runQueueBulkAction(button.dataset.bulk)); });
+    document.getElementById('queue-body').addEventListener('click', async (event) => { const action = event.target.dataset.queueAction; if (!action) return; const id = Number(event.target.dataset.id); const bulkAction = action === 'approve' ? 'approve' : 'reject'; await apiFetch('/api/admin/queue/bulk-action', { method: 'POST', body: JSON.stringify({ ids: [id], action: bulkAction }) }); showToast(`Queue item ${bulkAction}d.`, 'success'); loadQueue(); loadDashboard(); });
+    document.getElementById('content-body').addEventListener('click', async (event) => { if (event.target.dataset.contentPublish) { const id = event.target.dataset.contentPublish; const type = event.target.dataset.type; await apiFetch(`/api/admin/content/${id}?type=${encodeURIComponent(type)}`, { method: 'PUT', body: JSON.stringify({ status: 'published' }) }); showToast('Content published.', 'success'); loadContent(); return; } if (event.target.dataset.contentDelete) { const id = event.target.dataset.contentDelete; const type = event.target.dataset.type; if (!window.confirm('Delete this content item?')) return; await apiFetch(`/api/admin/content/${id}?type=${encodeURIComponent(type)}`, { method: 'DELETE' }); showToast('Content deleted.', 'success'); loadContent(); } });
+    document.getElementById('users-body').addEventListener('click', async (event) => { if (event.target.dataset.userToggle) { const id = event.target.dataset.userToggle; const type = event.target.dataset.userType; const suspended = event.target.dataset.userSuspended === '1'; const path = suspended ? 'reactivate' : 'suspend'; await apiFetch(`/api/admin/users/${id}/${path}`, { method: 'POST', body: JSON.stringify({ user_type: type }) }); showToast(`User ${path}d.`, 'success'); loadUsers(); return; } if (event.target.dataset.userVerify) { const id = event.target.dataset.userVerify; const type = event.target.dataset.userType; await apiFetch(`/api/admin/users/${id}/email-verify`, { method: 'PUT', body: JSON.stringify({ user_type: type }) }); showToast('Email verified.', 'success'); loadUsers(); } });
+    document.getElementById('users-body').addEventListener('change', async (event) => { if (!event.target.dataset.roleUser) return; const id = event.target.dataset.roleUser; await apiFetch(`/api/admin/users/${id}/role`, { method: 'PUT', body: JSON.stringify({ role: event.target.value }) }); showToast('Creator role updated.', 'success'); });
+    document.getElementById('queue-prev').addEventListener('click', () => stepPage('queue', -1));
+    document.getElementById('queue-next').addEventListener('click', () => stepPage('queue', 1));
+    document.getElementById('content-prev').addEventListener('click', () => stepPage('content', -1));
+    document.getElementById('content-next').addEventListener('click', () => stepPage('content', 1));
+    document.getElementById('users-prev').addEventListener('click', () => stepPage('users', -1));
+    document.getElementById('users-next').addEventListener('click', () => stepPage('users', 1));
+    document.getElementById('audit-prev').addEventListener('click', () => stepPage('audit', -1));
+    document.getElementById('audit-next').addEventListener('click', () => stepPage('audit', 1));
+    if (adminToken) { document.getElementById('login-overlay').classList.add('hidden'); loadDashboard().catch((error) => { adminToken = null; localStorage.removeItem('adminToken'); document.getElementById('login-overlay').classList.remove('hidden'); showToast(error.message, 'error'); }); }
+  </script>
 </body>
 </html>

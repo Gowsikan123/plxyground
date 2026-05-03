@@ -107,6 +107,37 @@ router.get('/auth/me', requireAuth, (req, res) => {
   }
 });
 
+router.patch('/auth/me', requireAuth, (req, res) => {
+  try {
+    if (req.userType !== 'business') {
+      return res.status(403).json({ success: false, error: 'Business access required' });
+    }
+
+    const existing = db.prepare('SELECT * FROM businesses WHERE id = ?').get(req.user.id);
+    const { company_name, bio, logo_url, industry, website, location } = req.body;
+
+    db.prepare(
+      `UPDATE businesses
+       SET company_name = ?, bio = ?, logo_url = ?, industry = ?, website = ?, location = ?
+       WHERE id = ?`
+    ).run(
+      company_name !== undefined ? company_name : existing.company_name,
+      bio !== undefined ? bio : existing.bio,
+      logo_url !== undefined ? logo_url : existing.logo_url,
+      industry !== undefined ? industry : existing.industry,
+      website !== undefined ? website : existing.website,
+      location !== undefined ? location : existing.location,
+      existing.id
+    );
+
+    const updated = db.prepare('SELECT * FROM businesses WHERE id = ?').get(existing.id);
+    const { password_hash, ...safeBusiness } = updated;
+    return res.json({ success: true, data: safeBusiness });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.post(
   '/content',
   requireAuth,
@@ -173,6 +204,19 @@ router.put('/content/:id', requireAuth, (req, res) => {
 
     const updated = db.prepare('SELECT * FROM business_content WHERE id = ?').get(existing.id);
     return res.json({ success: true, data: updated });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.delete('/content/:id', requireAuth, (req, res) => {
+  try {
+    if (req.userType !== 'business') return res.status(403).json({ success: false, error: 'Business access required' });
+    const existing = db.prepare('SELECT * FROM business_content WHERE id = ? AND business_id = ?').get(req.params.id, req.user.id);
+    if (!existing) return res.status(404).json({ success: false, error: 'Content not found' });
+
+    db.prepare("UPDATE business_content SET status = 'deleted', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(existing.id);
+    return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }

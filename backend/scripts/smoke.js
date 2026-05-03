@@ -336,7 +336,7 @@ async function main() {
 
   const failed = results.filter((result) => result.status === 'FAIL');
   for (const result of results) {
-    console.log(`${result.name} | ${result.status} | ${result.detail}`);
+    process.stdout.write(`${result.name} | ${result.status} | ${result.detail}\n`);
   }
 
   if (failed.length) {

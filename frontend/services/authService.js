@@ -1,22 +1,36 @@
 import { apiCall } from './api';
 
-export const creatorSignup = (payload) =>
-  apiCall((api) => api.post('/api/auth/signup', payload));
+export const creatorSignup = async (payload) => {
+  const result = await apiCall((api) => api.post('/api/auth/signup', payload));
+  return { data: result.data?.data || null, error: result.error };
+};
 
-export const creatorLogin = (email, password) =>
-  apiCall((api) => api.post('/api/auth/login', { email, password }));
+export const creatorLogin = async (email, password) => {
+  const result = await apiCall((api) => api.post('/api/auth/login', { email, password }));
+  return { data: result.data?.data || null, error: result.error };
+};
 
-export const creatorMe = () =>
-  apiCall((api) => api.get('/api/auth/me'));
+export const creatorMe = async () => {
+  const result = await apiCall((api) => api.get('/api/auth/me'));
+  return { data: result.data?.data || null, error: result.error };
+};
 
-export const businessSignup = (payload) =>
-  apiCall((api) => api.post('/api/business-auth/signup', payload));
+export const businessSignup = async (payload) => {
+  const result = await apiCall((api) => api.post('/api/business/auth/signup', payload));
+  return { data: result.data?.data || null, error: result.error };
+};
 
-export const businessLogin = (email, password) =>
-  apiCall((api) => api.post('/api/business-auth/login', { email, password }));
+export const businessLogin = async (email, password) => {
+  const result = await apiCall((api) => api.post('/api/business/auth/login', { email, password }));
+  return { data: result.data?.data || null, error: result.error };
+};
 
-export const businessMe = () =>
-  apiCall((api) => api.get('/api/business-auth/me'));
+export const businessMe = async () => {
+  const result = await apiCall((api) => api.get('/api/business/auth/me'));
+  return { data: result.data?.data || null, error: result.error };
+};
 
-export const updateBusinessProfile = (payload) =>
-  apiCall((api) => api.patch('/api/business-auth/me', payload));
+export const updateBusinessProfile = async (payload) => {
+  const result = await apiCall((api) => api.patch('/api/business/auth/me', payload));
+  return { data: result.data?.data || null, error: result.error };
+};

@@ -1,18 +1,16 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Badge } from '../ui/Badge';
 import { Colors } from '../../constants/colors';
 import { Typography } from '../../constants/typography';
 import { Spacing, Radius } from '../../constants/spacing';
 
-export function OpportunityCard({ item }) {
-  const router = useRouter();
+export function OpportunityCard({ item, onPress }) {
   return (
     <TouchableOpacity
       style={styles.card}
       activeOpacity={0.85}
-      onPress={() => router.push(`/opportunity/${item.id}`)}
+      onPress={onPress}
     >
       <View style={styles.header}>
         <Text style={styles.title}>{item.title}</Text>
@@ -20,9 +18,9 @@ export function OpportunityCard({ item }) {
       </View>
       <Text style={styles.desc} numberOfLines={2}>{item.description}</Text>
       <View style={styles.footer}>
-        {item.budget ? <Text style={styles.meta}>💰 {item.budget}</Text> : null}
-        {item.location ? <Text style={styles.meta}>📍 {item.location}</Text> : null}
-        {item.deadline ? <Text style={styles.meta}>⏰ {item.deadline}</Text> : null}
+        {item.budget ? <Text style={styles.meta}>Budget: {item.budget}</Text> : null}
+        {item.location ? <Text style={styles.meta}>Location: {item.location}</Text> : null}
+        {item.deadline ? <Text style={styles.meta}>Deadline: {item.deadline}</Text> : null}
       </View>
     </TouchableOpacity>
   );

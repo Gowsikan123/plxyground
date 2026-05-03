@@ -20,47 +20,65 @@ export default function CreatorProfile() {
 
   useEffect(() => {
     (async () => {
-      const { data, error: err } = await getCreatorProfile(id);
-      if (err) setError(err);
-      else setProfile(data.data);
+      const { data, error: requestError } = await getCreatorProfile(id);
+      if (requestError) setError(requestError);
+      else setProfile(data);
       setLoading(false);
     })();
   }, [id]);
 
-  if (loading) return (
-    <View style={styles.page}>
-      <Header title="Creator" showBack />
-      {[1, 2, 3].map((k) => <SkeletonCard key={k} />)}
-    </View>
-  );
+  if (loading) {
+    return (
+      <View style={styles.page}>
+        <Header title="Creator" showBack />
+        {[1, 2, 3].map((key) => <SkeletonCard key={key} />)}
+      </View>
+    );
+  }
 
-  if (error || !profile) return (
-    <View style={styles.page}>
-      <Header title="Creator" showBack />
-      <EmptyState title="Creator not found" message={error || ''} />
-    </View>
-  );
+  if (error || !profile?.creator) {
+    return (
+      <View style={styles.page}>
+        <Header title="Creator" showBack />
+        <EmptyState title="Creator not found" message={error || ''} />
+      </View>
+    );
+  }
+
+  const creator = profile.creator;
 
   return (
     <View style={styles.page}>
-      <Header title={profile.display_name} showBack />
+      <Header title={creator.display_name} showBack />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.profileHeader}>
-          <Avatar uri={profile.avatar_url} name={profile.display_name} size={72} />
+          <Avatar uri={creator.avatar_url} name={creator.display_name} size={72} />
           <View style={styles.info}>
-            <Text style={styles.name}>{profile.display_name}</Text>
-            <Text style={styles.handle}>@{profile.username}</Text>
-            {profile.is_verified ? <Badge label="✓ Verified" /> : null}
+            <Text style={styles.name}>{creator.display_name}</Text>
+            <Text style={styles.handle}>@{creator.username}</Text>
+            {creator.is_verified ? <Badge label="Verified" /> : null}
           </View>
         </View>
-        {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
+        {creator.bio ? <Text style={styles.bio}>{creator.bio}</Text> : null}
         <View style={styles.stats}>
-          {profile.sport ? <Text style={styles.stat}>🏆 {profile.sport}</Text> : null}
-          {profile.location ? <Text style={styles.stat}>📍 {profile.location}</Text> : null}
-          <Text style={styles.stat}>👥 {profile.follower_count} followers</Text>
+          {creator.sport ? <Text style={styles.stat}>Sport: {creator.sport}</Text> : null}
+          {creator.location ? <Text style={styles.stat}>Location: {creator.location}</Text> : null}
+          <Text style={styles.stat}>Followers: {creator.follower_count || 0}</Text>
         </View>
         <Text style={styles.sectionTitle}>Posts</Text>
-        {(profile.posts || []).map((p) => <PostCard key={p.id} post={{ ...p, display_name: profile.display_name, username: profile.username, creator_slug: profile.slug, avatar_url: profile.avatar_url, is_verified: profile.is_verified }} />)}
+        {(profile.posts || []).map((post) => (
+          <PostCard
+            key={post.id}
+            post={{
+              ...post,
+              display_name: creator.display_name,
+              username: creator.username,
+              creator_id: creator.id,
+              avatar_url: creator.avatar_url,
+              is_verified: creator.is_verified,
+            }}
+          />
+        ))}
       </ScrollView>
     </View>
   );

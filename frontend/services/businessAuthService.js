@@ -1,57 +1,21 @@
-import api from './api';
+import { businessLogin, businessMe, businessSignup, updateBusinessProfile } from './authService';
+import { apiCall } from './api';
 
 export const businessAuthService = {
-  signup: async ({ email, password, companyName, industry, website, location }) => {
-    try {
-      const res = await api.post('/api/business-auth/signup', { email, password, companyName, industry, website, location });
-      return { data: res.data, error: null };
-    } catch (err) {
-      return { data: null, error: err.message };
-    }
-  },
-
-  login: async (email, password) => {
-    try {
-      const res = await api.post('/api/business-auth/login', { email, password });
-      return { data: res.data, error: null };
-    } catch (err) {
-      return { data: null, error: err.message };
-    }
-  },
-
-  me: async () => {
-    try {
-      const res = await api.get('/api/business-auth/me');
-      return { data: res.data, error: null };
-    } catch (err) {
-      return { data: null, error: err.message };
-    }
-  },
-
+  signup: businessSignup,
+  login: businessLogin,
+  me: businessMe,
+  updateProfile: updateBusinessProfile,
   createContent: async (payload) => {
-    try {
-      const res = await api.post('/api/business-auth/content', payload);
-      return { data: res.data, error: null };
-    } catch (err) {
-      return { data: null, error: err.message };
-    }
+    const result = await apiCall((api) => api.post('/api/business/content', payload));
+    return { data: result.data?.data || null, error: result.error };
   },
-
   getMyContent: async () => {
-    try {
-      const res = await api.get('/api/business-auth/content/mine');
-      return { data: res.data, error: null };
-    } catch (err) {
-      return { data: null, error: err.message };
-    }
+    const result = await apiCall((api) => api.get('/api/business/content/mine'));
+    return { data: result.data?.data || null, error: result.error };
   },
-
   updateContent: async (id, payload) => {
-    try {
-      const res = await api.put(`/api/business-auth/content/${id}`, payload);
-      return { data: res.data, error: null };
-    } catch (err) {
-      return { data: null, error: err.message };
-    }
+    const result = await apiCall((api) => api.put(`/api/business/content/${id}`, payload));
+    return { data: result.data?.data || null, error: result.error };
   },
 };

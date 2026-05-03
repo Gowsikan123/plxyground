@@ -15,7 +15,16 @@ node_modules/
 dist/
 build/
 .expo/
+.expo-export-check/
 web-build/
+.vercel/
+.backend-vercel-env
+.frontend-vercel-env
+.vercel-env
+.run-logs/
+.postgres-local/
+*.db-shm
+*.db-wal
 
 # OS files
 .DS_Store
