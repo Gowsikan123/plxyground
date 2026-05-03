@@ -18,3 +18,6 @@ export const Radius = {
   xl: 24,
   full: 9999,
 };
+
+// Uppercase alias used by auth screens
+export const SPACING = Spacing;
