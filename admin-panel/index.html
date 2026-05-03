@@ -157,14 +157,19 @@
     .badge-approved { background: var(--green-dim);  color: var(--green); }
     .badge-rejected { background: var(--red-dim);    color: var(--red); }
     .badge-flagged  { background: var(--orange-dim); color: var(--orange); }
+    .badge-published{ background: var(--green-dim);  color: var(--green); }
     .badge-open     { background: var(--green-dim);  color: var(--green); }
     .badge-closed   { background: var(--surface-3);  color: var(--text-muted); }
     .badge-suspended{ background: var(--red-dim);    color: var(--red); }
     .badge-active   { background: var(--green-dim);  color: var(--green); }
     .badge-admin    { background: var(--accent-dim); color: var(--accent); }
-    .badge-content  { background: var(--accent-dim); color: var(--accent); }
-    .badge-business_content { background: var(--orange-dim); color: var(--orange); }
-    .badge-opportunity { background: var(--green-dim); color: var(--green); }
+    /* BUG FIX: added badge-creator and badge-business (backend now returns 'creator'/'business' as type) */
+    .badge-creator          { background: var(--accent-dim);  color: var(--accent); }
+    .badge-business         { background: var(--orange-dim);  color: var(--orange); }
+    /* legacy aliases kept in case old rows still arrive */
+    .badge-content          { background: var(--accent-dim);  color: var(--accent); }
+    .badge-business_content { background: var(--orange-dim);  color: var(--orange); }
+    .badge-opportunity      { background: var(--green-dim);   color: var(--green); }
 
     /* ── Login ───────────────────────────────────────────────────── */
     .login-card {
@@ -270,7 +275,7 @@
       </div>
       <div class="form-group">
         <label class="form-label">Password</label>
-        <input type="password" id="login-password" placeholder="••••••••" required />
+        <input type="password" id="login-password" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" required />
       </div>
       <div class="form-error" id="login-error" style="display:none"></div>
       <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;justify-content:center" id="login-btn">Sign in</button>
@@ -388,6 +393,7 @@
           <button class="btn btn-secondary btn-sm" onclick="loadContent()">&#8635; Refresh</button>
         </div>
         <div class="filters">
+          <!-- BUG FIX: status now passed to backend as query param, not filtered client-side -->
           <select id="content-status-filter" onchange="loadContent()">
             <option value="">All statuses</option>
             <option value="published">Published</option>
@@ -395,6 +401,7 @@
             <option value="rejected">Rejected</option>
             <option value="flagged">Flagged</option>
           </select>
+          <!-- BUG FIX: sport now passed as &sport= param (backend filters on cr.sport), not &search= -->
           <select id="content-sport-filter" onchange="loadContent()">
             <option value="">All sports</option>
             <option value="basketball">Basketball</option>
@@ -449,7 +456,7 @@
             <option value="admin">Admin</option>
             <option value="system">System</option>
           </select>
-          <input type="text" id="audit-action-filter" placeholder="Filter by action…" style="max-width:200px" oninput="debounceAudit()" />
+          <input type="text" id="audit-action-filter" placeholder="Filter by action\u2026" style="max-width:200px" oninput="debounceAudit()" />
           <div class="filter-sep"></div>
           <span id="audit-count" style="font-size:12px;color:var(--text-muted)"></span>
         </div>
@@ -525,7 +532,7 @@
       </div>
       <div class="form-group">
         <label class="form-label">Moderation note (optional)</label>
-        <textarea id="modal-note" rows="3" placeholder="Reason for this decision…"></textarea>
+        <textarea id="modal-note" rows="3" placeholder="Reason for this decision\u2026"></textarea>
       </div>
     </div>
     <div class="modal-footer">
@@ -541,6 +548,7 @@ let API_BASE = localStorage.getItem('px_api_base') || 'http://localhost:3011';
 let TOKEN = localStorage.getItem('px_admin_token') || null;
 let currentAdmin = null;
 let currentSection = 'dashboard';
+// moderateTargetId is now always a QUEUE row id (not content id)
 let moderateTargetId = null;
 let selectedIds = new Set();
 let currentUserTab = 'creator';
@@ -565,7 +573,7 @@ async function api(method, path, body) {
     const data = await res.json();
     return { ok: res.ok, status: res.status, data };
   } catch (e) {
-    return { ok: false, status: 0, data: { error: 'Network error — is the API running?' } };
+    return { ok: false, status: 0, data: { error: 'Network error \u2014 is the API running?' } };
   }
 }
 
@@ -606,7 +614,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
   const password = document.getElementById('login-password').value;
   const btn      = document.getElementById('login-btn');
   const errEl    = document.getElementById('login-error');
-  btn.disabled = true; btn.textContent = 'Signing in…';
+  btn.disabled = true; btn.textContent = 'Signing in\u2026';
   errEl.style.display = 'none';
 
   const r = await api('POST', '/api/admin/auth/login', { email, password });
@@ -614,7 +622,6 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 
   if (r.ok) {
     TOKEN = r.data.token;
-    // Backend now returns both r.data.admin and r.data.user — prefer admin
     currentAdmin = r.data.admin || r.data.user;
     localStorage.setItem('px_admin_token', TOKEN);
     showApp();
@@ -643,18 +650,18 @@ function navigate(section) {
 async function loadDashboard() {
   const r = await api('GET', '/api/admin/analytics');
   if (!r.ok) { toast('Failed to load analytics', 'error'); return; }
-  const kpis              = r.data.kpis || {};
-  const content_last_7    = r.data.content_last_7_days || r.data.trend || [];
-  const sport_breakdown   = r.data.sport_breakdown || [];
+  const kpis           = r.data.kpis || {};
+  const content_last_7 = r.data.content_last_7_days || [];
+  const sport_breakdown = r.data.sport_breakdown || [];
 
   const kpiDefs = [
-    { key: 'total_creators',    label: 'Creators',     cls: 'accent' },
-    { key: 'total_businesses',  label: 'Businesses',   cls: 'green' },
-    { key: 'total_content',     label: 'Total Content',cls: 'accent' },
-    { key: 'total_opps',        label: 'Opportunities',cls: 'green' },
-    { key: 'pending_queue',     label: 'Pending',      cls: 'yellow' },
-    { key: 'flagged_queue',     label: 'Flagged',      cls: 'orange' },
-    { key: 'total_applications',label: 'Applications', cls: 'accent' },
+    { key: 'total_creators',    label: 'Creators',      cls: 'accent' },
+    { key: 'total_businesses',  label: 'Businesses',    cls: 'green' },
+    { key: 'total_content',     label: 'Total Content', cls: 'accent' },
+    { key: 'total_opps',        label: 'Opportunities', cls: 'green' },
+    { key: 'pending_queue',     label: 'Pending',       cls: 'yellow' },
+    { key: 'flagged_queue',     label: 'Flagged',       cls: 'orange' },
+    { key: 'total_applications',label: 'Applications',  cls: 'accent' },
   ];
   document.getElementById('kpi-grid').innerHTML = kpiDefs.map(k =>
     `<div class="kpi-card"><div class="kpi-label">${k.label}</div><div class="kpi-value ${k.cls}">${(kpis[k.key]||0).toLocaleString()}</div></div>`
@@ -692,14 +699,14 @@ async function loadDashboard() {
 async function loadQueue() {
   const r = await api('GET', '/api/admin/queue');
   if (!r.ok) { toast('Failed to load queue', 'error'); return; }
-  // Backend returns { data: [...] }
+  // Backend returns { success, data: [...], total, limit, offset }
   const queue = r.data.data || [];
   const tbody = document.getElementById('queue-tbody');
   selectedIds.clear();
   updateBulkBar();
 
   if (!queue.length) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg><p>Queue is clear — nothing to review</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg><p>Queue is clear \u2014 nothing to review</p></div></td></tr>`;
     return;
   }
 
@@ -707,13 +714,13 @@ async function loadQueue() {
     <tr>
       <td><input type="checkbox" class="row-check" data-id="${item.id}" onchange="toggleRow(this)" /></td>
       <td style="max-width:240px">
-        <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.title_or_name || '—')}</div>
+        <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.title_or_name || '\u2014')}</div>
       </td>
       <td>
-        <div style="font-weight:500">${esc(item.submitted_by || '—')}</div>
+        <div style="font-weight:500">${esc(item.submitted_by || '\u2014')}</div>
       </td>
-      <td><span class="badge badge-${item.type || 'content'}">${esc(item.type || 'content')}</span></td>
-      <td><span class="badge badge-${item.status}">${esc(item.status)}</span></td>
+      <td><span class="badge badge-${esc(item.type || 'creator')}">${esc(item.type || 'creator')}</span></td>
+      <td><span class="badge badge-${esc(item.status)}">${esc(item.status)}</span></td>
       <td class="td-mono">${fmtDate(item.created_at)}</td>
       <td>
         <div style="display:flex;gap:4px">
@@ -726,17 +733,17 @@ async function loadQueue() {
 }
 
 async function quickModerate(id, status) {
-  // PATCH /api/admin/queue/:id
   const r = await api('PATCH', `/api/admin/queue/${id}`, { status });
   if (r.ok) { toast(`Content ${status}`, 'success'); loadQueue(); if (currentSection === 'dashboard') loadDashboard(); }
   else toast(r.data.error || 'Action failed', 'error');
 }
 
-function openModerate(id) {
-  moderateTargetId = id;
+// openModerate opens the modal with a QUEUE row id
+function openModerate(queueId) {
+  moderateTargetId = queueId;
   document.getElementById('modal-note').value = '';
   document.getElementById('modal-status').value = 'approved';
-  document.getElementById('modal-title').textContent = 'Moderate Item #' + id;
+  document.getElementById('modal-title').textContent = 'Moderate Item #' + queueId;
   document.getElementById('moderate-modal').classList.add('open');
 }
 
@@ -744,7 +751,6 @@ async function submitModerate() {
   if (!moderateTargetId) return;
   const status = document.getElementById('modal-status').value;
   const moderation_note = document.getElementById('modal-note').value;
-  // PATCH /api/admin/queue/:id
   const r = await api('PATCH', `/api/admin/queue/${moderateTargetId}`, { status, moderation_note });
   if (r.ok) { toast(`Content ${status}`, 'success'); closeModal('moderate-modal'); loadQueue(); }
   else toast(r.data.error || 'Action failed', 'error');
@@ -752,7 +758,6 @@ async function submitModerate() {
 
 async function bulkAction(action) {
   if (!selectedIds.size) return;
-  // Backend expects POST /api/admin/queue/bulk-action with { action, ids }
   const r = await api('POST', '/api/admin/queue/bulk-action', { action, ids: [...selectedIds] });
   if (r.ok) { toast(`Items ${action}d`, 'success'); loadQueue(); }
   else toast(r.data.error || 'Bulk action failed', 'error');
@@ -777,7 +782,7 @@ function clearSelection() {
 }
 
 function updateBulkBar() {
-  const bar = document.getElementById('bulk-bar');
+  const bar   = document.getElementById('bulk-bar');
   const count = document.getElementById('bulk-count');
   count.textContent = selectedIds.size;
   bar.classList.toggle('visible', selectedIds.size > 0);
@@ -787,14 +792,16 @@ function updateBulkBar() {
 async function loadContent() {
   const status = document.getElementById('content-status-filter').value;
   const sport  = document.getElementById('content-sport-filter').value;
-  // Use the admin-protected endpoint, not the public /api/content
+  // BUG FIX: pass status and sport as backend query params (not client-side filter)
+  // status -> &status=  (backend filters c.status = ?)
+  // sport  -> &sport=   (backend filters cr.sport = ?, not title LIKE)
   let url = '/api/admin/content?limit=50';
-  if (sport) url += '&search=' + encodeURIComponent(sport);
+  if (status) url += '&status=' + encodeURIComponent(status);
+  if (sport)  url += '&sport='  + encodeURIComponent(sport);
   const r = await api('GET', url);
   if (!r.ok) { toast('Failed to load content', 'error'); return; }
-  // Backend returns { data: [...] }
-  let items = r.data.data || [];
-  if (status) items = items.filter(i => i.status === status);
+  // Backend returns { success, data: [...], total, limit, offset }
+  const items = r.data.data || [];
   document.getElementById('content-count').textContent = items.length + ' items';
   const tbody = document.getElementById('content-tbody');
   if (!items.length) {
@@ -803,23 +810,35 @@ async function loadContent() {
   }
   tbody.innerHTML = items.map(item => `
     <tr>
-      <td style="max-width:200px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.title||'—')}</td>
-      <td>${esc(item.creator_name||item.display_name||'—')}</td>
-      <td style="text-transform:capitalize">${esc(item.sport||'—')}</td>
+      <td style="max-width:200px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.title||'\u2014')}</td>
+      <td>${esc(item.creator_name||'\u2014')}</td>
+      <td style="text-transform:capitalize">${esc(item.sport||'\u2014')}</td>
       <td>${esc(item.media_type||'text')}</td>
-      <td><span class="badge badge-${item.status||'pending'}">${esc(item.status||'pending')}</span></td>
+      <td><span class="badge badge-${esc(item.status||'pending')}">${esc(item.status||'pending')}</span></td>
       <td class="td-mono">${fmtDate(item.created_at)}</td>
       <td>
-        <button class="btn btn-secondary btn-sm" onclick="openModerateFromContent(${item.id})">Moderate</button>
+        <button class="btn btn-secondary btn-sm" onclick="openModerateFromContent(${item.id},'${esc(item.type||'creator')}')">Moderate</button>
       </td>
     </tr>`).join('');
 }
 
-function openModerateFromContent(id) {
-  moderateTargetId = id;
+// BUG FIX: look up the queue entry by content_id and content_type before opening the modal
+// so moderateTargetId is always a queue row id, not a content id
+async function openModerateFromContent(contentId, contentType) {
+  // Ask backend for the pending queue row for this content
+  const queueType = contentType === 'business' ? 'business_content' : 'creator_content';
+  const r = await api('GET', `/api/admin/queue?content_id=${contentId}&content_type=${queueType}&status=pending&limit=1`);
+  const rows = r.ok ? (r.data.data || []) : [];
+  if (!rows.length) {
+    // No pending queue entry — content may already be moderated or not yet submitted
+    toast('No pending queue entry for this item. Use the Mod Queue tab to review.', 'info');
+    return;
+  }
+  const queueId = rows[0].id;
+  moderateTargetId = queueId;
   document.getElementById('modal-note').value = '';
   document.getElementById('modal-status').value = 'approved';
-  document.getElementById('modal-title').textContent = 'Moderate Content #' + id;
+  document.getElementById('modal-title').textContent = 'Moderate Content #' + contentId;
   document.getElementById('moderate-modal').classList.add('open');
 }
 
@@ -832,7 +851,6 @@ function switchUserTab(el) {
 }
 
 async function loadUsers() {
-  // Pass type so backend filters the query
   const r = await api('GET', '/api/admin/users?type=' + currentUserTab);
   if (!r.ok) { toast('Failed to load users', 'error'); return; }
   // Backend returns { data: [...] }
@@ -846,16 +864,16 @@ async function loadUsers() {
       ? `<tr><td colspan="8"><div class="empty"><p>No creators found</p></div></td></tr>`
       : users.map(u => `
         <tr>
-          <td style="font-weight:500">${esc(u.display_name || u.name || u.username || '—')}</td>
-          <td class="td-mono">${u.username ? '@' + esc(u.username) : '—'}</td>
-          <td style="font-size:12px;color:var(--text-muted)">${esc(u.email||'—')}</td>
-          <td style="text-transform:capitalize">${esc(u.sport||'—')}</td>
+          <td style="font-weight:500">${esc(u.display_name || u.name || u.username || '\u2014')}</td>
+          <td class="td-mono">${u.username ? '@' + esc(u.username) : '\u2014'}</td>
+          <td style="font-size:12px;color:var(--text-muted)">${esc(u.email||'\u2014')}</td>
+          <td style="text-transform:capitalize">${esc(u.sport||'\u2014')}</td>
           <td>${u.is_suspended ? '<span class="badge badge-suspended">Suspended</span>' : '<span class="badge badge-active">Active</span>'}</td>
           <td class="td-mono">${(u.follower_count||0).toLocaleString()}</td>
           <td class="td-mono">${fmtDate(u.created_at)}</td>
           <td>
             <div style="display:flex;gap:4px">
-              ${!u.is_verified ? `<button class="btn btn-secondary btn-sm" onclick="userAction('creator',${u.id},'verify')">Verify</button>` : '<span style="font-size:11px;color:var(--green)">✓ Verified</span>'}
+              ${!u.is_verified ? `<button class="btn btn-secondary btn-sm" onclick="userAction('creator',${u.id},'verify')">Verify</button>` : '<span style="font-size:11px;color:var(--green)">&check; Verified</span>'}
               ${u.is_suspended
                 ? `<button class="btn btn-success btn-sm" onclick="userAction('creator',${u.id},'reactivate')">Reactivate</button>`
                 : `<button class="btn btn-danger btn-sm" onclick="userAction('creator',${u.id},'suspend')">Suspend</button>`}
@@ -868,14 +886,14 @@ async function loadUsers() {
       ? `<tr><td colspan="6"><div class="empty"><p>No businesses found</p></div></td></tr>`
       : users.map(u => `
         <tr>
-          <td style="font-weight:500">${esc(u.name||u.company_name||'—')}</td>
-          <td style="font-size:12px;color:var(--text-muted)">${esc(u.email||'—')}</td>
-          <td style="text-transform:capitalize">${esc(u.industry||'—')}</td>
+          <td style="font-weight:500">${esc(u.name||u.company_name||'\u2014')}</td>
+          <td style="font-size:12px;color:var(--text-muted)">${esc(u.email||'\u2014')}</td>
+          <td style="text-transform:capitalize">${esc(u.industry||'\u2014')}</td>
           <td>${u.is_suspended ? '<span class="badge badge-suspended">Suspended</span>' : '<span class="badge badge-active">Active</span>'}</td>
           <td class="td-mono">${fmtDate(u.created_at)}</td>
           <td>
             <div style="display:flex;gap:4px">
-              ${!u.is_verified ? `<button class="btn btn-secondary btn-sm" onclick="userAction('business',${u.id},'verify')">Verify</button>` : '<span style="font-size:11px;color:var(--green)">✓ Verified</span>'}
+              ${!u.is_verified ? `<button class="btn btn-secondary btn-sm" onclick="userAction('business',${u.id},'verify')">Verify</button>` : '<span style="font-size:11px;color:var(--green)">&check; Verified</span>'}
               ${u.is_suspended
                 ? `<button class="btn btn-success btn-sm" onclick="userAction('business',${u.id},'reactivate')">Reactivate</button>`
                 : `<button class="btn btn-danger btn-sm" onclick="userAction('business',${u.id},'suspend')">Suspend</button>`}
@@ -886,7 +904,6 @@ async function loadUsers() {
 }
 
 async function userAction(type, id, action) {
-  // PATCH /api/admin/users/:type/:id
   const r = await api('PATCH', `/api/admin/users/${type}/${id}`, { action });
   if (r.ok) { toast(`User ${action}d successfully`, 'success'); loadUsers(); }
   else toast(r.data.error || 'Action failed', 'error');
@@ -898,10 +915,10 @@ async function loadAudit() {
   const action = document.getElementById('audit-action-filter').value;
   let url = '/api/admin/audit?limit=100';
   if (actor)  url += '&actor_type=' + encodeURIComponent(actor);
-  if (action) url += '&action=' + encodeURIComponent(action);
+  if (action) url += '&action='     + encodeURIComponent(action);
   const r = await api('GET', url);
   if (!r.ok) { toast('Failed to load audit log', 'error'); return; }
-  // Backend returns { data: [...] }
+  // Backend returns { success, data: [...], total, limit, offset }
   auditLogs = r.data.data || [];
   document.getElementById('audit-count').textContent = auditLogs.length + ' entries';
   const tbody = document.getElementById('audit-tbody');
@@ -912,11 +929,11 @@ async function loadAudit() {
   tbody.innerHTML = auditLogs.map(l => `
     <tr>
       <td class="td-mono" style="font-size:11px">${l.id}</td>
-      <td class="td-mono">${l.actor_id || '—'}</td>
-      <td><span class="badge badge-${l.actor_type === 'admin' ? 'admin' : l.actor_type === 'user' ? 'active' : 'pending'}">${esc(l.actor_type||'—')}</span></td>
+      <td class="td-mono">${l.actor_id || '\u2014'}</td>
+      <td><span class="badge badge-${l.actor_type === 'admin' ? 'admin' : l.actor_type === 'user' ? 'active' : 'pending'}">${esc(l.actor_type||'\u2014')}</span></td>
       <td style="font-family:var(--mono);font-size:12px;color:var(--accent)">${esc(l.action)}</td>
-      <td class="td-mono">${l.target_type ? esc(l.target_type) + ' #' + l.target_id : '—'}</td>
-      <td class="td-mono" style="font-size:11px">${esc(l.ip_address || l.ip || '—')}</td>
+      <td class="td-mono">${l.target_type ? esc(l.target_type) + ' #' + l.target_id : '\u2014'}</td>
+      <td class="td-mono" style="font-size:11px">${esc(l.ip_address || l.ip || '\u2014')}</td>
       <td><pre class="json-pre">${esc(JSON.stringify(l.meta || {}, null, 1))}</pre></td>
       <td class="td-mono">${fmtDate(l.created_at)}</td>
     </tr>`).join('');
@@ -939,15 +956,14 @@ function exportAudit() {
 // ── Settings ──────────────────────────────────────────────────────────────
 document.getElementById('password-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const current  = document.getElementById('pw-current').value;
-  const newPw    = document.getElementById('pw-new').value;
-  const confirm  = document.getElementById('pw-confirm').value;
-  const errEl    = document.getElementById('pw-error');
-  const btn      = document.getElementById('pw-btn');
+  const current = document.getElementById('pw-current').value;
+  const newPw   = document.getElementById('pw-new').value;
+  const confirm = document.getElementById('pw-confirm').value;
+  const errEl   = document.getElementById('pw-error');
+  const btn     = document.getElementById('pw-btn');
   errEl.style.display = 'none';
   if (newPw !== confirm) { errEl.textContent = 'Passwords do not match'; errEl.style.display = 'block'; return; }
-  btn.disabled = true; btn.textContent = 'Updating…';
-  // PATCH /api/admin/settings/password
+  btn.disabled = true; btn.textContent = 'Updating\u2026';
   const r = await api('PATCH', '/api/admin/settings/password', { current_password: current, new_password: newPw });
   btn.disabled = false; btn.textContent = 'Update password';
   if (r.ok) { toast('Password updated', 'success'); e.target.reset(); }
@@ -961,7 +977,7 @@ function setApiBase() {
   localStorage.setItem('px_api_base', val);
   document.getElementById('api-base-display').textContent = val;
   document.getElementById('topbar-env').textContent = 'API: ' + val;
-  toast('API base URL updated — refresh to reconnect', 'success');
+  toast('API base URL updated \u2014 refresh to reconnect', 'success');
 }
 
 // ── Modal ─────────────────────────────────────────────────────────────────
@@ -991,7 +1007,7 @@ function esc(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 function fmtDate(iso) {
-  if (!iso) return '—';
+  if (!iso) return '\u2014';
   return new Date(iso).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
 }
 </script>
