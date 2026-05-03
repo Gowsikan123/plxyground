@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useAuthStore } from '../store/authStore';
+import { AuthProvider } from '../components/AuthContext';
 import { Colors } from '../constants/colors';
 
 export default function RootLayout() {
@@ -27,17 +28,19 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <StatusBar style="light" backgroundColor={Colors.bg} />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.bg } }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(creator)" />
-          <Stack.Screen name="(business)" />
-          <Stack.Screen name="post/[id]" options={{ presentation: 'card' }} />
-          <Stack.Screen name="creator/[id]" options={{ presentation: 'card' }} />
-          <Stack.Screen name="terms" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="privacy" options={{ presentation: 'modal' }} />
-        </Stack>
+        <AuthProvider>
+          <StatusBar style="light" backgroundColor={Colors.bg} />
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.bg } }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(creator)" />
+            <Stack.Screen name="(business)" />
+            <Stack.Screen name="post/[id]" options={{ presentation: 'card' }} />
+            <Stack.Screen name="creator/[id]" options={{ presentation: 'card' }} />
+            <Stack.Screen name="terms" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="privacy" options={{ presentation: 'modal' }} />
+          </Stack>
+        </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

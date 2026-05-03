@@ -1,10 +1,10 @@
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, StatusBar, ScrollView, KeyboardAvoidingView, Platform, Switch } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, StatusBar, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useAuth } from '../components/AuthContext';
+import { useAuthStore } from '../store/authStore';
 import { apiRequest } from '../components/ApiClient';
-import { C, R, GRAD_HERO, GRAD_CYAN, GRAD_LIME, GRAD_PURPLE } from '../components/theme';
+import { C, R, GRAD_HERO } from '../components/theme';
 
 const TYPES = [
   { id: 'article',     label: 'Article', icon: '📝', grad: ['#00D4FF','#0099CC'] },
@@ -19,21 +19,23 @@ export default function Create() {
   const [mediaUrl, setMediaUrl] = useState('');
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
-  const { token } = useAuth();
+
+  // Migrated from useAuth() to useAuthStore
+  const token = useAuthStore((s) => s.token);
   const router = useRouter();
 
   const handleSubmit = async () => {
     if (!title.trim() || !body.trim()) { setError('Title and body are required'); return; }
     setLoading(true); setError('');
     try {
+      // Token auto-attached by ApiClient — no need to pass manually
       await apiRequest('/api/content', {
         method: 'POST',
         body: { title: title.trim(), body: body.trim(), content_type: type, media_url: mediaUrl.trim() || null },
-        headers: { Authorization: `Bearer ${token}` },
       });
       router.replace('/feed');
     } catch (e) {
-      setError(e.message || 'Failed to post. Try again.');
+      setError(e.message || e.error || 'Failed to post. Try again.');
     } finally {
       setLoading(false);
     }

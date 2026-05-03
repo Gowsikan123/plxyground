@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, Image, RefreshControl, StatusBar, SafeAreaView, Dimensions } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
-import { useAuth } from '../components/AuthContext';
+import { useAuthStore } from '../store/authStore';
 import { apiRequest } from '../components/ApiClient';
 import { LinearGradient } from 'expo-linear-gradient';
 import BottomNav from '../components/BottomNav';
@@ -64,9 +64,9 @@ const DEMO_POSTS = [
 ];
 
 const TYPE_META = {
-  article:     { color: C.cyan,   bg: C.article?.bg, label: 'Article', grad: ['#00D4FF','#0099CC'] },
-  video_embed: { color: C.purple, bg: C.video?.bg,   label: 'Video',   grad: ['#BF5FFF','#8B2FCC'] },
-  image_story: { color: C.lime,   bg: C.story?.bg,   label: 'Story',   grad: ['#AAFF00','#7DCC00'] },
+  article:     { color: C.cyan,   label: 'Article', grad: ['#00D4FF','#0099CC'] },
+  video_embed: { color: C.purple, label: 'Video',   grad: ['#BF5FFF','#8B2FCC'] },
+  image_story: { color: C.lime,   label: 'Story',   grad: ['#AAFF00','#7DCC00'] },
 };
 
 const FILTERS = ['All', 'Article', 'Video', 'Story'];
@@ -77,21 +77,19 @@ export default function Feed() {
   const [filter, setFilter]         = useState('All');
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError]           = useState('');
-  const { token } = useAuth();
+
+  // Migrated from useAuth() to useAuthStore — no more null context crash
+  const token = useAuthStore((s) => s.token);
   const router = useRouter();
 
   const load = async (q = '') => {
     try {
       const data = await apiRequest(`/api/content?search=${encodeURIComponent(q)}&limit=50`);
       const live = data?.data || [];
-      // Show demo posts if the API returns nothing yet
       setPosts(live.length > 0 ? live : DEMO_POSTS);
-      setError('');
     } catch {
-      // On error, still show demo content so the screen is never blank
+      // On any error always show demo content so the feed is never blank
       setPosts(DEMO_POSTS);
-      setError('');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -113,13 +111,13 @@ export default function Feed() {
     const meta = TYPE_META[item.content_type] || TYPE_META.article;
     const isFeatured = index === 0 && filter === 'All';
     const initials = item.creator_name?.[0]?.toUpperCase() ?? '?';
+    const isDemo = item.id?.toString().startsWith('demo');
     return (
       <TouchableOpacity
         style={[s.card, isFeatured && s.featuredCard]}
-        onPress={() => item.id?.toString().startsWith('demo') ? null : router.push(`/post/${item.id}`)}
-        activeOpacity={0.90}
+        onPress={() => isDemo ? null : router.push(`/post/${item.id}`)}
+        activeOpacity={isDemo ? 1 : 0.90}
       >
-        {/* Colour band replaces image when there is no media_url */}
         <View style={s.imgWrap}>
           {item.media_url ? (
             <Image source={{ uri: item.media_url }} style={[s.img, isFeatured && s.featuredImg]} />
@@ -151,7 +149,9 @@ export default function Feed() {
           <Text style={[s.cardTitle, isFeatured && s.featuredTitle]} numberOfLines={isFeatured ? 3 : 2}>{item.title}</Text>
           <Text style={s.excerpt} numberOfLines={2}>{item.body}</Text>
           <View style={s.cardFooter}>
-            <Text style={[s.readMore, { color: meta.color }]}>Read more →</Text>
+            <Text style={[s.readMore, { color: meta.color }]}>
+              {isDemo ? 'Demo post' : 'Read more →'}
+            </Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -214,7 +214,8 @@ export default function Feed() {
         />
       )}
 
-      {token && <BottomNav />}
+      {/* BottomNav always shown when on feed — token gating was hiding it for logged-in users */}
+      <BottomNav />
     </SafeAreaView>
   );
 }

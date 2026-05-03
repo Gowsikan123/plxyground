@@ -1,33 +1,36 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, SafeAreaView, RefreshControl } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
-import { useAuth } from '../components/AuthContext';
+import { useAuthStore } from '../store/authStore';
 import { apiRequest } from '../components/ApiClient';
 import { LinearGradient } from 'expo-linear-gradient';
 import BottomNav from '../components/BottomNav';
-import { C, R, S, GRAD_HERO, GRAD_CYAN, GRAD_LIME } from '../components/theme';
+import { C, R, GRAD_HERO } from '../components/theme';
 
 export default function Profile() {
-  const [profile, setProfile]   = useState(null);
-  const [posts, setPosts]       = useState([]);
-  const [loading, setLoading]   = useState(true);
+  const [profile, setProfile]       = useState(null);
+  const [posts, setPosts]           = useState([]);
+  const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState(false);
-  const { token, user, logout } = useAuth();
-  const router = useRouter();
+  const [loadError, setLoadError]   = useState(false);
+
+  // Migrated from useAuth() to useAuthStore
+  const token   = useAuthStore((s) => s.token);
+  const user    = useAuthStore((s) => s.user);
+  const signOut = useAuthStore((s) => s.signOut);
+  const router  = useRouter();
 
   const load = async () => {
     setLoadError(false);
     try {
       const [prof, content] = await Promise.all([
-        apiRequest('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
+        apiRequest('/api/auth/me'),
         apiRequest('/api/content?limit=50'),
       ]);
       setProfile(prof ?? null);
       setPosts((content?.data || []).filter(p => p.creator_id === prof?.id));
     } catch (e) {
       console.warn('Profile load error:', e?.message);
-      // Fall back to whatever the auth store has so the screen still renders
       setProfile(user ?? null);
       setLoadError(true);
     } finally {
@@ -38,7 +41,7 @@ export default function Profile() {
 
   useEffect(() => { if (token) load(); else setLoading(false); }, [token]);
   const onRefresh = () => { setRefreshing(true); load(); };
-  const handleLogout = async () => { await logout(); router.replace('/'); };
+  const handleLogout = async () => { await signOut(); router.replace('/'); };
 
   if (!token) return (
     <SafeAreaView style={s.safe}>
@@ -63,9 +66,9 @@ export default function Profile() {
     </SafeAreaView>
   );
 
-  const displayName = profile?.name ?? user?.name ?? 'Creator';
+  const displayName  = profile?.name  ?? user?.name  ?? 'Creator';
   const displayEmail = profile?.email ?? user?.email ?? '';
-  const initial = displayName[0]?.toUpperCase() ?? '?';
+  const initial      = displayName[0]?.toUpperCase() ?? '?';
 
   return (
     <SafeAreaView style={s.safe}>
@@ -96,7 +99,6 @@ export default function Profile() {
             </View>
           </View>
 
-          {/* Stats */}
           <View style={s.statsRow}>
             {[
               { val: posts.length, label: 'Posts'    },
