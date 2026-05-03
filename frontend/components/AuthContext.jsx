@@ -1,5 +1,30 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
+
+// expo-secure-store is native-only — it crashes on web.
+// Use a unified storage helper that picks the right backend per platform.
+const storage = {
+  async getItem(key) {
+    if (Platform.OS === 'web') {
+      return AsyncStorage.getItem(key);
+    }
+    return SecureStore.getItemAsync(key);
+  },
+  async setItem(key, value) {
+    if (Platform.OS === 'web') {
+      return AsyncStorage.setItem(key, value);
+    }
+    return SecureStore.setItemAsync(key, value);
+  },
+  async removeItem(key) {
+    if (Platform.OS === 'web') {
+      return AsyncStorage.removeItem(key);
+    }
+    return SecureStore.deleteItemAsync(key);
+  },
+};
 
 const AuthContext = createContext(null);
 
@@ -11,11 +36,13 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     async function load() {
       try {
-        const t = await AsyncStorage.getItem('token');
-        const u = await AsyncStorage.getItem('user');
+        const t = await storage.getItem('token');
+        const u = await storage.getItem('user');
         if (t) setToken(t);
         if (u) setUser(JSON.parse(u));
-      } catch (e) {}
+      } catch (e) {
+        console.error('[AuthContext] Failed to load session:', e);
+      }
       setLoading(false);
     }
     load();
@@ -24,15 +51,15 @@ export function AuthProvider({ children }) {
   const login = async (token, user) => {
     setToken(token);
     setUser(user);
-    await AsyncStorage.setItem('token', token);
-    await AsyncStorage.setItem('user', JSON.stringify(user));
+    await storage.setItem('token', token);
+    await storage.setItem('user', JSON.stringify(user));
   };
 
   const logout = async () => {
     setToken(null);
     setUser(null);
-    await AsyncStorage.removeItem('token');
-    await AsyncStorage.removeItem('user');
+    await storage.removeItem('token');
+    await storage.removeItem('user');
   };
 
   const isBusiness = user?.role === 'BUSINESS';
