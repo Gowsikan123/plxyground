@@ -87,7 +87,8 @@ router.post(
         )
         .run(req.user.creator_id, title, bodyText, media_url, media_type, tagsJson);
 
-      db.prepare("INSERT INTO moderation_queue (content_type, content_id) VALUES ('creator_content', ?)").run(row.lastInsertRowid);
+      // content_type must be 'content' to match the admin /queue JOIN on mq.content_type = 'content'
+      db.prepare("INSERT INTO moderation_queue (content_type, content_id) VALUES ('content', ?)").run(row.lastInsertRowid);
       audit.log({ actor_type: 'creator', actor_id: req.user.id, action: 'CONTENT_CREATED', target_type: 'content', target_id: row.lastInsertRowid, ip_address: req.ip });
 
       const created = db.prepare('SELECT * FROM content WHERE id = ?').get(row.lastInsertRowid);
@@ -117,7 +118,8 @@ router.put('/:id', requireAuth, (req, res) => {
     let newStatus = post.status;
     if ((title !== undefined || bodyText !== undefined) && post.status === 'published') {
       newStatus = 'pending';
-      db.prepare("INSERT INTO moderation_queue (content_type, content_id) VALUES ('creator_content', ?)").run(post.id);
+      // content_type must be 'content' to match the admin /queue JOIN
+      db.prepare("INSERT INTO moderation_queue (content_type, content_id) VALUES ('content', ?)").run(post.id);
     }
 
     db.prepare('UPDATE content SET title=?, body=?, media_url=?, media_type=?, tags=?, status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?')

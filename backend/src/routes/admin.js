@@ -140,8 +140,9 @@ router.get('/queue', async (req, res) => {
       LEFT JOIN content          c  ON mq.content_type = 'content'          AND mq.content_id = c.id
       LEFT JOIN business_content bc ON mq.content_type = 'business_content' AND mq.content_id = bc.id
       LEFT JOIN opportunities    o  ON mq.content_type = 'opportunity'      AND mq.content_id = o.id
-      LEFT JOIN creators         cr ON c.creator_id  = cr.id OR bc.business_id IS NULL
+      LEFT JOIN creators         cr ON c.creator_id = cr.id
       LEFT JOIN businesses       b  ON bc.business_id = b.id OR o.business_id = b.id
+      WHERE mq.status = 'pending'
       ORDER BY mq.created_at DESC
     `);
     return res.json({ data: rows });
@@ -166,7 +167,6 @@ router.post('/queue/bulk-action', async (req, res) => {
       await pool.query('DELETE FROM moderation_queue WHERE id = ANY($1::int[])', [ids]);
     } else {
       const newStatus = action === 'approve' ? 'approved' : 'rejected';
-      // For each item: update queue status AND the underlying content/opportunity status
       const { rows } = await pool.query(
         'SELECT * FROM moderation_queue WHERE id = ANY($1::int[])',
         [ids]
@@ -305,7 +305,6 @@ router.get('/opportunities', async (req, res) => {
       ORDER BY o.created_at DESC
       LIMIT $2
     `, [pattern, lim]);
-    // Map status column to is_published boolean for the panel
     const mapped = rows.map(r => ({ ...r, is_published: r.status === 'published' }));
     return res.json({ data: mapped });
   } catch (err) {
@@ -360,7 +359,6 @@ router.get('/users', async (req, res) => {
   try {
     const { search = '' } = req.query;
     const pattern = `%${search}%`;
-    // Combine creators and businesses into one list
     const { rows } = await pool.query(`
       SELECT
         ca.id,
@@ -395,7 +393,7 @@ router.get('/users', async (req, res) => {
   }
 });
 
-// POST /api/admin/users/:id/suspend  (already existed, kept + extended)
+// POST /api/admin/users/:id/suspend
 router.post('/users/:id/suspend', async (req, res) => {
   const { type, reason } = req.body;
   try {
@@ -419,7 +417,6 @@ router.post('/users/:id/reactivate', async (req, res) => {
     if (type === 'business') {
       await pool.query('UPDATE businesses SET is_suspended = FALSE WHERE id = $1', [req.params.id]);
     } else {
-      // Default: try creator_accounts first
       await pool.query('UPDATE creator_accounts SET is_suspended = FALSE WHERE creator_id = $1', [req.params.id]);
     }
     await auditLogger.log({ actor_type: 'admin', actor_id: req.user.id, action: 'USER_REACTIVATED', target_type: type || 'user', target_id: req.params.id, ip_address: req.ip });
@@ -443,8 +440,6 @@ router.put('/users/:id/email-verify', async (req, res) => {
 });
 
 // POST /api/admin/users/reset-password
-// Admin-triggered password reset — sets a temporary random password
-// and returns it in the response (admin communicates it to the user).
 router.post('/users/reset-password', async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'email required.' });
@@ -465,7 +460,7 @@ router.post('/users/reset-password', async (req, res) => {
   }
 });
 
-// POST /api/admin/users/:id/verify  (already existed — kept)
+// POST /api/admin/users/:id/verify
 router.post('/users/:id/verify', async (req, res) => {
   try {
     await pool.query('UPDATE creators SET is_verified = TRUE WHERE id = $1', [req.params.id]);
@@ -481,7 +476,7 @@ router.post('/users/:id/verify', async (req, res) => {
 // AUDIT LOGS
 // ─────────────────────────────────────────────────────────────
 
-// GET /api/admin/audit  (original — kept)
+// GET /api/admin/audit
 router.get('/audit', async (req, res) => {
   try {
     const { limit = 50, offset = 0 } = req.query;
@@ -498,7 +493,7 @@ router.get('/audit', async (req, res) => {
   }
 });
 
-// GET /api/admin/audit/export  — returns full audit log as JSON download
+// GET /api/admin/audit/export
 router.get('/audit/export', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 5000');
@@ -516,7 +511,6 @@ router.get('/audit/export', async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 
 // GET /api/admin/analytics
-// Returns KPI cards + last-14-days content trend for the analytics section.
 router.get('/analytics', async (req, res) => {
   try {
     const [totalCreators, totalBusinesses, totalContent, totalOpps, pendingQueue, trend] =
@@ -554,7 +548,6 @@ router.get('/analytics', async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────
 // LIVE ALERTS
-// Returns the 50 most recent audit log entries as "live alerts".
 // ─────────────────────────────────────────────────────────────
 
 // GET /api/admin/alerts
