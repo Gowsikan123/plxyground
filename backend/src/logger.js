@@ -1,7 +1,8 @@
 'use strict';
 
 function formatMessage(level, msg) {
-  return `[${new Date().toISOString()}] ${level}: ${msg}`;
+  const ts = new Date().toISOString();
+  return `[${ts}] ${level}: ${msg}`;
 }
 
 const logger = {
