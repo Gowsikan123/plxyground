@@ -12,19 +12,27 @@ export default function Profile() {
   const [posts, setPosts]       = useState([]);
   const [loading, setLoading]   = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const { token, user, logout } = useAuth();
   const router = useRouter();
 
   const load = async () => {
+    setLoadError(false);
     try {
       const [prof, content] = await Promise.all([
         apiRequest('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
         apiRequest('/api/content?limit=50'),
       ]);
-      setProfile(prof);
-      setPosts((content.data || []).filter(p => p.creator_id === prof.id));
-    } catch {} finally {
-      setLoading(false); setRefreshing(false);
+      setProfile(prof ?? null);
+      setPosts((content?.data || []).filter(p => p.creator_id === prof?.id));
+    } catch (e) {
+      console.warn('Profile load error:', e?.message);
+      // Fall back to whatever the auth store has so the screen still renders
+      setProfile(user ?? null);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -46,7 +54,18 @@ export default function Profile() {
     </SafeAreaView>
   );
 
-  const initial = profile?.name?.[0]?.toUpperCase() ?? '?';
+  if (loading) return (
+    <SafeAreaView style={s.safe}>
+      <View style={s.center}>
+        <Text style={s.loadingIcon}>⚡</Text>
+        <Text style={s.loadingLabel}>Loading profile…</Text>
+      </View>
+    </SafeAreaView>
+  );
+
+  const displayName = profile?.name ?? user?.name ?? 'Creator';
+  const displayEmail = profile?.email ?? user?.email ?? '';
+  const initial = displayName[0]?.toUpperCase() ?? '?';
 
   return (
     <SafeAreaView style={s.safe}>
@@ -56,6 +75,12 @@ export default function Profile() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
         contentContainerStyle={s.scroll}
       >
+        {loadError && (
+          <View style={s.warnBox}>
+            <Text style={s.warnText}>⚡ Showing cached profile — pull down to refresh</Text>
+          </View>
+        )}
+
         {/* Profile hero */}
         <LinearGradient colors={['rgba(255,77,109,0.15)', 'transparent']} style={s.profileHero}>
           <View style={s.profileTop}>
@@ -63,8 +88,8 @@ export default function Profile() {
               <Text style={s.avatarLargeText}>{initial}</Text>
             </LinearGradient>
             <View style={s.profileInfo}>
-              <Text style={s.profileName}>{profile?.name ?? '—'}</Text>
-              <Text style={s.profileHandle}>@{profile?.email?.split('@')[0] ?? '—'}</Text>
+              <Text style={s.profileName}>{displayName}</Text>
+              <Text style={s.profileHandle}>@{displayEmail.split('@')[0] || '—'}</Text>
               <View style={s.rolePill}>
                 <Text style={s.roleText}>⚡ Creator</Text>
               </View>
@@ -99,9 +124,7 @@ export default function Profile() {
         {/* Posts section */}
         <View style={s.section}>
           <Text style={s.sectionTitle}>My Posts</Text>
-          {loading ? (
-            <Text style={s.loadingText}>Loading…</Text>
-          ) : posts.length === 0 ? (
+          {posts.length === 0 ? (
             <View style={s.emptyPosts}>
               <Text style={s.emptyPostsIcon}>📝</Text>
               <Text style={s.emptyPostsTitle}>No posts yet</Text>
@@ -146,6 +169,10 @@ const s = StyleSheet.create({
   signInWrap:      { borderRadius: R.xl, overflow: 'hidden', width: '100%' },
   signInBtn:       { paddingVertical: 16, alignItems: 'center' },
   signInText:      { color: '#fff', fontWeight: '800', fontSize: 16 },
+  loadingIcon:     { fontSize: 44 },
+  loadingLabel:    { color: C.textMuted, fontSize: 15, fontWeight: '600' },
+  warnBox:         { backgroundColor: 'rgba(255,165,0,0.08)', borderWidth: 1, borderColor: 'rgba(255,165,0,0.2)', padding: 10, marginHorizontal: 20, marginTop: 8, borderRadius: R.md },
+  warnText:        { color: '#FFA500', fontSize: 12, textAlign: 'center' },
   profileHero:     { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24 },
   profileTop:      { flexDirection: 'row', gap: 18, alignItems: 'center', marginBottom: 24 },
   avatarLarge:     { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
@@ -167,7 +194,6 @@ const s = StyleSheet.create({
   settingsBtnText: { fontSize: 22 },
   section:         { paddingHorizontal: 20 },
   sectionTitle:    { color: C.text, fontSize: 18, fontWeight: '800', marginBottom: 16, letterSpacing: -0.3 },
-  loadingText:     { color: C.textMuted, fontSize: 14 },
   emptyPosts:      { alignItems: 'center', paddingVertical: 40, gap: 10 },
   emptyPostsIcon:  { fontSize: 44 },
   emptyPostsTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
