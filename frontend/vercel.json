@@ -3,6 +3,9 @@
   "outputDirectory": "dist",
   "installCommand": "npm install --legacy-peer-deps",
   "framework": null,
+  "env": {
+    "EXPO_PUBLIC_API_URL": "https://plxyground.vercel.app"
+  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
