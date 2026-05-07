@@ -1,60 +1,70 @@
-/**
- * Seed script — creates 3 creator accounts and 3 business accounts.
- * Run from the backend directory: node scripts/seed.js
- */
+'use strict';
+require('dotenv').config({ path: process.env.DOTENV_PATH || '.env.local' });
+const { Client } = require('pg');
+const bcrypt = require('bcryptjs');
 
-const backendUrl = process.env.BACKEND_URL || 'http://127.0.0.1:3011';
+const connectionString = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
 
 const creators = [
-  { name: 'Alex Rivera',   email: 'creator1@plxyground.local', password: 'Password1!', bio: 'Sports & fitness content creator', location: 'London, UK' },
-  { name: 'Jamie Chen',    email: 'creator2@plxyground.local', password: 'Password1!', bio: 'Lifestyle and travel creator',      location: 'Manchester, UK' },
-  { name: 'Sam Okafor',    email: 'creator3@plxyground.local', password: 'Password1!', bio: 'Tech reviews and gaming content',   location: 'Birmingham, UK' },
+  { email: 'jayden@example.com', username: 'jayden', display_name: 'Jayden Carter', sport: 'Basketball', location: 'London' },
+  { email: 'emma@example.com',   username: 'emma',   display_name: 'Emma Singh',    sport: 'Athletics', location: 'Manchester' },
+  { email: 'kai@example.com',    username: 'kai',    display_name: 'Kai Thompson',  sport: 'Football',  location: 'Birmingham' },
+  { email: 'sara@example.com',   username: 'sara',   display_name: 'Sara Okafor',   sport: 'Tennis',    location: 'Leeds' },
+  { email: 'leo@example.com',    username: 'leo',    display_name: 'Leo Martinez',  sport: 'Boxing',    location: 'Liverpool' },
 ];
 
 const businesses = [
-  { organizationName: 'NovaSport Ltd',    email: 'business1@plxyground.local', password: 'Password1!', bio: 'Sports equipment brand', location: 'London, UK' },
-  { organizationName: 'TrendFlow Agency', email: 'business2@plxyground.local', password: 'Password1!', bio: 'Digital marketing agency', location: 'Leeds, UK' },
-  { organizationName: 'GreenEats Co',     email: 'business3@plxyground.local', password: 'Password1!', bio: 'Sustainable food brand',   location: 'Bristol, UK' },
+  { email: 'contact@peakgear.com',        password_hash: '', company_name: 'Peak Gear',      slug: 'peak-gear',      industry: 'Sports Equipment' },
+  { email: 'hello@fuelup.io',             password_hash: '', company_name: 'FuelUp Nutrition', slug: 'fuelup-nutrition', industry: 'Nutrition' },
+  { email: 'partnerships@sportsmedia.co', password_hash: '', company_name: 'Sports Media Co', slug: 'sports-media-co', industry: 'Media' },
 ];
 
-async function post(path, body) {
-  const res = await fetch(`${backendUrl}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json();
-  return { status: res.status, data };
-}
+(async () => {
+  const client = new Client({ connectionString });
+  await client.connect();
+  console.log('Seeding database...');
 
-async function main() {
-  console.log(`Seeding against ${backendUrl}\n`);
+  const password = 'Password1!';
+  const hash = await bcrypt.hash(password, 12);
 
-  console.log('--- CREATORS ---');
+  // Seed creators
   for (const c of creators) {
-    const { status, data } = await post('/api/auth/signup', c);
-    if (status === 201) {
-      console.log(`✓ ${c.email}`);
-    } else if (data.error && data.error.toLowerCase().includes('exist')) {
-      console.log(`~ ${c.email} (already exists)`);
-    } else {
-      console.log(`✗ ${c.email} — ${data.error || JSON.stringify(data)}`);
+    try {
+      const res = await client.query(
+        `INSERT INTO creators (username, slug, display_name, sport, location)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (username) DO UPDATE SET display_name=EXCLUDED.display_name
+         RETURNING id`,
+        [c.username, c.username, c.display_name, c.sport, c.location]
+      );
+      const creatorId = res.rows[0].id;
+      await client.query(
+        `INSERT INTO creator_accounts (creator_id, email, password_hash)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (email) DO UPDATE SET password_hash=EXCLUDED.password_hash`,
+        [creatorId, c.email, hash]
+      );
+      console.log(`  Creator: ${c.email}`);
+    } catch (err) {
+      console.error(`  FAILED ${c.email}:`, err.message);
     }
   }
 
-  console.log('\n--- BUSINESSES ---');
+  // Seed businesses
   for (const b of businesses) {
-    const { status, data } = await post('/api/business/auth/signup', b);
-    if (status === 201) {
-      console.log(`✓ ${b.email}`);
-    } else if (data.error && data.error.toLowerCase().includes('exist')) {
-      console.log(`~ ${b.email} (already exists)`);
-    } else {
-      console.log(`✗ ${b.email} — ${data.error || JSON.stringify(data)}`);
+    try {
+      await client.query(
+        `INSERT INTO businesses (email, password_hash, company_name, slug, industry)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (email) DO UPDATE SET password_hash=EXCLUDED.password_hash`,
+        [b.email, hash, b.company_name, b.slug, b.industry]
+      );
+      console.log(`  Business: ${b.email}`);
+    } catch (err) {
+      console.error(`  FAILED ${b.email}:`, err.message);
     }
   }
 
-  console.log('\nDone.');
-}
-
-main().catch((e) => { console.error(e); process.exit(1); });
+  console.log('\nDone. All test users seeded with password: Password1!');
+  await client.end();
+})();
