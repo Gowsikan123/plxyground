@@ -3,7 +3,6 @@ require('dotenv').config();
 const config = require('./config');
 const logger = require('./logger');
 
-
 const express = require('express');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -29,7 +28,7 @@ app.get('/', (req, res) => {
   res.json({ success: true, name: 'PLXYGROUND API', version: '1.0.0' });
 });
 
-// ── Creator / Business routes ──────────────────────────────────────────────
+// -- Creator / Business routes
 app.use('/api/auth',          require('./routes/auth'));
 app.use('/api/business',      require('./routes/businessAuth'));
 app.use('/api/business/content', require('./routes/businessContent'));
@@ -41,7 +40,7 @@ app.use('/api/follows',       require('./routes/follows'));
 app.use('/api/messages',      require('./routes/messages'));
 app.use('/api/notifications', require('./routes/notifications'));
 
-// ── Admin routes ───────────────────────────────────────────────────────────
+// -- Admin routes
 app.use('/api/admin/auth',      require('./routes/admin/auth'));
 app.use('/api/admin/queue',     require('./routes/admin/queue'));
 app.use('/api/admin/content',   require('./routes/admin/content'));
@@ -50,17 +49,23 @@ app.use('/api/admin/analytics', require('./routes/admin/analytics'));
 app.use('/api/admin/audit',     require('./routes/admin/audit'));
 app.use('/api/admin/settings',  require('./routes/admin/settings'));
 
-// ── 404 ────────────────────────────────────────────────────────────────────
+// -- 404
 app.use((req, res) => {
   res.status(404).json({ success: false, error: 'Route not found' });
 });
 
-// ── Global error handler ───────────────────────────────────────────────────
+// -- Global error handler
 app.use((err, req, res, next) => {
   logger.error(`Unhandled error: ${err.message}`);
   res.status(500).json({ success: false, error: 'Internal server error' });
 });
 
-app.listen(config.PORT, () => {
-  logger.info(`PLXYGROUND API listening on port ${config.PORT} [${config.NODE_ENV}]`);
-});
+// Export for Vercel serverless
+module.exports = app;
+
+// Listen only in local dev
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(config.PORT, () => {
+    logger.info(`PLXYGROUND API listening on port ${config.PORT} [${config.NODE_ENV}]`);
+  });
+}
