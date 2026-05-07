@@ -1,7 +1,9 @@
 import axios from 'axios';
 import { Platform } from 'react-native';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+const API_URL =
+  process.env.EXPO_PUBLIC_API_URL ||
+  'https://plxyground.vercel.app';
 
 // expo-secure-store cannot be imported at the top level on web —
 // it is native-only and blows up before any Platform check runs.
