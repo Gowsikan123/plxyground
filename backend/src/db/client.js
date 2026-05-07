@@ -1,18 +1,10 @@
 'use strict';
-const Database = require('better-sqlite3');
+const { neon } = require('@neondatabase/serverless');
 const config = require('../config');
 const logger = require('../logger');
 
-let instance;
+const sql = neon(config.DATABASE_URL);
 
-function getDb() {
-  if (!instance) {
-    instance = new Database(config.DATABASE_URL);
-    instance.pragma('journal_mode = WAL');
-    instance.pragma('foreign_keys = ON');
-    logger.info(`Database connected: ${config.DATABASE_URL}`);
-  }
-  return instance;
-}
+logger.info('Neon Postgres client initialised');
 
-module.exports = getDb();
+module.exports = sql;

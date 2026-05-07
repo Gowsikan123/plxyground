@@ -2,7 +2,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const bcrypt = require('bcryptjs');
-const db = require('../db/client');
+const sql = require('../db/client');
 const { signToken } = require('../utils/jwt');
 const { slugify, ensureUniqueSlug } = require('../utils/slugify');
 const audit = require('../utils/auditLogger');
@@ -27,37 +27,39 @@ router.post(
       .isLength({ min: 1, max: 50 }).withMessage('Display name must be 1-50 characters'),
   ],
   validationErrorHandler,
-  (req, res) => {
+  async (req, res) => {
     try {
       const { email, password, username, display_name, sport = '', location = '' } = req.body;
 
-      const existingUsername = db.prepare('SELECT id FROM creators WHERE username = ?').get(username);
+      const [existingUsername] = await sql`SELECT id FROM creators WHERE username = ${username}`;
       if (existingUsername) {
         return res.status(409).json({ success: false, error: 'Username already taken' });
       }
 
-      const existingEmail = db.prepare('SELECT id FROM creator_accounts WHERE email = ?').get(email);
+      const [existingEmail] = await sql`SELECT id FROM creator_accounts WHERE email = ${email}`;
       if (existingEmail) {
         return res.status(409).json({ success: false, error: 'Email already registered' });
       }
 
-      const passwordHash = bcrypt.hashSync(password, 12);
+      const passwordHash = await bcrypt.hash(password, 12);
       const baseSlug = slugify(username);
-      const slug = ensureUniqueSlug('creators', baseSlug);
+      const slug = await ensureUniqueSlug('creators', baseSlug);
 
-      const creator = db
-        .prepare('INSERT INTO creators (username, slug, display_name, sport, location) VALUES (?, ?, ?, ?, ?)')
-        .run(username, slug, display_name, sport, location);
+      const [creator] = await sql`
+        INSERT INTO creators (username, slug, display_name, sport, location)
+        VALUES (${username}, ${slug}, ${display_name}, ${sport}, ${location})
+        RETURNING id`;
 
-      const account = db
-        .prepare('INSERT INTO creator_accounts (creator_id, email, password_hash) VALUES (?, ?, ?)')
-        .run(creator.lastInsertRowid, email, passwordHash);
+      const [account] = await sql`
+        INSERT INTO creator_accounts (creator_id, email, password_hash)
+        VALUES (${creator.id}, ${email}, ${passwordHash})
+        RETURNING id`;
 
-      const token = signToken({ sub: account.lastInsertRowid, type: 'creator' });
+      const token = signToken({ sub: account.id, type: 'creator' });
 
-      audit.log({
+      await audit.log({
         actor_type: 'creator',
-        actor_id: account.lastInsertRowid,
+        actor_id: account.id,
         action: 'CREATOR_SIGNUP',
         ip_address: req.ip,
       });
@@ -67,7 +69,7 @@ router.post(
         data: {
           token,
           user: {
-            id: account.lastInsertRowid,
+            id: account.id,
             username,
             slug,
             display_name,
@@ -91,18 +93,16 @@ router.post(
     body('password').notEmpty().withMessage('Password required'),
   ],
   validationErrorHandler,
-  (req, res) => {
+  async (req, res) => {
     try {
       const { email, password } = req.body;
 
-      const account = db
-        .prepare(
-          `SELECT ca.*, c.id as creator_id, c.username, c.slug, c.display_name,
-           c.bio, c.avatar_url, c.sport, c.location, c.follower_count, c.is_verified
-           FROM creator_accounts ca JOIN creators c ON ca.creator_id = c.id
-           WHERE ca.email = ?`
-        )
-        .get(email);
+      const [account] = await sql`
+        SELECT ca.*, c.id as creator_id, c.username, c.slug, c.display_name,
+               c.bio, c.avatar_url, c.sport, c.location, c.follower_count, c.is_verified
+        FROM creator_accounts ca
+        JOIN creators c ON ca.creator_id = c.id
+        WHERE ca.email = ${email}`;
 
       if (!account) {
         return res.status(401).json({ success: false, error: 'Invalid credentials' });
@@ -111,16 +111,16 @@ router.post(
         return res.status(403).json({ success: false, error: 'Account suspended' });
       }
 
-      const valid = bcrypt.compareSync(password, account.password_hash);
+      const valid = await bcrypt.compare(password, account.password_hash);
       if (!valid) {
         return res.status(401).json({ success: false, error: 'Invalid credentials' });
       }
 
-      db.prepare('UPDATE creator_accounts SET last_login = CURRENT_TIMESTAMP WHERE id = ?').run(account.id);
+      await sql`UPDATE creator_accounts SET last_login = NOW() WHERE id = ${account.id}`;
 
       const token = signToken({ sub: account.id, type: 'creator' });
 
-      audit.log({ actor_type: 'creator', actor_id: account.id, action: 'CREATOR_LOGIN', ip_address: req.ip });
+      await audit.log({ actor_type: 'creator', actor_id: account.id, action: 'CREATOR_LOGIN', ip_address: req.ip });
 
       return res.json({
         success: true,

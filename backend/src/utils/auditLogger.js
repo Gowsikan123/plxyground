@@ -1,21 +1,14 @@
 'use strict';
+const sql = require('../db/client');
 const logger = require('../logger');
 
-let db;
-function getDb() {
-  if (!db) db = require('../db/client');
-  return db;
-}
-
-function log({ actor_type, actor_id = null, action, target_type = '', target_id = null, metadata = {}, ip_address = '' }) {
+async function log({ actor_type, actor_id, action, target_type = null, target_id = null, ip_address = null, metadata = null }) {
   try {
-    const stmt = getDb().prepare(`
-      INSERT INTO audit_log (actor_type, actor_id, action, target_type, target_id, metadata, ip_address)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-    stmt.run(actor_type, actor_id, action, target_type, target_id, JSON.stringify(metadata), ip_address);
+    await sql`
+      INSERT INTO audit_logs (actor_type, actor_id, action, target_type, target_id, ip_address, metadata)
+      VALUES (${actor_type}, ${actor_id}, ${action}, ${target_type}, ${target_id}, ${ip_address}, ${metadata ? JSON.stringify(metadata) : null})`;
   } catch (err) {
-    logger.error(`auditLogger failed: ${err.message}`);
+    logger.error('Audit log failed:', err);
   }
 }
 
