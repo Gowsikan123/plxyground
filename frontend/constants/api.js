@@ -1,9 +1,12 @@
 import Constants from 'expo-constants';
 
-const ENV_API_URL = Constants.expoConfig?.extra?.apiUrl;
+// EXPO_PUBLIC_API_URL works on Vercel web builds (expo export --platform web)
+// Constants.expoConfig.extra.apiUrl works on native (iOS/Android)
+const ENV_API_URL =
+  process.env.EXPO_PUBLIC_API_URL ||
+  Constants.expoConfig?.extra?.apiUrl;
 
 // Single source of truth for the API base URL.
-// Falls back to localhost:3000 (backend default port) for local dev.
 export const API_BASE_URL = ENV_API_URL || 'http://localhost:3000';
 
 export const ENDPOINTS = {
