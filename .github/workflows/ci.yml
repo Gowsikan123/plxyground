@@ -64,7 +64,21 @@ jobs:
 
       - name: Run tests
         working-directory: backend
-        run: npm test -- --reporters=default --reporters=github-actions
+        run: npm test -- --reporters=default --reporters=github-actions --json --outputFile=jest-results.json
+
+      - name: Summarise test failures
+        if: failure()
+        working-directory: backend
+        run: |
+          node -e '
+            const fs = require("fs");
+            if (!fs.existsSync("jest-results.json")) { console.log("::error::Jest produced no results file"); process.exit(0); }
+            const r = JSON.parse(fs.readFileSync("jest-results.json", "utf8"));
+            for (const s of r.testResults) {
+              if (s.message) console.log(`::error title=${s.name.split("/").pop()}::${s.message.slice(0, 900).replace(/\n/g, "%0A")}`);
+              for (const t of s.assertionResults.filter((a) => a.status === "failed"))
+                console.log(`::error title=${t.title}::${t.failureMessages.join(" ").slice(0, 900).replace(/\n/g, "%0A")}`);
+            }'
 
   # ─────────────────────────────────────────
   # 2. Mobile app — dependency install + Expo health check
