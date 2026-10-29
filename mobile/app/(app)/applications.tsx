@@ -2,7 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { applications } from '@/api/endpoints';
-import { Card, CenteredState, Loading, Screen, StatusTag, Tag, Title } from '@/components/ui';
+import { Card, CenteredState, Screen, StatusTag, Tag, Title } from '@/components/ui';
+import { SkeletonList } from '@/components/Skeleton';
 import { colors, spacing, type } from '@/theme/tokens';
 
 export default function MyApplications() {
@@ -14,7 +15,7 @@ export default function MyApplications() {
         <Title>Applications</Title>
       </View>
       {query.isPending ? (
-        <Loading />
+        <SkeletonList count={3} />
       ) : query.isError ? (
         <CenteredState
           title="Couldn't load your applications"

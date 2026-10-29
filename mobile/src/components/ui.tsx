@@ -146,7 +146,7 @@ export function CenteredState({ title, message, action }: {
 
 export function Loading() {
   return (
-    <View style={styles.centered} accessibilityLabel="Loading">
+    <View style={styles.centered} accessibilityRole="progressbar" accessibilityLabel="Loading">
       <ActivityIndicator color={colors.accent} />
     </View>
   );

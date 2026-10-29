@@ -2,7 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { opportunities } from '@/api/endpoints';
-import { Button, Card, CenteredState, Loading, Screen, Tag, Title } from '@/components/ui';
+import { Button, Card, CenteredState, Screen, Tag, Title } from '@/components/ui';
+import { SkeletonList } from '@/components/Skeleton';
 import { colors, spacing, type } from '@/theme/tokens';
 
 export default function MyListings() {
@@ -16,7 +17,7 @@ export default function MyListings() {
         <Button label="Post an opportunity" onPress={() => router.push('/listing/new')} />
       </View>
       {query.isPending ? (
-        <Loading />
+        <SkeletonList count={3} />
       ) : query.isError ? (
         <CenteredState
           title="Couldn't load your listings"

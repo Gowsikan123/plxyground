@@ -1,18 +1,28 @@
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { content } from '@/api/endpoints';
 import type { Post } from '@/api/types';
 import { useAuth } from '@/auth/store';
 import { Avatar } from '@/components/Avatar';
-import { Button, Card, CenteredState, Loading, Screen, Tag, Title } from '@/components/ui';
+import { SkeletonList } from '@/components/Skeleton';
+import { Button, Card, CenteredState, Screen, Tag, Title } from '@/components/ui';
 import { openReport } from '@/lib/chat';
+import { flattenPages, nextOffset } from '@/lib/paging';
 import { timeAgo } from '@/lib/time';
 import { colors, radius, spacing, type } from '@/theme/tokens';
 
+const PAGE_SIZE = 20;
+
 export default function Feed() {
-  const query = useQuery({ queryKey: ['feed'], queryFn: () => content.feed({ limit: 30 }) });
+  const query = useInfiniteQuery({
+    queryKey: ['feed'],
+    queryFn: ({ pageParam }) => content.feed({ limit: PAGE_SIZE, offset: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (last) => nextOffset(last, last.posts.length),
+  });
+  const posts = query.data ? flattenPages(query.data.pages.map((p) => p.posts)) : [];
   const isCreator = useAuth((s) => s.session?.role === 'creator');
   const myCreatorId = useAuth((s) => (s.session?.role === 'creator' ? s.session.user.creator_id : null));
 
@@ -23,7 +33,7 @@ export default function Feed() {
         {isCreator ? <Button label="New post" variant="secondary" onPress={() => router.push('/post/new')} /> : null}
       </View>
       {query.isPending ? (
-        <Loading />
+        <SkeletonList withMedia />
       ) : query.isError ? (
         <CenteredState
           title="Couldn't load the feed"
@@ -32,12 +42,17 @@ export default function Feed() {
         />
       ) : (
         <FlatList
-          data={query.data.posts}
+          data={posts}
           keyExtractor={(post) => String(post.id)}
           renderItem={({ item }) => <PostCard post={item} canReport={item.creator_id !== myCreatorId} />}
           contentContainerStyle={styles.list}
+          onEndReached={() => {
+            if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage();
+          }}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={query.isFetchingNextPage ? <ActivityIndicator color={colors.accent} style={{ margin: spacing.lg }} /> : null}
           refreshControl={
-            <RefreshControl refreshing={query.isRefetching} onRefresh={() => void query.refetch()} tintColor={colors.accent} />
+            <RefreshControl refreshing={query.isRefetching && !query.isFetchingNextPage} onRefresh={() => void query.refetch()} tintColor={colors.accent} />
           }
           ListEmptyComponent={
             <CenteredState title="No posts yet" message="Approved posts from creators will show up here." />
