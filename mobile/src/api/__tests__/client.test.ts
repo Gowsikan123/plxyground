@@ -8,7 +8,7 @@ function mockFetch(status: number, body: unknown) {
     status,
     json: () => Promise.resolve(body),
   });
-  global.fetch = fn as unknown as typeof fetch;
+  globalThis.fetch = fn as unknown as typeof fetch;
   return fn;
 }
 
@@ -52,7 +52,7 @@ describe('request', () => {
   });
 
   it('reports network failures in plain English', async () => {
-    global.fetch = jest.fn().mockRejectedValue(new TypeError('Network request failed')) as unknown as typeof fetch;
+    globalThis.fetch = jest.fn().mockRejectedValue(new TypeError('Network request failed')) as unknown as typeof fetch;
     await expect(request('/api/content')).rejects.toMatchObject({ status: 0 });
   });
 });
