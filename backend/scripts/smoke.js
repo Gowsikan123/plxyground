@@ -252,8 +252,8 @@ async function main() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: 'admin@plxyground.local',
-          password: 'Internet2026@',
+          email: process.env.ADMIN_EMAIL,
+          password: process.env.ADMIN_PASSWORD,
         }),
       });
       if (!response.ok || !data.token) throw new Error(data.error || 'Admin login failed');

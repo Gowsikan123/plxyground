@@ -1,11 +1,13 @@
 const { test, expect } = require('@playwright/test');
 
+test.skip(!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD, 'Set ADMIN_EMAIL and ADMIN_PASSWORD to run admin login tests');
+
 test('admin can log in and see queue plus alerts sections', async ({ page }) => {
   await page.goto('/');
 
   await expect(page.locator('#login-screen')).toBeVisible();
-  await page.locator('#login-email').fill('admin@plxyground.local');
-  await page.locator('#login-password').fill('Internet2026@');
+  await page.locator('#login-email').fill(process.env.ADMIN_EMAIL);
+  await page.locator('#login-password').fill(process.env.ADMIN_PASSWORD);
   await page.getByRole('button', { name: 'Sign In' }).click();
 
   await expect(page.locator('#login-screen')).toBeHidden();

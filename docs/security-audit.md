@@ -68,7 +68,7 @@ Evidence:
 
 What is happening:
 
-- The runtime DB bootstrap auto-creates an admin account with the email `admin@plxyground.local` and password `Internet2026@`.
+- The runtime DB bootstrap auto-creates an admin account with a hardcoded email and password. **Fixed:** admin credentials now come from `ADMIN_EMAIL` / `ADMIN_PASSWORD` environment variables.
 - It also creates multiple demo user accounts with the shared password `Password1!`.
 - This behavior lives in `backend/src/db/setup.js`, which runs during app startup rather than in a separate dev-only seed command.
 - The same credentials are repeated in seed scripts and tests, making accidental reuse more likely.

@@ -63,7 +63,7 @@ async function run() {
   const oppsRes = await req('GET', '/api/opportunities');
   check('GET /api/opportunities → data array', Array.isArray(oppsRes.body.data?.data));
 
-  const adminLogin = await req('POST', '/api/admin/auth/login', { email: 'admin@plxyground.local', password: 'Internet2026@' });
+  const adminLogin = await req('POST', '/api/admin/auth/login', { email: process.env.ADMIN_EMAIL, password: process.env.ADMIN_PASSWORD });
   check('POST /api/admin/auth/login → token', !!adminLogin.body.data?.token);
   const adminToken = adminLogin.body.data?.token;
 

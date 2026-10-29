@@ -17,8 +17,11 @@ const sql = neon(process.env.DATABASE_URL_UNPOOLED);
   `;
   console.log('Table ready.');
 
-  const EMAIL = 'admin@plxyground.com';
-  const PASSWORD = 'Admin1234!';
+  const EMAIL = process.env.ADMIN_EMAIL;
+  const PASSWORD = process.env.ADMIN_PASSWORD;
+  if (!EMAIL || !PASSWORD || PASSWORD.length < 12) {
+    throw new Error('Set ADMIN_EMAIL and ADMIN_PASSWORD (12+ characters) in .env.local');
+  }
   const hash = await bcrypt.hash(PASSWORD, 12);
 
   await sql`
