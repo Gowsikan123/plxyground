@@ -1,0 +1,57 @@
+name: Mobile app
+
+on:
+  push:
+    paths: ['mobile/**', '.github/workflows/mobile.yml']
+  pull_request:
+    paths: ['mobile/**', '.github/workflows/mobile.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    name: Typecheck, test, bundle
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Align packages with the Expo SDK
+        run: npx expo install --fix
+
+      - name: Commit resolved versions and lockfile
+        if: github.event_name == 'push' && github.ref != 'refs/heads/main'
+        run: |
+          if ! git diff --quiet -- package.json package-lock.json || [ -n "$(git ls-files --others --exclude-standard package-lock.json)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package.json package-lock.json
+            git commit -m "mobile: pin Expo SDK package versions and lockfile [skip ci]"
+            git push
+          fi
+
+      - name: Typecheck, test, bundle
+        run: |
+          set +e
+          {
+            echo "## typecheck"; npx tsc --noEmit; t=$?
+            echo "## test"; npx jest --ci; j=$?
+            echo "## ios bundle"; npx expo export --platform ios --output-dir dist-ios; i=$?
+            echo "## web bundle"; npx expo export --platform web --output-dir dist-web; w=$?
+          } > check-output.txt 2>&1
+          cat check-output.txt
+          echo "typecheck=$t test=$j ios=$i web=$w"
+          if [ $t -ne 0 ] || [ $j -ne 0 ] || [ $i -ne 0 ] || [ $w -ne 0 ]; then
+            echo "::error title=mobile checks (typecheck=$t test=$j ios=$i web=$w)::$(grep -vE '^\s*$' check-output.txt | tail -c 3500 | sed ':a;N;$!ba;s/\n/%0A/g')"
+            exit 1
+          fi
