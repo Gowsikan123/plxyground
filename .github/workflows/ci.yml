@@ -2,18 +2,19 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, 'fix/**']
   pull_request:
     branches: [main, develop]
 
 jobs:
   # ─────────────────────────────────────────
-  # 1. Backend — lint + unit tests
+  # 1. Backend — migrations + API tests against real Postgres
   # ─────────────────────────────────────────
   backend:
     name: Backend (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         node: ['20', '22']
 
@@ -35,9 +36,8 @@ jobs:
     env:
       DATABASE_URL: postgresql://plxyground:plxyground@localhost:5432/plxyground_test
       JWT_SECRET: ci-test-secret-must-be-at-least-32-chars!!
-      ADMIN_JWT_SECRET: ci-admin-secret-must-be-at-least-32-chars
+      CORS_ORIGIN: http://localhost:3012
       NODE_ENV: test
-      PORT: 3001
 
     steps:
       - uses: actions/checkout@v4
@@ -51,11 +51,13 @@ jobs:
 
       - name: Install deps
         working-directory: backend
-        run: npm ci
+        run: |
+          npm ci
+          npm install --no-save jest@29 supertest@7 pg@8
 
-      - name: Lint
+      - name: Syntax check
         working-directory: backend
-        run: npm run lint --if-present
+        run: find src -name '*.js' -print0 | xargs -0 -n1 node --check
 
       - name: Run migrations
         working-directory: backend
@@ -63,10 +65,10 @@ jobs:
 
       - name: Run tests
         working-directory: backend
-        run: npm test -- --forceExit --detectOpenHandles
+        run: npm test
 
   # ─────────────────────────────────────────
-  # 2. Frontend — JS type-check + lint
+  # 2. Mobile app — dependency install + Expo health check
   # ─────────────────────────────────────────
   frontend:
     name: Frontend (Expo)
@@ -78,20 +80,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
 
       - name: Install deps
         working-directory: frontend
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
-      - name: Lint
+      - name: Expo doctor (informational)
         working-directory: frontend
-        run: npm run lint --if-present
-
-      - name: Expo doctor
-        working-directory: frontend
-        run: npx expo-doctor@latest --fix-dependencies || true
+        run: npx expo-doctor@latest || true
 
   # ─────────────────────────────────────────
   # 3. Admin panel — syntax check

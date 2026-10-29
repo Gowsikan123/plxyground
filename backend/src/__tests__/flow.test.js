@@ -1,0 +1,114 @@
+'use strict';
+/**
+ * End-to-end API journey against a real, migrated Postgres database:
+ * business posts an opportunity → creator applies → business accepts →
+ * creator posts content → admin approves it → it becomes public.
+ */
+const request = require('supertest');
+const bcrypt = require('bcryptjs');
+const app = require('../app');
+const sql = require('../db/client');
+
+const run = Date.now();
+const password = 'Password1';
+let businessToken;
+let creatorToken;
+let adminToken;
+let opportunityId;
+let postId;
+
+beforeAll(async () => {
+  const adminEmail = `admin.${run}@test.local`;
+  const hash = await bcrypt.hash('AdminPassword123', 4);
+  await sql`INSERT INTO admin_users (email, password_hash) VALUES (${adminEmail}, ${hash})`;
+  const res = await request(app).post('/api/admin/auth/login').send({ email: adminEmail, password: 'AdminPassword123' });
+  adminToken = res.body.token || res.body.data?.token;
+});
+
+afterAll(() => sql.end());
+
+test('business signs up', async () => {
+  const res = await request(app).post('/api/business/auth/signup')
+    .send({ email: `brand.${run}@test.local`, password, company_name: `Brand ${run}` });
+  expect(res.status).toBe(201);
+  businessToken = res.body.data.token;
+});
+
+test('creator signs up', async () => {
+  const res = await request(app).post('/api/auth/signup')
+    .send({ email: `creator.${run}@test.local`, password, username: `c${run}`.slice(0, 20), display_name: 'Test Creator', sport: 'Basketball' });
+  expect(res.status).toBe(201);
+  creatorToken = res.body.data.token;
+});
+
+test('business posts an opportunity', async () => {
+  const res = await request(app).post('/api/opportunities')
+    .set('Authorization', `Bearer ${businessToken}`)
+    .send({ title: `Ambassador ${run}`, description: 'Promote our shoes', sport: 'Basketball' });
+  expect(res.status).toBe(201);
+  opportunityId = res.body.data.id;
+});
+
+test('opportunity is listed with its poster', async () => {
+  const res = await request(app).get(`/api/opportunities?search=${encodeURIComponent(`Ambassador ${run}`)}`);
+  expect(res.status).toBe(200);
+  expect(res.body.data.total).toBe(1);
+  expect(res.body.data.opportunities[0].poster.display_name).toBe(`Brand ${run}`);
+});
+
+test('creator applies once, second attempt is rejected', async () => {
+  const first = await request(app).post('/api/applications')
+    .set('Authorization', `Bearer ${creatorToken}`)
+    .send({ opportunity_id: opportunityId, message: 'Pick me' });
+  expect(first.status).toBe(201);
+
+  const second = await request(app).post('/api/applications')
+    .set('Authorization', `Bearer ${creatorToken}`)
+    .send({ opportunity_id: opportunityId });
+  expect(second.status).toBe(409);
+});
+
+test('business accepts the application', async () => {
+  const list = await request(app).get(`/api/applications/opportunity/${opportunityId}`)
+    .set('Authorization', `Bearer ${businessToken}`);
+  expect(list.status).toBe(200);
+  const res = await request(app).put(`/api/applications/${list.body.data[0].id}/status`)
+    .set('Authorization', `Bearer ${businessToken}`)
+    .send({ status: 'accepted' });
+  expect(res.status).toBe(200);
+  expect(res.body.data.status).toBe('accepted');
+});
+
+test('creator post goes through moderation before it is public', async () => {
+  const created = await request(app).post('/api/content')
+    .set('Authorization', `Bearer ${creatorToken}`)
+    .send({ title: `Highlight reel ${run}` });
+  expect(created.status).toBe(201);
+  postId = created.body.data.id;
+
+  expect((await request(app).get(`/api/content/${postId}`)).status).toBe(404);
+
+  const queue = await request(app).get('/api/admin/queue').set('Authorization', `Bearer ${adminToken}`);
+  expect(queue.status).toBe(200);
+  const item = queue.body.data.find((i) => i.content_id === postId && i.type === 'creator');
+  expect(item).toBeDefined();
+
+  const approve = await request(app).patch(`/api/admin/queue/${item.id}`)
+    .set('Authorization', `Bearer ${adminToken}`)
+    .send({ status: 'approved' });
+  expect(approve.status).toBe(200);
+
+  expect((await request(app).get(`/api/content/${postId}`)).status).toBe(200);
+});
+
+test('admin analytics returns KPIs and a 7-day series', async () => {
+  const res = await request(app).get('/api/admin/analytics').set('Authorization', `Bearer ${adminToken}`);
+  expect(res.status).toBe(200);
+  expect(res.body.data.kpis.total_opps).toBeGreaterThanOrEqual(1);
+  expect(res.body.data.content_last_7_days).toHaveLength(7);
+});
+
+test('non-admins cannot reach admin routes', async () => {
+  const res = await request(app).get('/api/admin/users').set('Authorization', `Bearer ${creatorToken}`);
+  expect(res.status).toBe(403);
+});

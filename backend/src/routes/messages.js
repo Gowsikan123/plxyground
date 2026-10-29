@@ -1,29 +1,47 @@
 'use strict';
 const express = require('express');
 const { body } = require('express-validator');
-const db = require('../db/client');
+const sql = require('../db/client');
 const { requireAuth } = require('../middleware/auth');
 const { validationErrorHandler } = require('../middleware/validate');
 const logger = require('../logger');
 
 const router = express.Router();
 
+function me(req) {
+  return { type: req.userType, id: req.userType === 'creator' ? req.user.creator_id : req.user.id };
+}
+
+// Returns the thread if the current user is in it; otherwise sends 404/403 and returns null.
+async function loadThreadFor(req, res) {
+  const { type, id } = me(req);
+  const [thread] = await sql`SELECT * FROM message_threads WHERE id = ${parseInt(req.params.threadId, 10)}`;
+  if (!thread) {
+    res.status(404).json({ success: false, error: 'Thread not found.' });
+    return null;
+  }
+  const isParticipant =
+    (thread.participant_a_type === type && thread.participant_a_id === id) ||
+    (thread.participant_b_type === type && thread.participant_b_id === id);
+  if (!isParticipant) {
+    res.status(403).json({ success: false, error: 'Not a participant.' });
+    return null;
+  }
+  return thread;
+}
+
 // GET /api/messages/threads
-router.get('/threads', requireAuth, (req, res) => {
+router.get('/threads', requireAuth, async (req, res) => {
   try {
-    const type = req.userType;
-    const id = type === 'creator' ? req.user.creator_id : req.user.id;
-    const rows = db
-      .prepare(
-        `SELECT * FROM message_threads
-         WHERE (participant_a_type = ? AND participant_a_id = ?)
-            OR (participant_b_type = ? AND participant_b_id = ?)
-         ORDER BY last_message_at DESC`
-      )
-      .all(type, id, type, id);
+    const { type, id } = me(req);
+    const rows = await sql`
+      SELECT * FROM message_threads
+      WHERE (participant_a_type = ${type} AND participant_a_id = ${id})
+         OR (participant_b_type = ${type} AND participant_b_id = ${id})
+      ORDER BY last_message_at DESC NULLS LAST, created_at DESC`;
     return res.json({ success: true, data: rows });
   } catch (err) {
-    logger.error('GET /api/messages/threads', { message: err.message });
+    logger.error(`GET /api/messages/threads: ${err.message}`);
     return res.status(500).json({ success: false, error: 'Failed to fetch threads.' });
   }
 });
@@ -37,64 +55,49 @@ router.post(
     body('recipient_id').isInt().withMessage('Recipient ID must be integer.'),
   ],
   validationErrorHandler,
-  (req, res) => {
+  async (req, res) => {
     try {
-      const { recipient_type, recipient_id } = req.body;
-      const senderType = req.userType;
-      const senderId = senderType === 'creator' ? req.user.creator_id : req.user.id;
+      const { type, id } = me(req);
+      const recipientType = req.body.recipient_type;
+      const recipientId = parseInt(req.body.recipient_id, 10);
 
-      const existing = db
-        .prepare(
-          `SELECT * FROM message_threads WHERE
-            (participant_a_type = ? AND participant_a_id = ? AND participant_b_type = ? AND participant_b_id = ?) OR
-            (participant_a_type = ? AND participant_a_id = ? AND participant_b_type = ? AND participant_b_id = ?)`
-        )
-        .get(senderType, senderId, recipient_type, recipient_id, recipient_type, recipient_id, senderType, senderId);
-
+      const [existing] = await sql`
+        SELECT * FROM message_threads WHERE
+          (participant_a_type = ${type} AND participant_a_id = ${id}
+           AND participant_b_type = ${recipientType} AND participant_b_id = ${recipientId})
+       OR (participant_a_type = ${recipientType} AND participant_a_id = ${recipientId}
+           AND participant_b_type = ${type} AND participant_b_id = ${id})`;
       if (existing) return res.json({ success: true, data: existing });
 
-      const row = db
-        .prepare(
-          'INSERT INTO message_threads (participant_a_type, participant_a_id, participant_b_type, participant_b_id) VALUES (?, ?, ?, ?)'
-        )
-        .run(senderType, senderId, recipient_type, recipient_id);
-
-      const thread = db.prepare('SELECT * FROM message_threads WHERE id = ?').get(row.lastInsertRowid);
+      const [thread] = await sql`
+        INSERT INTO message_threads (participant_a_type, participant_a_id, participant_b_type, participant_b_id)
+        VALUES (${type}, ${id}, ${recipientType}, ${recipientId})
+        RETURNING *`;
       return res.status(201).json({ success: true, data: thread });
     } catch (err) {
-      logger.error('POST /api/messages/threads', { message: err.message });
+      logger.error(`POST /api/messages/threads: ${err.message}`);
       return res.status(500).json({ success: false, error: 'Failed to create thread.' });
     }
   }
 );
 
-// GET /api/messages/threads/:threadId
-router.get('/threads/:threadId', requireAuth, (req, res) => {
+// GET /api/messages/threads/:threadId?before=<ISO date>&limit=
+router.get('/threads/:threadId', requireAuth, async (req, res) => {
   try {
-    const type = req.userType;
-    const id = type === 'creator' ? req.user.creator_id : req.user.id;
-    const thread = db.prepare('SELECT * FROM message_threads WHERE id = ?').get(req.params.threadId);
-    if (!thread) return res.status(404).json({ success: false, error: 'Thread not found.' });
+    const thread = await loadThreadFor(req, res);
+    if (!thread) return undefined;
 
-    const isParticipant =
-      (thread.participant_a_type === type && thread.participant_a_id === id) ||
-      (thread.participant_b_type === type && thread.participant_b_id === id);
-    if (!isParticipant) return res.status(403).json({ success: false, error: 'Not a participant.' });
-
-    const lim = Math.min(parseInt(req.query.limit, 10) || 50, 100);
-    let rows;
-    if (req.query.before) {
-      rows = db
-        .prepare('SELECT * FROM messages WHERE thread_id = ? AND created_at < ? ORDER BY created_at DESC LIMIT ?')
-        .all(req.params.threadId, req.query.before, lim);
-    } else {
-      rows = db
-        .prepare('SELECT * FROM messages WHERE thread_id = ? ORDER BY created_at DESC LIMIT ?')
-        .all(req.params.threadId, lim);
-    }
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+    const rows = req.query.before
+      ? await sql`
+          SELECT * FROM messages WHERE thread_id = ${thread.id} AND created_at < ${req.query.before}
+          ORDER BY created_at DESC LIMIT ${limit}`
+      : await sql`
+          SELECT * FROM messages WHERE thread_id = ${thread.id}
+          ORDER BY created_at DESC LIMIT ${limit}`;
     return res.json({ success: true, data: rows.reverse() });
   } catch (err) {
-    logger.error('GET /api/messages/threads/:threadId', { message: err.message });
+    logger.error(`GET /api/messages/threads/:threadId: ${err.message}`);
     return res.status(500).json({ success: false, error: 'Failed to fetch messages.' });
   }
 });
@@ -105,28 +108,20 @@ router.post(
   requireAuth,
   [body('body').trim().notEmpty().withMessage('Message body required.')],
   validationErrorHandler,
-  (req, res) => {
+  async (req, res) => {
     try {
-      const type = req.userType;
-      const id = type === 'creator' ? req.user.creator_id : req.user.id;
-      const thread = db.prepare('SELECT * FROM message_threads WHERE id = ?').get(req.params.threadId);
-      if (!thread) return res.status(404).json({ success: false, error: 'Thread not found.' });
+      const thread = await loadThreadFor(req, res);
+      if (!thread) return undefined;
+      const { type, id } = me(req);
 
-      const isParticipant =
-        (thread.participant_a_type === type && thread.participant_a_id === id) ||
-        (thread.participant_b_type === type && thread.participant_b_id === id);
-      if (!isParticipant) return res.status(403).json({ success: false, error: 'Not a participant.' });
-
-      const row = db
-        .prepare('INSERT INTO messages (thread_id, sender_type, sender_id, body) VALUES (?, ?, ?, ?)')
-        .run(req.params.threadId, type, id, req.body.body);
-
-      db.prepare('UPDATE message_threads SET last_message_at = CURRENT_TIMESTAMP WHERE id = ?').run(req.params.threadId);
-
-      const msg = db.prepare('SELECT * FROM messages WHERE id = ?').get(row.lastInsertRowid);
+      const [msg] = await sql`
+        INSERT INTO messages (thread_id, sender_type, sender_id, body)
+        VALUES (${thread.id}, ${type}, ${id}, ${req.body.body})
+        RETURNING *`;
+      await sql`UPDATE message_threads SET last_message_at = NOW() WHERE id = ${thread.id}`;
       return res.status(201).json({ success: true, data: msg });
     } catch (err) {
-      logger.error('POST /api/messages/threads/:threadId', { message: err.message });
+      logger.error(`POST /api/messages/threads/:threadId: ${err.message}`);
       return res.status(500).json({ success: false, error: 'Failed to send message.' });
     }
   }

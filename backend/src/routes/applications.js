@@ -1,12 +1,17 @@
 'use strict';
 const express = require('express');
 const { body } = require('express-validator');
-const db = require('../db/client');
+const sql = require('../db/client');
 const { requireAuth } = require('../middleware/auth');
 const { validationErrorHandler } = require('../middleware/validate');
 const logger = require('../logger');
 
 const router = express.Router();
+
+function ownsOpportunity(req, opp) {
+  const posterId = req.userType === 'creator' ? req.user.creator_id : req.user.id;
+  return opp && opp.posted_by_type === req.userType && opp.posted_by_id === posterId;
+}
 
 // POST /api/applications
 router.post(
@@ -17,76 +22,61 @@ router.post(
     body('message').optional().trim().isLength({ max: 2000 }).withMessage('Message must be under 2000 chars.'),
   ],
   validationErrorHandler,
-  (req, res) => {
-    if (req.userType !== 'creator')
-      return res.status(403).json({ success: false, error: 'Creators only.' });
+  async (req, res) => {
+    if (req.userType !== 'creator') return res.status(403).json({ success: false, error: 'Creators only.' });
     try {
-      const { opportunity_id, message } = req.body;
-      const opp = db
-        .prepare("SELECT * FROM opportunities WHERE id = ? AND status = 'published'")
-        .get(opportunity_id);
+      const opportunityId = parseInt(req.body.opportunity_id, 10);
+      const [opp] = await sql`SELECT id FROM opportunities WHERE id = ${opportunityId} AND status = 'published'`;
       if (!opp) return res.status(404).json({ success: false, error: 'Opportunity not found.' });
 
-      const existing = db
-        .prepare('SELECT 1 FROM applications WHERE opportunity_id = ? AND creator_id = ?')
-        .get(opportunity_id, req.user.creator_id);
-      if (existing) return res.status(409).json({ success: false, error: 'Already applied.' });
-
-      const row = db
-        .prepare('INSERT INTO applications (opportunity_id, creator_id, message) VALUES (?, ?, ?)')
-        .run(opportunity_id, req.user.creator_id, message || null);
-
-      const created = db.prepare('SELECT * FROM applications WHERE id = ?').get(row.lastInsertRowid);
+      // UNIQUE(opportunity_id, creator_id) makes a second application a no-op.
+      const [created] = await sql`
+        INSERT INTO applications (opportunity_id, creator_id, message)
+        VALUES (${opportunityId}, ${req.user.creator_id}, ${req.body.message || null})
+        ON CONFLICT (opportunity_id, creator_id) DO NOTHING
+        RETURNING *`;
+      if (!created) return res.status(409).json({ success: false, error: 'Already applied.' });
       return res.status(201).json({ success: true, data: created });
     } catch (err) {
-      logger.error('POST /api/applications', { message: err.message });
+      logger.error(`POST /api/applications: ${err.message}`);
       return res.status(500).json({ success: false, error: 'Failed to apply.' });
     }
   }
 );
 
 // GET /api/applications/mine
-router.get('/mine', requireAuth, (req, res) => {
-  if (req.userType !== 'creator')
-    return res.status(403).json({ success: false, error: 'Creators only.' });
+router.get('/mine', requireAuth, async (req, res) => {
+  if (req.userType !== 'creator') return res.status(403).json({ success: false, error: 'Creators only.' });
   try {
-    const rows = db
-      .prepare(
-        `SELECT a.*, o.title AS opp_title, o.sport, o.budget
-         FROM applications a
-         JOIN opportunities o ON o.id = a.opportunity_id
-         WHERE a.creator_id = ?
-         ORDER BY a.created_at DESC`
-      )
-      .all(req.user.creator_id);
+    const rows = await sql`
+      SELECT a.*, o.title AS opp_title, o.sport, o.budget
+      FROM applications a
+      JOIN opportunities o ON o.id = a.opportunity_id
+      WHERE a.creator_id = ${req.user.creator_id}
+      ORDER BY a.created_at DESC`;
     return res.json({ success: true, data: rows });
   } catch (err) {
-    logger.error('GET /api/applications/mine', { message: err.message });
+    logger.error(`GET /api/applications/mine: ${err.message}`);
     return res.status(500).json({ success: false, error: 'Failed to fetch applications.' });
   }
 });
 
 // GET /api/applications/opportunity/:id
-router.get('/opportunity/:id', requireAuth, (req, res) => {
+router.get('/opportunity/:id', requireAuth, async (req, res) => {
   try {
-    const opp = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(req.params.id);
+    const [opp] = await sql`SELECT * FROM opportunities WHERE id = ${parseInt(req.params.id, 10)}`;
     if (!opp) return res.status(404).json({ success: false, error: 'Not found.' });
-    const posterId = req.userType === 'creator' ? req.user.creator_id : req.user.id;
-    if (opp.posted_by_type !== req.userType || opp.posted_by_id !== posterId) {
-      return res.status(403).json({ success: false, error: 'Not your opportunity.' });
-    }
-    const rows = db
-      .prepare(
-        `SELECT a.*, c.display_name, c.username, c.slug, c.avatar_url
-         FROM applications a
-         JOIN creators c ON c.id = a.creator_id
-         WHERE a.opportunity_id = ?
-         ORDER BY a.created_at DESC`
-      )
-      .all(req.params.id);
+    if (!ownsOpportunity(req, opp)) return res.status(403).json({ success: false, error: 'Not your opportunity.' });
+
+    const rows = await sql`
+      SELECT a.*, c.display_name, c.username, c.slug, c.avatar_url
+      FROM applications a
+      JOIN creators c ON c.id = a.creator_id
+      WHERE a.opportunity_id = ${opp.id}
+      ORDER BY a.created_at DESC`;
     return res.json({ success: true, data: rows });
   } catch (err) {
-    logger.error('GET /api/applications/opportunity/:id', { message: err.message });
+    logger.error(`GET /api/applications/opportunity/:id: ${err.message}`);
     return res.status(500).json({ success: false, error: 'Failed to fetch applications.' });
   }
 });
@@ -95,28 +85,23 @@ router.get('/opportunity/:id', requireAuth, (req, res) => {
 router.put(
   '/:id/status',
   requireAuth,
-  [
-    body('status').isIn(['accepted', 'rejected']).withMessage('Status must be accepted or rejected.'),
-  ],
+  [body('status').isIn(['accepted', 'rejected']).withMessage('Status must be accepted or rejected.')],
   validationErrorHandler,
-  (req, res) => {
+  async (req, res) => {
     try {
-      const appln = db.prepare('SELECT * FROM applications WHERE id = ?').get(req.params.id);
+      const [appln] = await sql`SELECT * FROM applications WHERE id = ${parseInt(req.params.id, 10)}`;
       if (!appln) return res.status(404).json({ success: false, error: 'Not found.' });
 
-      const opp = db.prepare('SELECT * FROM opportunities WHERE id = ?').get(appln.opportunity_id);
-      const posterId = req.userType === 'creator' ? req.user.creator_id : req.user.id;
-      if (!opp || opp.posted_by_type !== req.userType || opp.posted_by_id !== posterId) {
-        return res.status(403).json({ success: false, error: 'Not your opportunity.' });
-      }
+      const [opp] = await sql`SELECT * FROM opportunities WHERE id = ${appln.opportunity_id}`;
+      if (!ownsOpportunity(req, opp)) return res.status(403).json({ success: false, error: 'Not your opportunity.' });
 
-      db.prepare('UPDATE applications SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-        .run(req.body.status, req.params.id);
-
-      const updated = db.prepare('SELECT * FROM applications WHERE id = ?').get(req.params.id);
+      const [updated] = await sql`
+        UPDATE applications SET status = ${req.body.status}, updated_at = NOW()
+        WHERE id = ${appln.id}
+        RETURNING *`;
       return res.json({ success: true, data: updated });
     } catch (err) {
-      logger.error('PUT /api/applications/:id/status', { message: err.message });
+      logger.error(`PUT /api/applications/:id/status: ${err.message}`);
       return res.status(500).json({ success: false, error: 'Failed to update application.' });
     }
   }

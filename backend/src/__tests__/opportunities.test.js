@@ -4,12 +4,13 @@
 const request = require('supertest');
 const app = require('../app');
 
+afterAll(() => require('../db/client').end());
+
 describe('GET /api/opportunities', () => {
   it('returns 200 and an array', async () => {
     const res = await request(app).get('/api/opportunities');
     expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('data');
-    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(Array.isArray(res.body.data.opportunities)).toBe(true);
   });
 
   it('accepts sport filter param', async () => {

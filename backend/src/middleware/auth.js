@@ -28,6 +28,7 @@ async function requireAuth(req, res, next) {
     }
     if (!user) return res.status(401).json({ success: false, error: 'User not found' });
     req.user = { ...user, type: payload.type };
+    req.userType = payload.type;
     next();
   } catch (err) {
     return res.status(401).json({ success: false, error: 'Invalid token' });

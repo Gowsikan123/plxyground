@@ -5,6 +5,8 @@
 const request = require('supertest');
 const app = require('../app');
 
+afterAll(() => require('../db/client').end());
+
 describe('POST /api/auth/signup', () => {
   it('returns 400 when required fields are missing', async () => {
     const res = await request(app)

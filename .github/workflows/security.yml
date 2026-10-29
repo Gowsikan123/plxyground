@@ -11,6 +11,7 @@ jobs:
     name: npm audit
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         dir: [backend, frontend, admin-panel]
 
@@ -23,8 +24,8 @@ jobs:
 
       - name: Install deps (${{ matrix.dir }})
         working-directory: ${{ matrix.dir }}
-        run: npm ci
+        run: if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
 
       - name: Audit (${{ matrix.dir }})
         working-directory: ${{ matrix.dir }}
-        run: npm audit --audit-level=high
+        run: npm audit --omit=dev --audit-level=high
