@@ -170,6 +170,7 @@
     .badge-content          { background: var(--accent-dim);  color: var(--accent); }
     .badge-business_content { background: var(--orange-dim);  color: var(--orange); }
     .badge-opportunity      { background: var(--green-dim);   color: var(--green); }
+    .badge-message          { background: var(--surface-3);   color: var(--text-muted); }
 
     /* ── Login ───────────────────────────────────────────────────── */
     .login-card {
@@ -304,6 +305,11 @@
         Mod Queue
         <span class="nav-badge" id="queue-badge" style="display:none">0</span>
       </div>
+      <div class="nav-item" data-section="reports">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/></svg>
+        Reports
+        <span class="nav-badge" id="reports-badge" style="display:none">0</span>
+      </div>
       <div class="nav-item" data-section="content">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
         Content
@@ -382,6 +388,30 @@
               <th>Content</th><th>Submitted By</th><th>Type</th><th>Status</th><th>Posted</th><th>Actions</th>
             </tr></thead>
             <tbody id="queue-tbody"><tr><td colspan="7"><div class="empty"><p>Loading...</p></div></td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── Reports ── -->
+      <section id="section-reports" class="section">
+        <div class="section-header">
+          <div><h2>Reports</h2><p>Things people have reported from the app</p></div>
+          <div style="display:flex;gap:8px">
+            <select id="reports-status" onchange="loadReports()" class="btn btn-secondary btn-sm">
+              <option value="open">Open</option>
+              <option value="actioned">Actioned</option>
+              <option value="dismissed">Dismissed</option>
+              <option value="all">All</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" onclick="loadReports()">&#8635; Refresh</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Reported</th><th>Reason</th><th>Reported by</th><th>Status</th><th>When</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="reports-tbody"><tr><td colspan="6"><div class="empty"><p>Loading...</p></div></td></tr></tbody>
           </table>
         </div>
       </section>
@@ -640,14 +670,15 @@ function navigate(section) {
   currentSection = section;
   document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.section === section));
   document.querySelectorAll('.section').forEach(el => el.classList.toggle('active', el.id === 'section-' + section));
-  const titles = { dashboard:'Dashboard', queue:'Moderation Queue', content:'Content', users:'Users', audit:'Audit Log', settings:'Settings' };
+  const titles = { dashboard:'Dashboard', queue:'Moderation Queue', reports:'Reports', content:'Content', users:'Users', audit:'Audit Log', settings:'Settings' };
   document.getElementById('topbar-title').textContent = titles[section] || section;
-  const loaders = { dashboard: loadDashboard, queue: loadQueue, content: loadContent, users: loadUsers, audit: loadAudit };
+  const loaders = { dashboard: loadDashboard, queue: loadQueue, reports: loadReports, content: loadContent, users: loadUsers, audit: loadAudit };
   if (loaders[section]) loaders[section]();
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────
 async function loadDashboard() {
+  api('GET', '/api/admin/reports?status=open&limit=1').then(r => { if (r.ok) updateReportsBadge(r.data.open || 0); });
   const r = await api('GET', '/api/admin/analytics');
   if (!r.ok) { toast('Failed to load analytics', 'error'); return; }
   const kpis           = r.data.kpis || {};
@@ -730,6 +761,56 @@ async function loadQueue() {
         </div>
       </td>
     </tr>`).join('');
+}
+
+// ── Reports ───────────────────────────────────────────────────────────────
+const REPORT_REASONS = { spam: 'Spam', harassment: 'Harassment', inappropriate: 'Inappropriate', scam: 'Scam or fraud', impersonation: 'Impersonation', other: 'Other' };
+
+async function loadReports() {
+  const status = document.getElementById('reports-status').value;
+  const r = await api('GET', `/api/admin/reports?status=${status}`);
+  if (!r.ok) { toast('Failed to load reports', 'error'); return; }
+  const reports = r.data.data || [];
+  updateReportsBadge(r.data.open || 0);
+  const tbody = document.getElementById('reports-tbody');
+  if (!reports.length) {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><p>No ${status === 'all' ? '' : esc(status) + ' '}reports</p></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = reports.map(rep => `
+    <tr>
+      <td style="max-width:280px">
+        <span class="badge badge-${esc(rep.target_type)}">${esc(rep.target_type)}</span>
+        <div style="font-weight:500;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(rep.target_label || '(deleted)')} <span class="td-mono">#${rep.target_id}</span></div>
+        ${rep.times_reported > 1 ? `<div style="color:var(--orange);font-size:12px">Reported ${rep.times_reported} times</div>` : ''}
+      </td>
+      <td>
+        <div>${esc(REPORT_REASONS[rep.reason] || rep.reason)}</div>
+        ${rep.details ? `<div style="color:var(--text-muted);font-size:12px;max-width:240px">${esc(rep.details)}</div>` : ''}
+      </td>
+      <td>${esc(rep.reporter_name || '(deleted)')} <span class="badge badge-${esc(rep.reporter_type)}">${esc(rep.reporter_type)}</span></td>
+      <td><span class="badge badge-${rep.status === 'open' ? 'pending' : rep.status === 'actioned' ? 'approved' : 'closed'}">${esc(rep.status)}</span></td>
+      <td class="td-mono">${fmtDate(rep.created_at)}</td>
+      <td>
+        ${rep.status === 'open' ? `<div style="display:flex;gap:4px">
+          <button class="btn btn-success btn-sm" onclick="resolveReport(${rep.id},'actioned')" title="You dealt with it, e.g. removed the post or suspended the account">Actioned</button>
+          <button class="btn btn-secondary btn-sm" onclick="resolveReport(${rep.id},'dismissed')">Dismiss</button>
+        </div>` : ''}
+      </td>
+    </tr>`).join('');
+}
+
+function updateReportsBadge(open) {
+  const badge = document.getElementById('reports-badge');
+  badge.textContent = open;
+  badge.style.display = open > 0 ? 'inline-block' : 'none';
+}
+
+async function resolveReport(id, status) {
+  const r = await api('PUT', `/api/admin/reports/${id}`, { status });
+  if (!r.ok) { toast(r.data?.error || 'Failed to update report', 'error'); return; }
+  toast(status === 'actioned' ? 'Marked as actioned' : 'Report dismissed', 'success');
+  loadReports();
 }
 
 async function quickModerate(id, status) {

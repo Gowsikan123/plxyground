@@ -3,13 +3,14 @@ const express = require('express');
 const { body } = require('express-validator');
 const pool = require('../db/client');   // PostgreSQL — all tables live here
 const audit = require('../utils/auditLogger');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, optionalAuth } = require('../middleware/auth');
+const { actorOf, hiddenCreatorIds } = require('../utils/blocks');
 const { validationErrorHandler } = require('../middleware/validate');
 
 const router = express.Router();
 
 // GET /api/content
-router.get('/', async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
   try {
     const search = req.query.search || '';
     const sport  = req.query.sport  || '';
@@ -29,6 +30,14 @@ router.get('/', async (req, res) => {
       where += ` AND cr.sport = $${idx}`;
       params.push(sport);
       idx++;
+    }
+    if (req.userType === 'creator' || req.userType === 'business') {
+      const hidden = await hiddenCreatorIds(actorOf(req));
+      if (hidden.length) {
+        where += ` AND NOT (c.creator_id = ANY($${idx}::int[]))`;
+        params.push(hidden);
+        idx++;
+      }
     }
 
     const dataParams  = [...params, limit, offset];

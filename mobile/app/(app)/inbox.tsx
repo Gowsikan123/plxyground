@@ -7,6 +7,7 @@ import type { AppNotification, Thread } from '@/api/types';
 import { useAuth } from '@/auth/store';
 import { Avatar } from '@/components/Avatar';
 import { Button, CenteredState, Loading, Screen, Title } from '@/components/ui';
+import { goToChat } from '@/lib/chat';
 import { timeAgo } from '@/lib/time';
 import { colors, minTouchSize, radius, spacing, type } from '@/theme/tokens';
 
@@ -69,7 +70,7 @@ function ThreadRow({ thread }: { thread: Thread }) {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Conversation with ${name}${thread.unread_count ? `, ${thread.unread_count} unread` : ''}`}
-      onPress={() => router.push({ pathname: '/chat/[threadId]', params: { threadId: String(thread.id), name } })}
+      onPress={() => goToChat(thread.id, { type: thread.other_type, id: thread.other_id, name })}
       style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
     >
       <Avatar url={thread.other_avatar} name={name} size={48} />

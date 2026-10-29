@@ -39,6 +39,14 @@ export default function Profile() {
         </Card>
         <Button label="Edit profile" onPress={() => router.push('/edit-profile')} />
         <Button label="Log out" variant="secondary" onPress={() => void logout()} />
+
+        <Text style={styles.section}>Privacy and safety</Text>
+        <View style={styles.links}>
+          <Button label="Blocked accounts" variant="ghost" onPress={() => router.push('/blocked')} />
+          <Button label="Terms of use" variant="ghost" onPress={() => router.push('/legal/terms')} />
+          <Button label="Privacy notice" variant="ghost" onPress={() => router.push('/legal/privacy')} />
+          <Button label="Delete account" variant="ghost" onPress={() => router.push('/delete-account')} />
+        </View>
       </ScrollView>
     </Screen>
   );
@@ -47,5 +55,7 @@ export default function Profile() {
 const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.lg },
   name: { ...type.heading, color: colors.text },
+  section: { ...type.label, color: colors.textMuted, textTransform: 'uppercase', marginTop: spacing.md },
+  links: { gap: spacing.xs, alignItems: 'flex-start' },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm },
 });

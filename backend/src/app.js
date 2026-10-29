@@ -55,6 +55,7 @@ app.use('/api/follows',          require('./routes/follows'));
 app.use('/api/messages',         require('./routes/messages'));
 app.use('/api/notifications',    require('./routes/notifications'));
 app.use('/api/uploads',          require('./routes/uploads'));
+app.use('/api/safety',           require('./routes/safety'));
 
 // Admin routes
 app.use('/api/admin/auth',      authLimiter, require('./routes/admin/auth'));
@@ -64,6 +65,7 @@ app.use('/api/admin/users',     require('./routes/admin/users'));
 app.use('/api/admin/analytics', require('./routes/admin/analytics'));
 app.use('/api/admin/audit',     require('./routes/admin/audit'));
 app.use('/api/admin/settings',  require('./routes/admin/settings'));
+app.use('/api/admin/reports',   require('./routes/admin/reports'));
 
 // 404
 app.use((_req, res) => res.status(404).json({ success: false, error: 'Route not found' }));

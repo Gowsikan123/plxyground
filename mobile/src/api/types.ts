@@ -175,3 +175,13 @@ export interface UnreadCounts {
   notifications: number;
   messages: number;
 }
+
+export type ReportTarget = 'creator' | 'business' | 'content' | 'opportunity' | 'message';
+export type ReportReason = 'spam' | 'harassment' | 'inappropriate' | 'scam' | 'impersonation' | 'other';
+export interface BlockedAccount {
+  blocked_type: Role;
+  blocked_id: number;
+  name: string | null;
+  avatar_url: string | null;
+  created_at: string;
+}
