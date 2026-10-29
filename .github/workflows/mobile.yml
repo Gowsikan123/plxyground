@@ -23,15 +23,12 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install with SDK-matched versions
+      - name: Install (versions pinned to Expo SDK 57)
         run: |
           set +e
           {
             npm install --no-audit --no-fund &&
-            npx expo install expo-constants expo-dev-client expo-linking expo-router expo-secure-store expo-status-bar \
-              react react-dom react-native react-native-safe-area-context react-native-screens react-native-web &&
-            npx expo install jest-expo typescript @types/react -- --save-dev &&
-            npx expo install --fix
+            npx expo install --check
           } > install-output.txt 2>&1
           code=$?
           cat install-output.txt
@@ -40,14 +37,14 @@ jobs:
           fi
           exit $code
 
-      - name: Commit resolved versions and lockfile
+      - name: Commit lockfile
         if: github.event_name == 'push' && github.ref != 'refs/heads/main'
         run: |
           if ! git diff --quiet -- package.json package-lock.json || [ -n "$(git ls-files --others --exclude-standard package-lock.json)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add package.json package-lock.json
-            git commit -m "mobile: pin Expo SDK package versions and lockfile [skip ci]"
+            git commit -m "mobile: add package-lock.json [skip ci]"
             git push
           fi
 
