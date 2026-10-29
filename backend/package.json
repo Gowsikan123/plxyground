@@ -32,5 +32,10 @@
     "testMatch": [
       "**/src/__tests__/**/*.test.js"
     ]
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "pg": "^8.11.5",
+    "supertest": "^7.0.0"
   }
 }

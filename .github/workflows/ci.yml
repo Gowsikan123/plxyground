@@ -51,9 +51,8 @@ jobs:
 
       - name: Install deps
         working-directory: backend
-        run: |
-          npm ci
-          npm install --no-save jest@29 supertest@7 pg@8
+        # package-lock.json is behind package.json, so install rather than ci until it's regenerated
+        run: npm install --no-audit --no-fund
 
       - name: Syntax check
         working-directory: backend
