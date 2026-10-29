@@ -40,6 +40,8 @@
     },
     "extra": {
       "apiUrl": "https://plxyground.vercel.app"
-    }
+    },
+    "primaryColor": "#FF5A1F",
+    "description": "PLXYGROUND connects sports creators with brands: share posts, find opportunities, apply and message."
   }
 }
