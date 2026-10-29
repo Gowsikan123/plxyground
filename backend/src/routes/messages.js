@@ -30,15 +30,33 @@ async function loadThreadFor(req, res) {
   return thread;
 }
 
-// GET /api/messages/threads
+// GET /api/messages/threads — my conversations, newest first, with the other
+// person's name and avatar, the last message and how many are unread.
 router.get('/threads', requireAuth, async (req, res) => {
   try {
     const { type, id } = me(req);
     const rows = await sql`
-      SELECT * FROM message_threads
-      WHERE (participant_a_type = ${type} AND participant_a_id = ${id})
-         OR (participant_b_type = ${type} AND participant_b_id = ${id})
-      ORDER BY last_message_at DESC NULLS LAST, created_at DESC`;
+      WITH mine AS (
+        SELECT t.*,
+          CASE WHEN t.participant_a_type = ${type} AND t.participant_a_id = ${id}
+               THEN t.participant_b_type ELSE t.participant_a_type END AS other_type,
+          CASE WHEN t.participant_a_type = ${type} AND t.participant_a_id = ${id}
+               THEN t.participant_b_id ELSE t.participant_a_id END AS other_id
+        FROM message_threads t
+        WHERE (t.participant_a_type = ${type} AND t.participant_a_id = ${id})
+           OR (t.participant_b_type = ${type} AND t.participant_b_id = ${id})
+      )
+      SELECT m.id, m.other_type, m.other_id, m.last_message_at, m.created_at,
+             COALESCE(c.display_name, b.company_name) AS other_name,
+             COALESCE(c.avatar_url, b.logo_url)       AS other_avatar,
+             (SELECT body FROM messages WHERE thread_id = m.id ORDER BY created_at DESC LIMIT 1) AS last_message,
+             (SELECT COUNT(*)::int FROM messages
+               WHERE thread_id = m.id AND is_read = FALSE
+                 AND NOT (sender_type = ${type} AND sender_id = ${id})) AS unread_count
+      FROM mine m
+      LEFT JOIN creators   c ON m.other_type = 'creator'  AND c.id = m.other_id
+      LEFT JOIN businesses b ON m.other_type = 'business' AND b.id = m.other_id
+      ORDER BY COALESCE(m.last_message_at, m.created_at) DESC`;
     return res.json({ success: true, data: rows });
   } catch (err) {
     logger.error(`GET /api/messages/threads: ${err.message}`);
@@ -60,6 +78,13 @@ router.post(
       const { type, id } = me(req);
       const recipientType = req.body.recipient_type;
       const recipientId = parseInt(req.body.recipient_id, 10);
+      if (recipientType === type && recipientId === id) {
+        return res.status(400).json({ success: false, error: 'You cannot message yourself.' });
+      }
+      const recipient = recipientType === 'creator'
+        ? await sql`SELECT id FROM creators WHERE id = ${recipientId}`
+        : await sql`SELECT id FROM businesses WHERE id = ${recipientId}`;
+      if (!recipient.length) return res.status(404).json({ success: false, error: 'That account no longer exists.' });
 
       const [existing] = await sql`
         SELECT * FROM message_threads WHERE
@@ -86,6 +111,11 @@ router.get('/threads/:threadId', requireAuth, async (req, res) => {
   try {
     const thread = await loadThreadFor(req, res);
     if (!thread) return undefined;
+
+    const { type, id } = me(req);
+    await sql`
+      UPDATE messages SET is_read = TRUE
+      WHERE thread_id = ${thread.id} AND is_read = FALSE AND NOT (sender_type = ${type} AND sender_id = ${id})`;
 
     const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
     const rows = req.query.before

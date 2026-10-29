@@ -103,6 +103,7 @@ router.put(
     body('company_name').optional().isLength({ min: 1, max: 80 }).withMessage('Company name must be 1-80 characters'),
     body('website').optional({ values: 'falsy' }).isURL().withMessage('Website must be a valid URL'),
     body('bio').optional().isLength({ max: 500 }).withMessage('Bio must be under 500 characters'),
+    body('logo_url').optional({ values: 'null' }).isURL().withMessage('Logo must be a URL'),
   ],
   validationErrorHandler,
   async (req, res) => {
@@ -114,7 +115,7 @@ router.put(
       const [biz] = await sql`
         UPDATE businesses
         SET company_name = ${pick('company_name')}, industry = ${pick('industry')}, website = ${pick('website')},
-            location = ${pick('location')}, bio = ${pick('bio')}, updated_at = NOW()
+            location = ${pick('location')}, bio = ${pick('bio')}, logo_url = ${pick('logo_url')}, updated_at = NOW()
         WHERE id = ${req.user.id}
         RETURNING id, email, company_name, slug, industry, website, location, logo_url, bio, is_verified`;
       return res.json({ success: true, data: biz });

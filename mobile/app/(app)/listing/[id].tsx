@@ -3,6 +3,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { applications, opportunities } from '@/api/endpoints';
 import type { Applicant } from '@/api/types';
+import { Avatar } from '@/components/Avatar';
+import { MessageButton } from '@/components/MessageButton';
 import { Body, Button, Card, CenteredState, Loading, Screen, StatusTag, Title } from '@/components/ui';
 import { colors, spacing, type } from '@/theme/tokens';
 
@@ -93,6 +95,7 @@ function ApplicantCard({ applicant, busy, onDecide }: {
   return (
     <Card>
       <View style={styles.row}>
+        <Avatar url={applicant.avatar_url} name={applicant.display_name} size={44} />
         <View style={{ flex: 1 }}>
           <Text style={styles.name}>{applicant.display_name}</Text>
           <Text style={styles.handle}>@{applicant.username}</Text>
@@ -106,6 +109,9 @@ function ApplicantCard({ applicant, busy, onDecide }: {
           <View style={{ flex: 1 }}><Button label="Decline" variant="secondary" onPress={() => onDecide('rejected')} disabled={busy} /></View>
         </View>
       ) : null}
+      <View style={{ marginTop: spacing.sm }}>
+        <MessageButton recipientType="creator" recipientId={applicant.creator_id} name={applicant.display_name} />
+      </View>
     </Card>
   );
 }

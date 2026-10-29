@@ -3,6 +3,7 @@ const express = require('express');
 const { body } = require('express-validator');
 const sql = require('../../db/client');
 const audit = require('../../utils/auditLogger');
+const { notify } = require('../../utils/notify');
 const { requireAdmin } = require('../../middleware/auth');
 const { validationErrorHandler } = require('../../middleware/validate');
 
@@ -18,11 +19,25 @@ async function applyDecision(item, { queueStatus, contentStatus, adminId, note }
     UPDATE moderation_queue
     SET status = ${queueStatus}, reviewed_by = ${adminId}, rejection_reason = ${note || null}, reviewed_at = NOW()
     WHERE id = ${item.id}`;
-  // Table name comes from a fixed whitelist above, never from user input.
-  await sql.query(
-    `UPDATE ${contentTable(item)} SET status = $1, updated_at = NOW() WHERE id = $2`,
+  // Table and column names come from fixed values above, never from user input.
+  const ownerColumn = isCreatorItem(item) ? 'creator_id' : 'business_id';
+  const { rows } = await sql.query(
+    `UPDATE ${contentTable(item)} SET status = $1, updated_at = NOW() WHERE id = $2
+     RETURNING ${ownerColumn} AS owner_id, title`,
     [contentStatus, item.content_id]
   );
+  const post = rows[0];
+  if (post && contentStatus !== 'deleted') {
+    await notify({
+      recipientType: isCreatorItem(item) ? 'creator' : 'business',
+      recipientId: post.owner_id,
+      type: contentStatus === 'published' ? 'post_approved' : 'post_rejected',
+      title: contentStatus === 'published' ? `Your post "${post.title}" is live` : `Your post "${post.title}" wasn't approved`,
+      body: contentStatus === 'rejected' ? note || null : null,
+      referenceType: isCreatorItem(item) ? 'content' : 'business_content',
+      referenceId: item.content_id,
+    });
+  }
 }
 
 // GET /api/admin/queue?status=pending&content_type=&limit=&offset=

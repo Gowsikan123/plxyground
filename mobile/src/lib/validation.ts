@@ -81,3 +81,8 @@ export const businessProfileSchema = z.object({
   location: z.string().trim().max(80),
   website: z.union([z.literal(''), z.string().trim().url('Enter a full URL, starting with https://')]),
 });
+
+export const postSchema = z.object({
+  title: z.string().trim().min(1, 'Give your post a title').max(120, 'Keep it under 120 characters'),
+  body: z.string().trim().max(2000, 'Keep it under 2000 characters'),
+});

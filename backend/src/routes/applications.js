@@ -5,6 +5,7 @@ const sql = require('../db/client');
 const { requireAuth } = require('../middleware/auth');
 const { validationErrorHandler } = require('../middleware/validate');
 const logger = require('../logger');
+const { notify } = require('../utils/notify');
 
 const router = express.Router();
 
@@ -26,7 +27,9 @@ router.post(
     if (req.userType !== 'creator') return res.status(403).json({ success: false, error: 'Creators only.' });
     try {
       const opportunityId = parseInt(req.body.opportunity_id, 10);
-      const [opp] = await sql`SELECT id FROM opportunities WHERE id = ${opportunityId} AND status = 'published'`;
+      const [opp] = await sql`
+        SELECT id, title, posted_by_type, posted_by_id FROM opportunities
+        WHERE id = ${opportunityId} AND status = 'published'`;
       if (!opp) return res.status(404).json({ success: false, error: 'Opportunity not found.' });
 
       // UNIQUE(opportunity_id, creator_id) makes a second application a no-op.
@@ -36,6 +39,15 @@ router.post(
         ON CONFLICT (opportunity_id, creator_id) DO NOTHING
         RETURNING *`;
       if (!created) return res.status(409).json({ success: false, error: 'Already applied.' });
+      await notify({
+        recipientType: opp.posted_by_type,
+        recipientId: opp.posted_by_id,
+        type: 'application_received',
+        title: `${req.user.display_name} applied to ${opp.title}`,
+        body: req.body.message || null,
+        referenceType: 'opportunity',
+        referenceId: opp.id,
+      });
       return res.status(201).json({ success: true, data: created });
     } catch (err) {
       logger.error(`POST /api/applications: ${err.message}`);
@@ -99,6 +111,16 @@ router.put(
         UPDATE applications SET status = ${req.body.status}, updated_at = NOW()
         WHERE id = ${appln.id}
         RETURNING *`;
+      await notify({
+        recipientType: 'creator',
+        recipientId: appln.creator_id,
+        type: 'application_decided',
+        title: req.body.status === 'accepted'
+          ? `You were accepted for ${opp.title}`
+          : `Update on ${opp.title}: not selected this time`,
+        referenceType: 'opportunity',
+        referenceId: opp.id,
+      });
       return res.json({ success: true, data: updated });
     } catch (err) {
       logger.error(`PUT /api/applications/:id/status: ${err.message}`);

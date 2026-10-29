@@ -123,6 +123,43 @@ test('admin analytics returns KPIs and a 7-day series', async () => {
   expect(res.body.data.content_last_7_days).toHaveLength(7);
 });
 
+test('brand was notified of the application and the creator of the decision', async () => {
+  const brand = await request(app).get('/api/notifications').set('Authorization', `Bearer ${businessToken}`);
+  expect(brand.body.data.some((n) => n.type === 'application_received')).toBe(true);
+  const creator = await request(app).get('/api/notifications').set('Authorization', `Bearer ${creatorToken}`);
+  expect(creator.body.data.some((n) => n.type === 'application_decided')).toBe(true);
+  const counts = await request(app).get('/api/notifications/unread').set('Authorization', `Bearer ${creatorToken}`);
+  expect(counts.body.data.notifications).toBeGreaterThanOrEqual(1);
+});
+
+test('creator and brand can message each other', async () => {
+  const me = await request(app).get('/api/business/auth/me').set('Authorization', `Bearer ${businessToken}`);
+  const thread = await request(app).post('/api/messages/threads')
+    .set('Authorization', `Bearer ${creatorToken}`)
+    .send({ recipient_type: 'business', recipient_id: me.body.data.id });
+  expect(thread.status).toBe(201);
+  const sent = await request(app).post(`/api/messages/threads/${thread.body.data.id}`)
+    .set('Authorization', `Bearer ${creatorToken}`)
+    .send({ body: 'Thanks for accepting me!' });
+  expect(sent.status).toBe(201);
+
+  const inbox = await request(app).get('/api/messages/threads').set('Authorization', `Bearer ${businessToken}`);
+  const t = inbox.body.data.find((x) => x.id === thread.body.data.id);
+  expect(t.last_message).toBe('Thanks for accepting me!');
+  expect(t.unread_count).toBe(1);
+});
+
+test('uploads are validated and report when storage is not configured', async () => {
+  const bad = await request(app).post('/api/uploads').set('Authorization', `Bearer ${creatorToken}`)
+    .send({ data: 'abc', content_type: 'image/gif' });
+  expect(bad.status).toBe(400);
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    const res = await request(app).post('/api/uploads').set('Authorization', `Bearer ${creatorToken}`)
+      .send({ data: 'aGVsbG8=', content_type: 'image/jpeg' });
+    expect(res.status).toBe(503);
+  }
+});
+
 test('non-admins cannot reach admin routes', async () => {
   const res = await request(app).get('/api/admin/users').set('Authorization', `Bearer ${creatorToken}`);
   expect(res.status).toBe(403);

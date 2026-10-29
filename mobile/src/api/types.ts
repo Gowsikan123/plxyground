@@ -137,3 +137,41 @@ export interface Application {
 export type Session =
   | { role: 'creator'; token: string; user: CreatorAccount }
   | { role: 'business'; token: string; user: Business };
+
+export interface Thread {
+  id: number;
+  other_type: Role;
+  other_id: number;
+  other_name: string | null;
+  other_avatar: string | null;
+  last_message: string | null;
+  last_message_at: string | null;
+  created_at: string;
+  unread_count: number;
+}
+
+export interface Message {
+  id: number;
+  thread_id: number;
+  sender_type: Role;
+  sender_id: number;
+  body: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface AppNotification {
+  id: number;
+  type: 'application_received' | 'application_decided' | 'post_approved' | 'post_rejected' | string;
+  title: string;
+  body: string | null;
+  reference_type: string | null;
+  reference_id: number | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface UnreadCounts {
+  notifications: number;
+  messages: number;
+}
