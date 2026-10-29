@@ -9,6 +9,10 @@ const { globalLimiter, authLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
 
+// Vercel sits in front of the app as a proxy; trust its X-Forwarded-For so
+// rate limiting is per real client IP instead of one shared bucket.
+app.set('trust proxy', 1);
+
 app.use(helmet());
 app.use(cors({
   origin: config.CORS_ORIGIN.split(',').map(o => o.trim()),
