@@ -5,6 +5,8 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ApiError } from '@/api/client';
 import { applications, opportunities } from '@/api/endpoints';
 import { useAuth } from '@/auth/store';
+import { Avatar } from '@/components/Avatar';
+import { MessageButton } from '@/components/MessageButton';
 import { Body, Button, CenteredState, Loading, Screen, StatusTag, Tag, TextField, Title } from '@/components/ui';
 import { colors, spacing, type } from '@/theme/tokens';
 
@@ -57,7 +59,10 @@ export default function OpportunityDetail() {
     <Screen>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Button label="Back" variant="ghost" onPress={() => router.back()} />
-        <Text style={styles.poster}>{opp.poster?.display_name ?? 'PLXYGROUND'}</Text>
+        <View style={styles.posterRow}>
+          <Avatar url={opp.poster?.avatar_url} name={opp.poster?.display_name ?? 'PLXYGROUND'} size={32} />
+          <Text style={styles.poster}>{opp.poster?.display_name ?? 'PLXYGROUND'}</Text>
+        </View>
         <Title>{opp.title}</Title>
         <View style={styles.tags}>
           {opp.sport ? <Tag label={opp.sport} /> : null}
@@ -66,6 +71,16 @@ export default function OpportunityDetail() {
           {opp.deadline ? <Tag label={`Apply by ${opp.deadline.slice(0, 10)}`} /> : null}
         </View>
         <Body>{opp.description}</Body>
+        {role === 'creator' && opp.posted_by_type === 'business' ? (
+          <View style={{ marginTop: spacing.lg }}>
+            <MessageButton
+              recipientType="business"
+              recipientId={opp.posted_by_id}
+              name={opp.poster?.display_name ?? 'Brand'}
+              label="Message the brand"
+            />
+          </View>
+        ) : null}
 
         {role === 'creator' ? (
           <View style={styles.apply}>
@@ -104,5 +119,6 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.md },
   poster: { ...type.caption, color: colors.textMuted },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  posterRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
   apply: { marginTop: spacing.xl, paddingTop: spacing.xl, borderTopWidth: 1, borderTopColor: colors.border },
 });

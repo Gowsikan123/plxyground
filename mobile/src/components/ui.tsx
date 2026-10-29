@@ -75,7 +75,7 @@ interface FieldProps extends TextInputProps {
   error?: string;
 }
 
-export const TextField = forwardRef<TextInput, FieldProps>(function TextField({ label, error, ...input }, ref) {
+export const TextField = forwardRef<TextInput, FieldProps>(function TextField({ label, error, style, ...input }, ref) {
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -83,8 +83,8 @@ export const TextField = forwardRef<TextInput, FieldProps>(function TextField({ 
         ref={ref}
         accessibilityLabel={label}
         placeholderTextColor={colors.textMuted}
-        style={[styles.input, error ? styles.inputError : null]}
         {...input}
+        style={[styles.input, error ? styles.inputError : null, style]}
       />
       {error ? <Text style={styles.errorText} accessibilityLiveRegion="polite">{error}</Text> : null}
     </View>

@@ -1,5 +1,6 @@
 import { request } from './client';
 import type {
+  AppNotification,
   Applicant,
   Application,
   Business,
@@ -7,9 +8,13 @@ import type {
   CreatorAccount,
   CreatorList,
   Opportunity,
+  Message,
   MyListing,
   OpportunityList,
+  Post,
   PostList,
+  Thread,
+  UnreadCounts,
 } from './types';
 
 // ---- Auth --------------------------------------------------------------------
@@ -49,7 +54,7 @@ export const auth = {
 
   businessMe: () => request<Business>('/api/business/auth/me'),
 
-  updateBusiness: (input: Partial<Pick<Business, 'company_name' | 'industry' | 'website' | 'location' | 'bio'>>) =>
+  updateBusiness: (input: Partial<Pick<Business, 'company_name' | 'industry' | 'website' | 'location' | 'bio' | 'logo_url'>>) =>
     request<Business>('/api/business/auth/me', { method: 'PUT', body: input }),
 };
 
@@ -99,12 +104,50 @@ export const applications = {
 export const content = {
   feed: (params: { search?: string; sport?: string; limit?: number; offset?: number } = {}) =>
     request<PostList>('/api/content', { query: params }),
+
+  /** New posts go to moderation and appear in the feed once approved. */
+  create: (input: { title: string; body?: string; media_url?: string; media_type?: 'image' | 'none' }) =>
+    request<Post>('/api/content', { method: 'POST', body: input }),
 };
 
 export const creators = {
   list: (params: { search?: string; sport?: string; limit?: number; offset?: number } = {}) =>
     request<CreatorList>('/api/creators', { query: params }),
 
-  update: (creatorId: number, input: Partial<Pick<Creator, 'display_name' | 'bio' | 'sport' | 'location'>>) =>
+  update: (creatorId: number, input: Partial<Pick<Creator, 'display_name' | 'bio' | 'sport' | 'location' | 'avatar_url'>>) =>
     request<Creator>(`/api/creators/${creatorId}`, { method: 'PUT', body: input }),
+};
+
+// ---- Messages ------------------------------------------------------------------
+
+export const messages = {
+  threads: () => request<Thread[]>('/api/messages/threads'),
+
+  /** Returns the existing conversation with this person, or starts one. */
+  open: (recipientType: 'creator' | 'business', recipientId: number) =>
+    request<{ id: number }>('/api/messages/threads', {
+      method: 'POST',
+      body: { recipient_type: recipientType, recipient_id: recipientId },
+    }),
+
+  list: (threadId: number) => request<Message[]>(`/api/messages/threads/${threadId}`),
+
+  send: (threadId: number, body: string) =>
+    request<Message>(`/api/messages/threads/${threadId}`, { method: 'POST', body: { body } }),
+};
+
+// ---- Notifications ---------------------------------------------------------------
+
+export const notifications = {
+  list: () => request<AppNotification[]>('/api/notifications', { query: { limit: 50 } }),
+  unread: () => request<UnreadCounts>('/api/notifications/unread'),
+  markRead: (id: number) => request<void>(`/api/notifications/${id}/read`, { method: 'PUT' }),
+  readAll: () => request<void>('/api/notifications/read-all', { method: 'PUT' }),
+};
+
+// ---- Uploads ---------------------------------------------------------------------
+
+export const uploads = {
+  image: (base64: string, contentType: 'image/jpeg' | 'image/png' | 'image/webp' = 'image/jpeg') =>
+    request<{ url: string }>('/api/uploads', { method: 'POST', body: { data: base64, content_type: contentType } }),
 };
