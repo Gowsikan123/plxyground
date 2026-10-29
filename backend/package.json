@@ -27,12 +27,6 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "jest": {
-    "testEnvironment": "node",
-    "testMatch": [
-      "**/src/__tests__/**/*.test.js"
-    ]
-  },
   "devDependencies": {
     "jest": "^29.7.0",
     "pg": "^8.11.5",
