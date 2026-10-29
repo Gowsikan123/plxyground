@@ -79,6 +79,21 @@ test('business accepts the application', async () => {
   expect(res.body.data.status).toBe('accepted');
 });
 
+test('business sees its listing with application counts', async () => {
+  const res = await request(app).get('/api/opportunities/mine').set('Authorization', `Bearer ${businessToken}`);
+  expect(res.status).toBe(200);
+  const listing = res.body.data.find((o) => o.id === opportunityId);
+  expect(listing.application_count).toBe(1);
+});
+
+test('business updates its profile', async () => {
+  const res = await request(app).put('/api/business/auth/me')
+    .set('Authorization', `Bearer ${businessToken}`)
+    .send({ industry: 'Footwear', bio: 'We make shoes' });
+  expect(res.status).toBe(200);
+  expect(res.body.data.industry).toBe('Footwear');
+});
+
 test('creator post goes through moderation before it is public', async () => {
   const created = await request(app).post('/api/content')
     .set('Authorization', `Bearer ${creatorToken}`)

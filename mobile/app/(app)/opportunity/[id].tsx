@@ -5,7 +5,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ApiError } from '@/api/client';
 import { applications, opportunities } from '@/api/endpoints';
 import { useAuth } from '@/auth/store';
-import { Body, Button, CenteredState, Loading, Screen, Tag, TextField, Title } from '@/components/ui';
+import { Body, Button, CenteredState, Loading, Screen, StatusTag, Tag, TextField, Title } from '@/components/ui';
 import { colors, spacing, type } from '@/theme/tokens';
 
 export default function OpportunityDetail() {
@@ -21,10 +21,19 @@ export default function OpportunityDetail() {
     enabled: Number.isFinite(opportunityId),
   });
 
+  // Creators see where their existing application stands instead of the Apply form.
+  const myApplications = useQuery({
+    queryKey: ['applications', 'mine'],
+    queryFn: applications.mine,
+    enabled: role === 'creator',
+  });
+  const existing = myApplications.data?.find((a) => a.opportunity_id === opportunityId);
+
   const apply = useMutation({
     mutationFn: () => applications.apply(opportunityId, message.trim() || undefined),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['applications'] });
+      void queryClient.invalidateQueries({ queryKey: ['opportunities', 'mine'] });
     },
   });
 
@@ -60,8 +69,15 @@ export default function OpportunityDetail() {
 
         {role === 'creator' ? (
           <View style={styles.apply}>
-            {apply.isSuccess ? (
+            {existing ? (
+              <View style={{ gap: spacing.sm }}>
+                <Body>You applied on {new Date(existing.created_at).toLocaleDateString('en-GB')}.</Body>
+                <StatusTag status={existing.status} />
+              </View>
+            ) : apply.isSuccess ? (
               <Body>Application sent. The brand will see it in their dashboard.</Body>
+            ) : opp.status !== 'published' ? (
+              <Body muted>This opportunity is closed to new applications.</Body>
             ) : (
               <>
                 <TextField

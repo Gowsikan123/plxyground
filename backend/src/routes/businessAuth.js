@@ -95,6 +95,35 @@ router.post(
   }
 );
 
+// PUT /api/business/auth/me — update the signed-in brand's profile.
+router.put(
+  '/auth/me',
+  requireAuth,
+  [
+    body('company_name').optional().isLength({ min: 1, max: 80 }).withMessage('Company name must be 1-80 characters'),
+    body('website').optional({ values: 'falsy' }).isURL().withMessage('Website must be a valid URL'),
+    body('bio').optional().isLength({ max: 500 }).withMessage('Bio must be under 500 characters'),
+  ],
+  validationErrorHandler,
+  async (req, res) => {
+    if (req.userType !== 'business') {
+      return res.status(403).json({ success: false, error: 'Business access required' });
+    }
+    try {
+      const pick = (key) => (req.body[key] !== undefined ? req.body[key] : req.user[key]);
+      const [biz] = await sql`
+        UPDATE businesses
+        SET company_name = ${pick('company_name')}, industry = ${pick('industry')}, website = ${pick('website')},
+            location = ${pick('location')}, bio = ${pick('bio')}, updated_at = NOW()
+        WHERE id = ${req.user.id}
+        RETURNING id, email, company_name, slug, industry, website, location, logo_url, bio, is_verified`;
+      return res.json({ success: true, data: biz });
+    } catch (err) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+);
+
 // GET /api/business/auth/me
 router.get('/auth/me', requireAuth, (req, res) => {
   try {

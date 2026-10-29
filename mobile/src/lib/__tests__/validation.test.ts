@@ -1,4 +1,4 @@
-import { creatorSignupSchema, fieldErrors, password } from '../validation';
+import { creatorSignupSchema, fieldErrors, opportunitySchema, password } from '../validation';
 
 describe('password rules (match the API)', () => {
   it.each([
@@ -25,5 +25,13 @@ describe('creator sign-up', () => {
       expect(Object.keys(errors).sort()).toEqual(['displayName', 'email', 'password', 'username']);
       expect(errors.password).toBe('Use at least 8 characters');
     }
+  });
+});
+
+describe('opportunity form', () => {
+  it('drops empty optional fields and checks the date format', () => {
+    const ok = opportunitySchema.safeParse({ title: ' Ambassador ', description: 'Promote shoes', sport: '', deadline: '2026-12-01' });
+    expect(ok.success && ok.data).toEqual({ title: 'Ambassador', description: 'Promote shoes', deadline: '2026-12-01' });
+    expect(opportunitySchema.safeParse({ title: 'A', description: 'B', deadline: '01/12/2026' }).success).toBe(false);
   });
 });

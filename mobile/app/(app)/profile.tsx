@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '@/auth/store';
 import { Body, Button, Card, Screen, Tag, Title } from '@/components/ui';
@@ -32,9 +33,11 @@ export default function Profile() {
                 <Tag label="Brand" />
                 {session.user.industry ? <Tag label={session.user.industry} /> : null}
               </View>
+              {session.user.bio ? <View style={{ marginTop: spacing.md }}><Body>{session.user.bio}</Body></View> : null}
             </>
           )}
         </Card>
+        <Button label="Edit profile" onPress={() => router.push('/edit-profile')} />
         <Button label="Log out" variant="secondary" onPress={() => void logout()} />
       </ScrollView>
     </Screen>

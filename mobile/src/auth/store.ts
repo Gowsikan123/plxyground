@@ -44,10 +44,12 @@ interface AuthState {
     companyName: string;
     industry?: string;
   }) => Promise<void>;
+  /** Re-fetches the signed-in profile, e.g. after editing it. */
+  refreshProfile: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
-export const useAuth = create<AuthState>((set) => {
+export const useAuth = create<AuthState>((set, get) => {
   async function saveSession(session: Session) {
     await storage.set(JSON.stringify({ role: session.role, token: session.token }));
     set({ status: 'signedIn', token: session.token, session });
@@ -110,6 +112,11 @@ export const useAuth = create<AuthState>((set) => {
         industry,
       });
       await saveSession({ role: 'business', token, user: business });
+    },
+
+    refreshProfile: async () => {
+      const session = get().session;
+      if (session) await signInWithToken(session.role, session.token);
     },
 
     logout: async () => {

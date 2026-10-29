@@ -55,6 +55,24 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/opportunities/mine — the signed-in user's own listings, with application counts.
+router.get('/mine', requireAuth, async (req, res) => {
+  try {
+    const rows = await sql`
+      SELECT o.*,
+             COUNT(a.id)::int                                   AS application_count,
+             COUNT(a.id) FILTER (WHERE a.status = 'pending')::int AS pending_count
+      FROM opportunities o
+      LEFT JOIN applications a ON a.opportunity_id = o.id
+      WHERE o.posted_by_type = ${req.userType} AND o.posted_by_id = ${posterId(req)} AND o.status != 'deleted'
+      GROUP BY o.id
+      ORDER BY o.created_at DESC`;
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -98,6 +116,9 @@ router.put('/:id', requireAuth, async (req, res) => {
       WHERE id = ${parseInt(req.params.id, 10)} AND posted_by_type = ${req.userType} AND posted_by_id = ${posterId(req)}`;
     if (!opp) return res.status(404).json({ success: false, error: 'Opportunity not found or not yours' });
 
+    if (req.body.status !== undefined && !['published', 'closed'].includes(req.body.status)) {
+      return res.status(400).json({ success: false, error: 'status must be published or closed' });
+    }
     const pick = (key) => (req.body[key] !== undefined ? req.body[key] : opp[key]);
     const [updated] = await sql`
       UPDATE opportunities

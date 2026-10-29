@@ -1,10 +1,13 @@
 import { request } from './client';
 import type {
+  Applicant,
   Application,
   Business,
+  Creator,
   CreatorAccount,
   CreatorList,
   Opportunity,
+  MyListing,
   OpportunityList,
   PostList,
 } from './types';
@@ -45,6 +48,9 @@ export const auth = {
     }),
 
   businessMe: () => request<Business>('/api/business/auth/me'),
+
+  updateBusiness: (input: Partial<Pick<Business, 'company_name' | 'industry' | 'website' | 'location' | 'bio'>>) =>
+    request<Business>('/api/business/auth/me', { method: 'PUT', body: input }),
 };
 
 // ---- Opportunities -------------------------------------------------------------
@@ -63,6 +69,11 @@ export const opportunities = {
     budget?: string;
     deadline?: string;
   }) => request<Opportunity>('/api/opportunities', { method: 'POST', body: input }),
+
+  mine: () => request<MyListing[]>('/api/opportunities/mine'),
+
+  setStatus: (id: number, status: 'published' | 'closed') =>
+    request<Opportunity>(`/api/opportunities/${id}`, { method: 'PUT', body: { status } }),
 };
 
 // ---- Applications --------------------------------------------------------------
@@ -75,6 +86,12 @@ export const applications = {
     }),
 
   mine: () => request<Application[]>('/api/applications/mine'),
+
+  forOpportunity: (opportunityId: number) =>
+    request<Applicant[]>(`/api/applications/opportunity/${opportunityId}`),
+
+  decide: (applicationId: number, status: 'accepted' | 'rejected') =>
+    request<Application>(`/api/applications/${applicationId}/status`, { method: 'PUT', body: { status } }),
 };
 
 // ---- Content & creators --------------------------------------------------------
@@ -87,4 +104,7 @@ export const content = {
 export const creators = {
   list: (params: { search?: string; sport?: string; limit?: number; offset?: number } = {}) =>
     request<CreatorList>('/api/creators', { query: params }),
+
+  update: (creatorId: number, input: Partial<Pick<Creator, 'display_name' | 'bio' | 'sport' | 'location'>>) =>
+    request<Creator>(`/api/creators/${creatorId}`, { method: 'PUT', body: input }),
 };

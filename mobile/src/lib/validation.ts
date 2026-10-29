@@ -43,3 +43,41 @@ export function fieldErrors(error: z.ZodError): Record<string, string> {
   }
   return out;
 }
+
+/** Optional text field: trims, and turns an empty string into undefined. */
+const optionalText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max, `Keep it under ${max} characters`)
+    .optional()
+    .transform((v) => (v ? v : undefined));
+
+export const opportunitySchema = z.object({
+  title: z.string().trim().min(1, 'Give it a title').max(120, 'Keep it under 120 characters'),
+  description: z.string().trim().min(1, 'Describe the opportunity').max(4000, 'Keep it under 4,000 characters'),
+  sport: optionalText(40),
+  location: optionalText(80),
+  budget: optionalText(60),
+  deadline: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v ? v : undefined))
+    .refine((v) => v === undefined || /^\d{4}-\d{2}-\d{2}$/.test(v), 'Use the format YYYY-MM-DD'),
+});
+
+export const creatorProfileSchema = z.object({
+  name: z.string().trim().min(1, 'Enter your name').max(50, 'Keep it under 50 characters'),
+  bio: z.string().trim().max(500, 'Keep it under 500 characters'),
+  sport: z.string().trim().max(40),
+  location: z.string().trim().max(80),
+});
+
+export const businessProfileSchema = z.object({
+  name: z.string().trim().min(1, 'Enter your company name').max(80, 'Keep it under 80 characters'),
+  bio: z.string().trim().max(500, 'Keep it under 500 characters'),
+  industry: z.string().trim().max(60),
+  location: z.string().trim().max(80),
+  website: z.union([z.literal(''), z.string().trim().url('Enter a full URL, starting with https://')]),
+});

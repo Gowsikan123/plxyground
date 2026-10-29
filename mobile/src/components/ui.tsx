@@ -111,12 +111,21 @@ export function Card({ children, onPress, accessibilityLabel }: {
   );
 }
 
-export function Tag({ label }: { label: string }) {
+export function Tag({ label, tone = 'neutral' }: { label: string; tone?: 'neutral' | 'good' | 'warning' | 'bad' }) {
+  const color = { neutral: colors.textMuted, good: colors.success, warning: colors.warning, bad: colors.danger }[tone];
   return (
-    <View style={styles.tag}>
-      <Text style={styles.tagText}>{label}</Text>
+    <View style={[styles.tag, tone !== 'neutral' && { borderWidth: 1, borderColor: color }]}>
+      <Text style={[styles.tagText, { color }]}>{label}</Text>
     </View>
   );
+}
+
+const STATUS_TONE = { pending: 'warning', accepted: 'good', rejected: 'bad' } as const;
+const STATUS_LABEL = { pending: 'Pending', accepted: 'Accepted', rejected: 'Not selected' } as const;
+
+/** Application status as a coloured tag. */
+export function StatusTag({ status }: { status: keyof typeof STATUS_TONE }) {
+  return <Tag label={STATUS_LABEL[status]} tone={STATUS_TONE[status]} />;
 }
 
 // ---- States ---------------------------------------------------------------------

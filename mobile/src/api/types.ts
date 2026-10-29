@@ -43,6 +43,7 @@ export interface Business {
   location: string | null;
   logo_url: string | null;
   is_verified: boolean;
+  bio?: string | null;
 }
 
 export interface Poster {
@@ -103,6 +104,24 @@ export interface CreatorList {
   offset: number;
 }
 
+export interface MyListing extends Omit<Opportunity, 'poster'> {
+  application_count: number;
+  pending_count: number;
+}
+
+export interface Applicant {
+  id: number;
+  opportunity_id: number;
+  creator_id: number;
+  message: string | null;
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string;
+  display_name: string;
+  username: string;
+  slug: string;
+  avatar_url: string | null;
+}
+
 export interface Application {
   id: number;
   opportunity_id: number;
@@ -111,6 +130,8 @@ export interface Application {
   status: 'pending' | 'accepted' | 'rejected';
   created_at: string;
   opp_title?: string;
+  sport?: string | null;
+  budget?: string | null;
 }
 
 export type Session =
