@@ -1,6 +1,10 @@
 import { request } from './client';
 import type {
   AppNotification,
+  BlockedAccount,
+  ReportReason,
+  ReportTarget,
+  Role,
   Applicant,
   Application,
   Business,
@@ -150,4 +154,18 @@ export const notifications = {
 export const uploads = {
   image: (base64: string, contentType: 'image/jpeg' | 'image/png' | 'image/webp' = 'image/jpeg') =>
     request<{ url: string }>('/api/uploads', { method: 'POST', body: { data: base64, content_type: contentType } }),
+};
+
+// ---- Safety --------------------------------------------------------------------
+
+export const safety = {
+  report: (input: { target_type: ReportTarget; target_id: number; reason: ReportReason; details?: string }) =>
+    request<{ id: number }>('/api/safety/reports', { method: 'POST', body: input }),
+  blocks: () => request<BlockedAccount[]>('/api/safety/blocks'),
+  block: (type: Role, id: number) =>
+    request<void>('/api/safety/blocks', { method: 'POST', body: { blocked_type: type, blocked_id: id } }),
+  unblock: (type: Role, id: number) => request<void>(`/api/safety/blocks/${type}/${id}`, { method: 'DELETE' }),
+  /** Permanently deletes the signed-in account. The password confirms it's really them. */
+  deleteAccount: (password: string) =>
+    request<void>('/api/safety/delete-account', { method: 'POST', body: { password } }),
 };

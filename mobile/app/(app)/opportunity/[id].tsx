@@ -6,6 +6,7 @@ import { ApiError } from '@/api/client';
 import { applications, opportunities } from '@/api/endpoints';
 import { useAuth } from '@/auth/store';
 import { Avatar } from '@/components/Avatar';
+import { openReport } from '@/lib/chat';
 import { MessageButton } from '@/components/MessageButton';
 import { Body, Button, CenteredState, Loading, Screen, StatusTag, Tag, TextField, Title } from '@/components/ui';
 import { colors, spacing, type } from '@/theme/tokens';
@@ -14,6 +15,7 @@ export default function OpportunityDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const opportunityId = Number(id);
   const role = useAuth((s) => s.session?.role);
+  const myBusinessId = useAuth((s) => (s.session?.role === 'business' ? s.session.user.id : null));
   const queryClient = useQueryClient();
   const [message, setMessage] = useState('');
 
@@ -108,6 +110,11 @@ export default function OpportunityDetail() {
                 <Button label="Apply" onPress={() => apply.mutate()} loading={apply.isPending} />
               </>
             )}
+          </View>
+        ) : null}
+        {opp.posted_by_type === 'business' && opp.posted_by_id !== myBusinessId ? (
+          <View style={{ marginTop: spacing.xl }}>
+            <Button label="Report this opportunity" variant="ghost" onPress={() => openReport('opportunity', opp.id, opp.title)} />
           </View>
         ) : null}
       </ScrollView>

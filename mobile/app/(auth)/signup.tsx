@@ -4,6 +4,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 're
 import { ApiError } from '@/api/client';
 import type { Role } from '@/api/types';
 import { useAuth } from '@/auth/store';
+import { Agreement } from '@/components/Agreement';
 import { RolePicker } from '@/components/RolePicker';
 import { Body, Button, Screen, TextField, Title } from '@/components/ui';
 import { businessSignupSchema, creatorSignupSchema, fieldErrors } from '@/lib/validation';
@@ -23,6 +24,7 @@ export default function Signup() {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [agreed, setAgreed] = useState(false);
   const signupCreator = useAuth((s) => s.signupCreator);
   const signupBusiness = useAuth((s) => s.signupBusiness);
 
@@ -30,6 +32,7 @@ export default function Signup() {
 
   async function submit() {
     setErrors({});
+    if (!agreed) return setErrors({ agreement: 'Tick the box to continue.' });
     setSubmitting(true);
     try {
       if (role === 'creator') {
@@ -102,7 +105,9 @@ export default function Signup() {
           <Body muted>At least 8 characters, with an uppercase letter and a number.</Body>
           {errors.form ? <><View style={{ height: spacing.md }} /><Body>{errors.form}</Body></> : null}
 
-          <View style={{ height: spacing.xl }} />
+          <View style={{ height: spacing.lg }} />
+          <Agreement checked={agreed} onChange={setAgreed} error={errors.agreement} />
+          <View style={{ height: spacing.lg }} />
           <Button label="Create account" onPress={submit} loading={submitting} />
           <Button label="I already have an account" variant="ghost" onPress={() => router.replace({ pathname: '/login', params: { role } })} />
         </ScrollView>

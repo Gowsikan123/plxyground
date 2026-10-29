@@ -5,6 +5,9 @@ const sql = require('../db/client');
 const { requireAuth } = require('../middleware/auth');
 const { validationErrorHandler } = require('../middleware/validate');
 const logger = require('../logger');
+const { isBlockedBetween } = require('../utils/blocks');
+
+const BLOCKED = 'You can no longer message this account.';
 
 const router = express.Router();
 
@@ -54,8 +57,12 @@ router.get('/threads', requireAuth, async (req, res) => {
                WHERE thread_id = m.id AND is_read = FALSE
                  AND NOT (sender_type = ${type} AND sender_id = ${id})) AS unread_count
       FROM mine m
+      LEFT JOIN blocks bl ON
+           (bl.blocker_type = ${type} AND bl.blocker_id = ${id} AND bl.blocked_type = m.other_type AND bl.blocked_id = m.other_id)
+        OR (bl.blocked_type = ${type} AND bl.blocked_id = ${id} AND bl.blocker_type = m.other_type AND bl.blocker_id = m.other_id)
       LEFT JOIN creators   c ON m.other_type = 'creator'  AND c.id = m.other_id
       LEFT JOIN businesses b ON m.other_type = 'business' AND b.id = m.other_id
+      WHERE bl.blocker_id IS NULL
       ORDER BY COALESCE(m.last_message_at, m.created_at) DESC`;
     return res.json({ success: true, data: rows });
   } catch (err) {
@@ -85,6 +92,9 @@ router.post(
         ? await sql`SELECT id FROM creators WHERE id = ${recipientId}`
         : await sql`SELECT id FROM businesses WHERE id = ${recipientId}`;
       if (!recipient.length) return res.status(404).json({ success: false, error: 'That account no longer exists.' });
+      if (await isBlockedBetween({ type, id }, { type: recipientType, id: recipientId })) {
+        return res.status(403).json({ success: false, error: BLOCKED });
+      }
 
       const [existing] = await sql`
         SELECT * FROM message_threads WHERE
@@ -143,6 +153,12 @@ router.post(
       const thread = await loadThreadFor(req, res);
       if (!thread) return undefined;
       const { type, id } = me(req);
+      const other = thread.participant_a_type === type && thread.participant_a_id === id
+        ? { type: thread.participant_b_type, id: thread.participant_b_id }
+        : { type: thread.participant_a_type, id: thread.participant_a_id };
+      if (await isBlockedBetween({ type, id }, other)) {
+        return res.status(403).json({ success: false, error: BLOCKED });
+      }
 
       const [msg] = await sql`
         INSERT INTO messages (thread_id, sender_type, sender_id, body)

@@ -69,8 +69,11 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   }
 
   if (!response.ok || !payload || payload.success === false) {
-    if (response.status === 401 && token) onUnauthorized();
     const failure = (payload ?? {}) as ApiFailure;
+    // A dead token, or an account an admin has suspended, signs the user out.
+    if (token && (response.status === 401 || (response.status === 403 && failure.error === 'Account suspended'))) {
+      onUnauthorized();
+    }
     const message =
       failure.error ?? failure.errors?.[0]?.message ?? `Request failed (${response.status})`;
     throw new ApiError(message, response.status, failure.errors ?? []);

@@ -40,6 +40,7 @@ export default function RootLayout() {
             <Stack.Protected guard={status === 'signedIn'}>
               <Stack.Screen name="(app)" />
             </Stack.Protected>
+            <Stack.Screen name="legal/[doc]" options={{ presentation: 'modal' }} />
           </Stack>
         )}
       </QueryClientProvider>

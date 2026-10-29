@@ -43,6 +43,17 @@ describe('request', () => {
     await expect(request('/api/auth/login')).rejects.toThrow('Valid email required');
   });
 
+  it('signs out when the account has been suspended, but not on other 403s', async () => {
+    const onUnauthorized = jest.fn();
+    configureClient({ getToken: () => 'tok', onUnauthorized });
+    mockFetch(403, { success: false, error: 'Creator access required' });
+    await expect(request('/api/content', { method: 'POST', body: {} })).rejects.toBeInstanceOf(ApiError);
+    expect(onUnauthorized).not.toHaveBeenCalled();
+    mockFetch(403, { success: false, error: 'Account suspended' });
+    await expect(request('/api/auth/me')).rejects.toBeInstanceOf(ApiError);
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+  });
+
   it('signs out on 401 when a token was sent', async () => {
     const onUnauthorized = jest.fn();
     configureClient({ getToken: () => 'expired', onUnauthorized });

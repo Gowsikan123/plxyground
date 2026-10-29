@@ -37,6 +37,9 @@ export default function AppLayout() {
       <Tabs.Screen name="edit-profile" options={{ href: null }} />
       <Tabs.Screen name="chat/[threadId]" options={{ href: null }} />
       <Tabs.Screen name="post/new" options={{ href: null }} />
+      <Tabs.Screen name="report" options={{ href: null }} />
+      <Tabs.Screen name="blocked" options={{ href: null }} />
+      <Tabs.Screen name="delete-account" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -164,3 +164,66 @@ test('non-admins cannot reach admin routes', async () => {
   const res = await request(app).get('/api/admin/users').set('Authorization', `Bearer ${creatorToken}`);
   expect(res.status).toBe(403);
 });
+
+describe('safety', () => {
+  let brandId;
+  let creatorId;
+
+  beforeAll(async () => {
+    brandId = (await request(app).get('/api/business/auth/me').set('Authorization', `Bearer ${businessToken}`)).body.data.id;
+    creatorId = (await request(app).get('/api/auth/me').set('Authorization', `Bearer ${creatorToken}`)).body.data.creator_id;
+  });
+
+  test('a report reaches the admin queue and can be dismissed', async () => {
+    const report = await request(app).post('/api/safety/reports').set('Authorization', `Bearer ${businessToken}`)
+      .send({ target_type: 'creator', target_id: creatorId, reason: 'spam', details: 'Test report' });
+    expect(report.status).toBe(201);
+
+    const list = await request(app).get('/api/admin/reports').set('Authorization', `Bearer ${adminToken}`);
+    const found = list.body.data.find((r) => r.id === report.body.data.id);
+    expect(found.target_label).toBe('Test Creator');
+    expect(found.reporter_name).toBe(`Brand ${run}`);
+
+    const done = await request(app).put(`/api/admin/reports/${found.id}`).set('Authorization', `Bearer ${adminToken}`)
+      .send({ status: 'dismissed' });
+    expect(done.status).toBe(200);
+  });
+
+  test('blocking stops messages both ways until unblocked', async () => {
+    const block = await request(app).post('/api/safety/blocks').set('Authorization', `Bearer ${businessToken}`)
+      .send({ blocked_type: 'creator', blocked_id: creatorId });
+    expect(block.status).toBe(201);
+
+    const open = await request(app).post('/api/messages/threads').set('Authorization', `Bearer ${creatorToken}`)
+      .send({ recipient_type: 'business', recipient_id: brandId });
+    expect(open.status).toBe(403);
+    const inbox = await request(app).get('/api/messages/threads').set('Authorization', `Bearer ${creatorToken}`);
+    expect(inbox.body.data).toHaveLength(0);
+
+    const unblock = await request(app).delete(`/api/safety/blocks/creator/${creatorId}`).set('Authorization', `Bearer ${businessToken}`);
+    expect(unblock.status).toBe(200);
+    const again = await request(app).post('/api/messages/threads').set('Authorization', `Bearer ${creatorToken}`)
+      .send({ recipient_type: 'business', recipient_id: brandId });
+    expect(again.status).toBe(200);
+  });
+
+  test('deleting an account needs the password and removes it', async () => {
+    const wrong = await request(app).post('/api/safety/delete-account').set('Authorization', `Bearer ${creatorToken}`)
+      .send({ password: 'not-it' });
+    expect(wrong.status).toBe(401);
+
+    const ok = await request(app).post('/api/safety/delete-account').set('Authorization', `Bearer ${creatorToken}`)
+      .send({ password });
+    expect(ok.status).toBe(200);
+
+    const me = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${creatorToken}`);
+    expect(me.status).toBe(401);
+    const login = await request(app).post('/api/auth/login').send({ email: `creator.${run}@test.local`, password });
+    expect(login.status).toBe(401);
+    const threads = await sql`
+      SELECT count(*)::int AS n FROM message_threads
+      WHERE (participant_a_type = 'creator' AND participant_a_id = ${creatorId})
+         OR (participant_b_type = 'creator' AND participant_b_id = ${creatorId})`;
+    expect(threads[0].n).toBe(0);
+  });
+});
