@@ -64,7 +64,15 @@ jobs:
 
       - name: Run tests
         working-directory: backend
-        run: npm test -- --reporters=default --reporters=github-actions --json --outputFile=jest-results.json
+        run: |
+          set +e
+          npm test -- --reporters=default --reporters=github-actions --json --outputFile=jest-results.json > test-output.txt 2>&1
+          code=$?
+          cat test-output.txt
+          if [ $code -ne 0 ]; then
+            echo "::error title=jest output::$(tail -c 3000 test-output.txt | sed ':a;N;$!ba;s/\n/%0A/g')"
+          fi
+          exit $code
 
       - name: Summarise test failures
         if: failure()
