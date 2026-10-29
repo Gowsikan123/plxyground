@@ -23,11 +23,22 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install
-        run: npm install --no-audit --no-fund
-
-      - name: Align packages with the Expo SDK
-        run: npx expo install --fix
+      - name: Install with SDK-matched versions
+        run: |
+          set +e
+          {
+            npm install --no-audit --no-fund &&
+            npx expo install expo-constants expo-dev-client expo-linking expo-router expo-secure-store expo-status-bar \
+              react react-dom react-native react-native-safe-area-context react-native-screens react-native-web &&
+            npx expo install jest-expo typescript @types/react -- --save-dev &&
+            npx expo install --fix
+          } > install-output.txt 2>&1
+          code=$?
+          cat install-output.txt
+          if [ $code -ne 0 ]; then
+            echo "::error title=install::$(grep -vE '^\s*$' install-output.txt | tail -c 3500 | sed ':a;N;$!ba;s/\n/%0A/g')"
+          fi
+          exit $code
 
       - name: Commit resolved versions and lockfile
         if: github.event_name == 'push' && github.ref != 'refs/heads/main'

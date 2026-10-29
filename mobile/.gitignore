@@ -10,3 +10,7 @@ android/
 *.mobileprovision
 .env*.local
 expo-env.d.ts
+install-output.txt
+check-output.txt
+dist-ios/
+dist-web/
