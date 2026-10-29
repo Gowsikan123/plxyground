@@ -64,7 +64,7 @@ jobs:
 
       - name: Run tests
         working-directory: backend
-        run: npm test
+        run: npm test -- --reporters=default --reporters=github-actions
 
   # ─────────────────────────────────────────
   # 2. Mobile app — dependency install + Expo health check
