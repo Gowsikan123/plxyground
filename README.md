@@ -30,8 +30,8 @@ I was the **sole developer**: API design, database schema, authentication, admin
 | Auth | JWT + role-based access control | Creator, business and admin roles |
 | Security | Helmet, CORS allow-list, rate limiting | Hardened public API |
 | Admin panel | HTML + vanilla JavaScript | Lightweight moderation dashboard |
-| Testing | Supertest (API), Playwright (admin E2E) | Auth, content, opportunities and admin login journeys |
-| CI | GitHub Actions | Lint, migration and test workflows across backend, app and admin panel |
+| Testing | Jest + Supertest (34 API tests), Playwright (admin E2E) | Includes a full brand → creator → admin moderation journey |
+| CI | GitHub Actions | Runs migrations and the API tests against Postgres 16 on Node 20 and 22 |
 | Hosting | Vercel | API and admin panel |
 
 ---
@@ -64,7 +64,7 @@ API reference: [`docs/openapi.yaml`](docs/openapi.yaml) · Design notes: [`docs/
 - **JWT auth + RBAC**: role middleware on every protected route
 - **Opportunities and applications**: brands create listings; creators browse and apply
 - **Moderation pipeline**: submission → admin review queue → bulk approve / reject / delete, with a timestamped audit log
-- **Automated tests**: Supertest API tests and Playwright end-to-end tests for the admin panel
+- **Automated tests**: 34 API tests against a real Postgres database on every push, plus Playwright tests for the admin panel
 
 ---
 
@@ -94,6 +94,15 @@ cd frontend
 npm install
 cp .env.example .env        # set EXPO_PUBLIC_API_URL to your machine's LAN IP
 npx expo start              # scan the QR code with Expo Go
+```
+
+### Running the tests
+```bash
+cd backend
+npm install
+# point DATABASE_URL at a local or throwaway Postgres database, then:
+npm run migrate
+npm test
 ```
 
 ### Creating an admin account
